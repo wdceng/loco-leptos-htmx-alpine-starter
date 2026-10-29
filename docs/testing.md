@@ -327,13 +327,16 @@ and an emulator's is the one of its Chrome's version
 (`prerequisites.md`).
 
 - **What only DevTools can do runs in Chrome and Edge:** the safe-area
-  insets, Reduce Motion asked for, a changed answer, a slow network,
-  memory. The other lanes skip those tests, each with its reason in the
-  lane's `skipped.txt`, counted apart in the summary.
+  insets, Reduce Motion asked for, a refused file, memory. The other lanes
+  skip those tests, each with its reason in the lane's `skipped.txt`,
+  counted apart in the summary.
+- **An answer is changed in the page itself** (`Page::answer_with`,
+  `window.fetch` wrapped, as the islands app on this stack does it): a
+  newer build, a gateway's 502, a 500, a slow answer, in every lane.
 - **A page's errors are heard in Chrome, Edge and Firefox**, Firefox's
-  through WebDriver BiDi's log (no CSP refusals there). Safari's driver
-  has neither DevTools nor BiDi, nor has Chrome's on an emulator: those
-  lanes hear none.
+  through WebDriver BiDi's log, its CSP refusals by a recorder that runs
+  before the page's own scripts. Safari's driver has neither DevTools nor
+  BiDi, nor has Chrome's on an emulator: those lanes hear none.
 - **A device's screen is its own:** a phone runs the phone's tests at its
   screen, a tablet skips them, and a test that sizes the page reads what
   the device has. A press there is a finger's tap.
@@ -352,11 +355,16 @@ and an emulator's is the one of its Chrome's version
 - **Moves** (`e2e/tests/moves.rs`): the lazy island wakes; a link moves in
   place with its title, the focus on `<main>` and the title read out; no
   field takes the focus on the way (htmx's refocus by `id`, blurred
-  first); Back restores the scroll; a 404 shows in the region; a refused
-  form swaps in, keeps the address and keeps the focus in its field; a
-  second press sends no second post; a sent form looks busy until its
-  answer (a slow network); a newer build and a gateway's 502 load plainly.
-  DevTools changes those two answers on their way in.
+  first); Back restores the scroll; a 404 and a 500 show in the region; a
+  refused form swaps in, keeps the address and keeps the focus in its
+  field; a second press sends no second post; a sent form looks busy until
+  its slow answer; a newer build and a gateway's 502 load plainly; a move
+  fetches no WASM again and starts the page at its top, never passing
+  below; a desktop's move is asked for at the mouse's press, a hover
+  asking nothing.
+- **Blocked** (`e2e/tests/blocked.rs`, Chrome and Edge): with htmx refused
+  a link and a form are page loads; with Alpine or the WASM refused a move
+  and a refused form still stay in place.
 - **Memory** (`e2e/tests/memory.rs`): an island that leaves is freed; twenty
   moves and twenty Back and Forward steps keep the documents, detached
   nodes, listeners, JS heap and WASM memory flat, measured three times.
@@ -368,11 +376,14 @@ and an emulator's is the one of its Chrome's version
   header and the skip link below a 59px status bar and back (skipped
   there too), the
   Reduce Motion rule as the browser read it and a transition stopped by
-  it, twenty loads in one tab each with its islands awake.
+  it, twenty loads in one tab each with its islands awake, no script
+  error or CSP refusal (a recorder before the page's scripts), and the
+  skip link first on Tab, leading to `<main>`.
 - **Every test fails on a page error**: an exception, a console error or
   warning, a CSP refusal. A test that causes a failed load on purpose
   names its status and page (`page.allow_failed_load(404, "/no-such-page")`);
-  any other line still fails it.
+  any other line still fails it. A test that refuses a script expects its
+  dependants' errors (`page.allow_errors()`).
 
 What a failed test's page showed (screenshot, HTML, the server log's tail,
 and every line the page logged) is in `target/e2e/<lane>/failures/`.
@@ -380,15 +391,17 @@ and every line the page logged) is in `target/e2e/<lane>/failures/`.
 - **The memory tests turn DevTools' log off.** It keeps every element a
   log entry names, and Chrome notes the reset form on each visit, which
   looked like a leak of one `<main>` per Back.
-- **A changed answer keeps DevTools pausing answers for the session.**
-  Turned off mid-test, Chrome 114 left a paused wasm fetch hanging, and
-  the next page's islands never started.
-- **A press is a mouse's at a measured point** (`Page::press`): through
-  DevTools in Chrome and Edge, WebDriver's own pointer in Firefox, held
-  300 ms so it preloads, as a person's does. Never the driver's element:
-  chromedriver keeps each one it hands a test, and that holds the old page
-  in memory. Safari's driver sends no `mousedown`, so there it's the
-  page's own events, nothing held.
+- **Count a page's requests where they leave, `window.fetch` wrapped.**
+  Chrome lists a request among the page's resources
+  (`performance.getEntriesByType`) only once its answer is read, and a
+  press's preload waits unread for the click.
+- **A press is a mouse's at a measured point** (`Page::press`, built on
+  `hold` and `let_go`): through DevTools in Chrome and Edge, WebDriver's
+  own pointer in Firefox, held 300 ms so it preloads, as a person's does.
+  Never the driver's element: chromedriver keeps each one it hands a test,
+  and that holds the old page in memory. Safari's driver sends no
+  `mousedown`, so there it's the page's own events, nothing held; on a
+  device a finger's tap.
 
 ## Manual Testing
 
@@ -696,7 +709,9 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
 5. **A link that leaves the site:** a tap on a phone number opens the
    dialer, on a mail address the mail app, on another site the browser,
    and the page is still there when you come back (`for_the_system`,
-   `src-tauri/src/lib.rs`).
+   `src-tauri/src/lib.rs`). **On the iPhone and iPad, a real tap only.**
+   WebKit drops a script's click on a link that opens a new tab as a
+   popup, before the app is asked, so it proves nothing either way.
 
 **Until `SITE` is a real site, the app built by hand stops at "The site
 isn't reachable right now"** (example.com has no `/up`). The pictures
@@ -749,9 +764,6 @@ The installed geckodriver drives Firefox from 115 on. Local only, never in
 `ci.yaml`. In Chrome 114 the two leak tests and the two inset tests skip,
 saying why (no `DOM.getDetachedDomNodes`, no safe-area insets); the rest
 run.
-
-- **htmx's `fetch()` is resource type `XHR` in Chrome 114,** `Fetch` in
-  155: the harness pauses both, or a changed answer never reaches the page.
 
 | Browser | Low bar | Why that version |
 |---|---|---|

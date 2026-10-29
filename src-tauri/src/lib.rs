@@ -24,7 +24,15 @@ use tauri_plugin_opener::OpenerExt;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let started = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        // Without the plugin's own script for links to a new tab: it caught
+        // their click and asked the app over IPC, which the site may not, so
+        // such a link did nothing (an islands app on this stack, 2026-10-29).
+        // It now navigates like any other and `on_navigation` hands it over.
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .setup(|app| {
             let Some(window) = app.config().app.windows.first().cloned() else {
                 return Err("tauri.conf.json describes no window".into());

@@ -4,10 +4,14 @@
 //! `<main>` and the title read out; Back brings the page back where it was
 //! scrolled; a missing page shows in the region; a newer build and a
 //! gateway's error load the page plainly instead (`Navigation`,
-//! src/islands.rs). An answer changed on its way in and a slow network are
-//! DevTools': those run in Chrome and Edge and skip elsewhere, saying why.
+//! src/islands.rs). A move fetches no WASM again, starts the new page at
+//! its top at once, and a desktop's is asked for at the mouse's press,
+//! never at a hover. An answer is changed in the page itself
+//! ([`Page::answer_with`]), so every browser runs those.
 
-use app_e2e::{Answer, HOME_LINK, Page, RESET, WebDriverResult, browse};
+use std::time::Duration;
+
+use app_e2e::{HOME_LINK, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
 
 /// The home page's title, from a full load.
@@ -16,17 +20,14 @@ async fn home_title(page: &Page) -> WebDriverResult<String> {
     page.driver.title().await
 }
 
-/// From the reset page, the header's link home with htmx's answer changed
-/// as `answer` says: the home page must load whole, not swap in. The answer
-/// is changed through DevTools: skipped elsewhere.
-async fn loads_plainly(page: &Page, answer: Answer) -> WebDriverResult<()> {
-    if !page.browser.has_devtools() {
-        page.skip("no DevTools: no answer changed on its way in");
-        return Ok(());
-    }
+/// From the reset page, the header's link home with htmx's answer made by
+/// `answer` ([`Page::answer_with`]): the home page must load whole, not
+/// swap in. The browser asks the link's address itself then, which the
+/// real server answers.
+async fn loads_plainly(page: &Page, answer: &str) -> WebDriverResult<()> {
     page.open(RESET).await?;
     page.mark().await?;
-    page.answers(answer).await?;
+    page.answer_with("/", answer).await?;
     page.press(HOME_LINK).await?;
     page.until(
         "the home page loaded whole",
@@ -34,7 +35,6 @@ async fn loads_plainly(page: &Page, answer: Answer) -> WebDriverResult<()> {
              && document.readyState === 'complete'",
     )
     .await?;
-    page.answers(Answer::Plain).await?;
     page.ready().await
 }
 
@@ -162,8 +162,11 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
     .await;
 }
 
+/// A link to nothing shows the not-found page in the region; a page
+/// answered with a 500 shows in the region too (`PAGE_STATUSES`,
+/// src/views/layout.rs), the 500 made in the page ([`Page::answer_with`]).
 #[tokio::test]
-async fn a_missing_page_shows_in_the_region() {
+async fn a_404_and_a_500_are_shown_in_the_region() {
     browse(|page| async move {
         // The 404 asked for, which Chrome logs.
         page.allow_failed_load(404, "/no-such-page");
@@ -176,7 +179,24 @@ async fn a_missing_page_shows_in_the_region() {
             "return document.body.innerText.includes('Page not found')",
         )
         .await?;
-        assert!(page.in_place().await?, "no full load");
+        assert!(page.in_place().await?, "the 404 in place");
+        page.open("/").await?;
+        page.mark().await?;
+        page.answer_with(
+            RESET,
+            "const real = await original(...args);
+             const html = (await real.text()).replace('</main>', '<p id=\"e2e-500\">e2e 500</p></main>');
+             return new Response(html, { status: 500, headers: { 'Content-Type': 'text/html' } });",
+        )
+        .await?;
+        page.add_link(RESET).await?;
+        page.press("#e2e-link").await?;
+        page.until(
+            "the 500's page in the region",
+            "return !!document.getElementById('e2e-500')",
+        )
+        .await?;
+        assert!(page.in_place().await?, "the 500 in place");
         Ok(())
     })
     .await;
@@ -184,7 +204,17 @@ async fn a_missing_page_shows_in_the_region() {
 
 #[tokio::test]
 async fn a_newer_build_loads_the_next_page_plainly() {
-    browse(|page| async move { loads_plainly(&page, Answer::NewerBuild).await }).await;
+    browse(|page| async move {
+        loads_plainly(
+            &page,
+            "const real = await original(...args);
+             const headers = new Headers(real.headers);
+             headers.set('X-Build', 'e2e-newer');
+             return new Response(await real.text(), { status: real.status, headers });",
+        )
+        .await
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -266,14 +296,11 @@ async fn a_second_press_sends_no_second_post() {
 
 /// While the form is on its way, slower than 200 ms, it's `aria-busy` and
 /// its button takes the `busy:` look; the answer's page holds neither. The
-/// slow network is DevTools': skipped elsewhere.
+/// answer held back a second and a half in the page
+/// ([`Page::answer_with`]), so every browser runs it.
 #[tokio::test]
 async fn a_sent_form_looks_busy_until_its_answer() {
     browse(|page| async move {
-        if !page.browser.has_devtools() {
-            page.skip("no DevTools: no slow network");
-            return Ok(());
-        }
         // The e2e token is no real one: the post is refused as expired.
         page.allow_failed_load(400, "/reset");
         page.open(RESET).await?;
@@ -281,11 +308,11 @@ async fn a_sent_form_looks_busy_until_its_answer() {
         let idle = page
             .text(&format!("return getComputedStyle({button}).opacity"))
             .await?;
-        // A slow network: the answer takes longer than the look's delay.
-        page.devtools("Network.enable", json!({})).await?;
-        page.devtools(
-            "Network.emulateNetworkConditions",
-            json!({ "offline": false, "latency": 1500, "downloadThroughput": -1, "uploadThroughput": -1 }),
+        // A slow answer: longer than the look's delay.
+        page.answer_with(
+            "/reset",
+            "await new Promise(done => setTimeout(done, 1500));
+             return original(...args);",
         )
         .await?;
         page.eval(
@@ -322,9 +349,138 @@ async fn a_sent_form_looks_busy_until_its_answer() {
 #[tokio::test]
 async fn a_gateway_error_loads_the_link_plainly() {
     browse(|page| async move {
-        // The faked 502, which Chrome logs.
-        page.allow_failed_load(502, "/");
-        loads_plainly(&page, Answer::Status(502)).await
+        loads_plainly(
+            &page,
+            "return new Response('<!doctype html><title>502</title><h1>Bad gateway</h1>',
+                 { status: 502, headers: { 'Content-Type': 'text/html' } });",
+        )
+        .await
+    })
+    .await;
+}
+
+/// A move fetches no WASM again: the main file and the lazy island's come
+/// once, at the first load, however many moves follow.
+#[tokio::test]
+async fn a_move_fetches_no_wasm_again() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        let loaded = page.wasm_settled().await?;
+        page.add_link(RESET).await?;
+        page.move_to("#e2e-link", RESET).await?;
+        page.move_to(HOME_LINK, "/").await?;
+        assert!(page.in_place().await?, "every move in place");
+        assert!(page.says("Islands: running").await?, "the lazy island back");
+        assert_eq!(page.wasm_settled().await?, loaded, "no WASM fetched again");
+        Ok(())
+    })
+    .await;
+}
+
+/// A move starts the new page at its top at once (`show:top`,
+/// src/views/layout.rs), never passing below where the page stood on the
+/// way: every scroll of the move recorded by the page. A device's screen
+/// can't be made shorter: where the reset page fits it, skipped.
+#[tokio::test]
+async fn a_move_starts_at_the_top_at_once_never_below() {
+    browse(|page| async move {
+        page.viewport(800, 300).await?;
+        page.open(RESET).await?;
+        page.add_link("/").await?;
+        page.eval(
+            "document.documentElement.style.scrollBehavior = 'auto';
+             document.getElementById('e2e-link').scrollIntoView({ block: 'end' });
+             document.documentElement.style.scrollBehavior = ''",
+        )
+        .await?;
+        let from = page.eval("return Math.round(window.scrollY)").await?;
+        let from = from.as_i64().unwrap_or_default();
+        if from == 0 && page.browser.screen().is_some() {
+            page.skip("the reset page fits this device's screen: no scroll to start from");
+            return Ok(());
+        }
+        assert!(from > 0, "the reset page scrolls in 300 pixels");
+        // The link's own click: no scroll of the harness's on the way.
+        page.eval(
+            "window.__scrolls = [];
+             addEventListener('scroll', () => window.__scrolls.push(Math.round(scrollY)), { passive: true });
+             document.getElementById('e2e-link').click()",
+        )
+        .await?;
+        page.until("home", "return location.pathname === '/'")
+            .await?;
+        page.settled().await?;
+        page.until("home at its top", "return window.scrollY === 0")
+            .await?;
+        let scrolls = page.eval("return window.__scrolls").await?;
+        let deepest = scrolls
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_i64)
+            .max()
+            .unwrap_or(0);
+        assert!(
+            deepest <= from,
+            "the move passed below where the page stood ({from}): {scrolls}"
+        );
+        Ok(())
+    })
+    .await;
+}
+
+/// A desktop's move is asked for at the mouse's press, before the click
+/// (`PRELOAD`, src/views/layout.rs), and a hover asks nothing: one request
+/// a move, the click taking the press's. Counted where the requests leave,
+/// `window.fetch` wrapped: Chrome lists a request among the page's
+/// resources only once its answer is read, and the press's waits unread
+/// for the click (a probe, 2026-10-29). A real mouse's: Safari's driver and
+/// the devices skip it.
+#[tokio::test]
+async fn a_desktop_move_is_asked_for_at_the_press_and_a_hover_asks_nothing() {
+    browse(|page| async move {
+        if page.browser.is_safari() || page.browser.screen().is_some() {
+            page.skip("no real mouse to hover and press with");
+            return Ok(());
+        }
+        page.open("/").await?;
+        page.add_link(RESET).await?;
+        page.eval(&format!(
+            "window.__asked = 0;
+             const original = window.fetch.bind(window);
+             window.fetch = (...args) => {{
+                 const u = new URL(typeof args[0] === 'string' ? args[0] : args[0].url, location.href);
+                 if (u.pathname + u.search === {RESET:?}) window.__asked++;
+                 return original(...args);
+             }}"
+        ))
+        .await?;
+        let asked = "return window.__asked";
+        page.hover("#e2e-link").await?;
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert_eq!(
+            page.eval(asked).await?,
+            Value::from(0),
+            "a hover asks nothing"
+        );
+        let at = page.hold("#e2e-link").await?;
+        page.until("asked at the press", "return window.__asked === 1")
+            .await?;
+        assert_eq!(
+            page.path().await?,
+            "/",
+            "still home while the button is down"
+        );
+        page.let_go(at).await?;
+        page.until(
+            "the reset page",
+            &format!("return location.pathname + location.search === {RESET:?}"),
+        )
+        .await?;
+        page.settled().await?;
+        assert_eq!(page.eval(asked).await?, Value::from(1), "one request a move");
+        Ok(())
     })
     .await;
 }

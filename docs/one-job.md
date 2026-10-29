@@ -88,12 +88,13 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A browser test: a session in the lane's browser, its page, waits, memory | `browse`, `Page` (`open`, `until`, `still`, `move_to`, `held`) | `e2e/src/` |
 | Which browser a lane drives, and what it can do (DevTools or not) | `Browser` (`has_devtools`) | `e2e/src/browser.rs` |
 | A browser test that doesn't apply to this browser, said and counted | `Page::skip` | `e2e/src/page.rs` |
-| A press in a browser test: a mouse's, held for the preload, never the driver's element | `Page::press` | `e2e/src/page.rs` |
+| A press in a browser test: a mouse's, held for the preload, never the driver's element; its hover and its held button alone | `Page::press`, `Page::hover`, `Page::hold`, `Page::let_go` | `e2e/src/page.rs` |
+| One of the site's scripts refused in a browser test, its dependants' errors expected | `Page::block`, `Page::allow_errors` | `e2e/src/devtools.rs` |
 | The visitor's settings in a browser test (Reduce Motion) | `Page::emulate` | `e2e/src/devtools.rs` |
 | The accessibility audit | `Page::axe` (axe-core in `e2e/vendor/`) | `e2e/src/devtools.rs` |
 | The pages and links browser tests share | `RESET`, `HOME_LINK` | `e2e/src/lib.rs` |
 | A failed load a browser test causes on purpose | `Page::allow_failed_load` | `e2e/src/devtools.rs` |
-| An answer of htmx's changed in a browser test (a deploy, a gateway's error) | `Page::answers` with an `Answer` | `e2e/src/devtools.rs` |
+| An answer of htmx's changed in a browser test (a deploy, a gateway's error, a 500, a slow answer), in every browser | `Page::answer_with` (`window.fetch` wrapped) | `e2e/src/page.rs` |
 
 ## Server
 

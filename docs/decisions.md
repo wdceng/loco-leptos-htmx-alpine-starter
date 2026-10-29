@@ -197,6 +197,14 @@ change of mind gets a new line, and the old one moves to
   stays Chrome's and Edge's, skipped elsewhere with its reason; Firefox
   hears a page's errors through BiDi's log, Safari's driver and an
   emulator's Chrome can't.
+- 2026-10-29: **A browser test changes an answer in the page itself**
+  (`Page::answer_with`, `window.fetch` wrapped), as the islands app on
+  this stack does, no longer through DevTools' paused answers: the newer
+  build, the gateway's 502, a 500 and a slow answer run in all twenty
+  lanes, not in Chrome's and Edge's alone. Its tests that the starter has
+  the features for came with it: the skip link, the press's preload, no
+  WASM fetched again, the start at the top, a refused script, and a
+  recorder that hears Firefox's CSP refusals.
 - 2026-10-21: **A browser test presses as a person does:** the mouse
   through DevTools, held 300 ms so the press preloads, never the driver's
   element (the memory tests) nor a script's instant click, which hides the

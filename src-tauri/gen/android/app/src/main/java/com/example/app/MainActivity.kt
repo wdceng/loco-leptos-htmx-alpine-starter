@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.insets.GradientProtection
 import androidx.core.view.insets.ProtectionLayout
@@ -69,6 +71,11 @@ class MainActivity : TauriActivity() {
         if (HEX.matches(hex)) {
           color = Color.parseColor(hex)
           statusBar?.setColor(color)
+          // The clock and icons dark on a light colour and light on a dark
+          // one: Android sets them by the system's scheme once, at the start,
+          // and a day-night switch left them dark on a dark page.
+          WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = ColorUtils.calculateLuminance(color) > 0.5
         }
       }
     }

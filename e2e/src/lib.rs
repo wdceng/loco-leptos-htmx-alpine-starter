@@ -20,7 +20,7 @@ mod page;
 mod session;
 
 pub use browser::{Browser, Screen};
-pub use devtools::{Answer, Held};
+pub use devtools::Held;
 pub use page::Page;
 pub use session::browse;
 pub use thirtyfour::prelude::*;

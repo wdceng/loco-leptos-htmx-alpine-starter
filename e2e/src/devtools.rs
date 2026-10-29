@@ -1,11 +1,13 @@
 //! What the browsers' own tools give a test: Chrome's and Edge's DevTools
 //! over their own socket (thirtyfour's `cdp-events`; the driver passes
 //! commands on but no events), WebDriver BiDi's log in Firefox, and
-//! axe-core's accessibility audit. Through DevTools: what the page logs, an
-//! answer of htmx's changed on its way in, what the page holds in memory,
-//! the window's exact size and the visitor's settings emulated. Firefox's
-//! BiDi hears what the page logs; Safari's driver has neither, so there a
-//! page's errors go unheard.
+//! axe-core's accessibility audit. Through DevTools: what the page logs,
+//! what the page holds in memory, the window's exact size, the visitor's
+//! settings emulated, a file refused and a script run before the page's
+//! own. Firefox's BiDi hears what the page logs and runs that script;
+//! Safari's driver has neither, so there a page's errors go unheard. An
+//! answer is changed in the page itself, in every browser
+//! ([`Page::answer_with`]).
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -48,19 +50,6 @@ impl ExtensionCommand for EdgeDevTools {
 /// beside it (`e2e/vendor/`).
 const AXE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/vendor/axe-core-4.14.0.min.js");
 
-/// How htmx's answers reach the page from now on ([`Page::answers`]), as
-/// something between the browser and the site would change them.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Answer {
-    /// As the site sent them.
-    #[default]
-    Plain,
-    /// With another build's `X-Build`, as after a deploy.
-    NewerBuild,
-    /// With this status, as a gateway's error page.
-    Status(u16),
-}
-
 /// What the page holds after a garbage collection ([`Page::held`]).
 #[derive(Debug, Clone, Copy)]
 pub struct Held {
@@ -86,7 +75,8 @@ pub(crate) struct Heard {
     /// Failed loads a test causes on purpose: the status, and the full
     /// address Chrome's line ends with ([`Page::allow_failed_load`]).
     allowed: Vec<(u16, String)>,
-    answer: Answer,
+    /// Whether the test expects the page's errors ([`Page::allow_errors`]).
+    errors_expected: bool,
 }
 
 /// The shared state, locked briefly and never across an await.
@@ -99,9 +89,8 @@ fn lock(heard: &Shared) -> std::sync::MutexGuard<'_, Heard> {
 impl Page {
     /// The page on `driver`, listened to where the browser lets it be: in
     /// Chrome and Edge their DevTools session, the page's errors, warnings
-    /// and refused resources noted and htmx's answers passed on as
-    /// [`Page::answers`] says; in Firefox BiDi's log, its errors and
-    /// warnings noted; in Safari nothing.
+    /// and refused resources noted; in Firefox BiDi's log, its errors and
+    /// warnings noted; in Safari and on the devices nothing.
     pub(crate) async fn start(driver: WebDriver, run: &Run, test: &str) -> WebDriverResult<Self> {
         let heard = Shared::default();
         let (cdp, watcher) = match run.browser {
@@ -150,6 +139,9 @@ impl Page {
     /// What the page logged that wasn't allowed.
     pub(crate) fn problems(&self) -> Vec<String> {
         let heard = lock(&self.heard);
+        if heard.errors_expected {
+            return Vec::new();
+        }
         heard
             .problems
             .iter()
@@ -171,28 +163,46 @@ impl Page {
         lock(&self.heard).allowed.push((status, url));
     }
 
-    /// htmx's answers from now on, changed as `answer` says. Only requests
-    /// htmx makes (`HX-Request`) change; every other passes as it came.
-    /// Once on, the pausing stays on for the session, `Plain` passing each
-    /// answer on unchanged: turning it off while the watcher passed a
-    /// paused answer on left that request hanging in Chrome 114, a full
-    /// load's islands never starting (2026-10-21).
-    pub async fn answers(&self, answer: Answer) -> WebDriverResult<()> {
-        lock(&self.heard).answer = answer;
-        if answer == Answer::Plain {
-            return Ok(());
+    /// The page's errors expected for the rest of the test, so they don't
+    /// fail it: a test that refuses one of the site's scripts, whose
+    /// dependants then say so ([`Page::block`]).
+    pub fn allow_errors(&self) {
+        lock(&self.heard).errors_expected = true;
+    }
+
+    /// The files whose addresses match `patterns` (`*` any run of
+    /// characters) refused from now on, as a blocker or a failed download
+    /// would. Chrome's and Edge's alone, through DevTools: a test skips the
+    /// others first.
+    pub async fn block(&self, patterns: &[&str]) -> WebDriverResult<()> {
+        self.devtools("Network.enable", json!({})).await?;
+        self.devtools("Network.setBlockedURLs", json!({ "urls": patterns }))
+            .await
+            .map(drop)
+    }
+
+    /// Run `source` on every page this session loads from now on, before
+    /// the page's own scripts: DevTools' `Page.addScriptToEvaluateOnNewDocument`
+    /// in Chrome and Edge, on the driver's own session (sent on our socket,
+    /// it never ran: a probe, 2026-10-29), WebDriver BiDi's
+    /// `script.addPreloadScript` in Firefox. Safari's driver and the
+    /// devices' have neither.
+    pub async fn preload(&self, source: &str) -> WebDriverResult<()> {
+        if self.browser.has_devtools() {
+            return self
+                .driver_devtools(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    json!({ "source": source }),
+                )
+                .await
+                .map(drop);
         }
-        // htmx's `fetch()` is resource type `Fetch` in Chrome 155 and `XHR`
-        // in Chrome 114, the low bar (a probe, 2026-10-19).
-        self.devtools(
-            "Fetch.enable",
-            json!({ "patterns": [
-                { "urlPattern": "*", "resourceType": "Fetch", "requestStage": "Response" },
-                { "urlPattern": "*", "resourceType": "XHR", "requestStage": "Response" },
-            ] }),
-        )
-        .await
-        .map(drop)
+        let bidi = self.driver.bidi().await?;
+        bidi.script()
+            .add_preload_script(format!("() => {{ {source} }}"))
+            .await
+            .map(drop)
+            .map_err(|e| WebDriverError::RequestFailed(format!("a preload script: {e}")))
     }
 
     /// The page's size in CSS pixels, as near as the browser goes: exactly
@@ -391,7 +401,7 @@ async fn listen(driver: &WebDriver, heard: Shared) -> WebDriverResult<AbortHandl
 }
 
 /// Listen to the session's events until stopped: problems noted in
-/// `heard`, paused answers passed on.
+/// `heard`.
 fn watch(cdp: CdpSession, heard: Shared) -> AbortHandle {
     let mut events = cdp.subscribe_all();
     tokio::spawn(async move {
@@ -447,7 +457,6 @@ fn watch(cdp: CdpSession, heard: Shared) -> AbortHandle {
                         );
                     }
                 }
-                "Fetch.requestPaused" => pass_on(&cdp, &heard, params).await,
                 _ => {}
             }
         }
@@ -457,55 +466,4 @@ fn watch(cdp: CdpSession, heard: Shared) -> AbortHandle {
 
 fn note(heard: &Shared, problem: String) {
     lock(heard).problems.push(problem);
-}
-
-/// A paused answer passed on, changed when htmx asked for it and the test
-/// said so ([`Page::answers`]). A request that failed before an answer
-/// goes on unchanged. Best effort: an answer DevTools won't take is
-/// noted, so the test fails saying why.
-async fn pass_on(cdp: &CdpSession, heard: &Shared, params: &Value) {
-    let id = params["requestId"].clone();
-    if params.get("responseErrorReason").is_some() {
-        let _ = cdp
-            .send_raw("Fetch.continueRequest", json!({ "requestId": id }))
-            .await;
-        return;
-    }
-    let from_htmx = params["request"]["headers"]
-        .as_object()
-        .is_some_and(|headers| headers.keys().any(|k| k.eq_ignore_ascii_case("hx-request")));
-    let answer = if from_htmx {
-        lock(heard).answer
-    } else {
-        Answer::Plain
-    };
-    let mut code = params["responseStatusCode"].as_u64().unwrap_or(200);
-    let mut headers = params["responseHeaders"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-    match answer {
-        Answer::Plain => {}
-        Answer::NewerBuild => {
-            for header in &mut headers {
-                if header["name"]
-                    .as_str()
-                    .is_some_and(|name| name.eq_ignore_ascii_case("x-build"))
-                {
-                    header["value"] = Value::from("ffffffffffffffff");
-                }
-            }
-        }
-        Answer::Status(status) => code = u64::from(status),
-    }
-    // DevTools wants the status whenever the headers are given.
-    if let Err(e) = cdp
-        .send_raw(
-            "Fetch.continueResponse",
-            json!({ "requestId": id, "responseCode": code, "responseHeaders": headers }),
-        )
-        .await
-    {
-        note(heard, format!("passing an answer on: {e}"));
-    }
 }

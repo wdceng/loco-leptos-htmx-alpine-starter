@@ -25,6 +25,29 @@ use crate::{
 /// How long a finger rests on the screen in a tap.
 const TAP_HELD: Duration = Duration::from_millis(50);
 
+/// How long the WASM files fetched must stay the same to count as done
+/// coming ([`Page::wasm_settled`]).
+const WASM_QUIET: Duration = Duration::from_secs(1);
+
+/// One step of WebDriver's own pointer ([`Page::hold`] and the others).
+#[derive(Clone, Copy)]
+enum Step {
+    /// To a point in the window.
+    Move(f64, f64),
+    /// The button down.
+    Down,
+    /// Resting as it is.
+    Pause(Duration),
+    /// The button up.
+    Up,
+}
+
+/// What a test asking a browser with no real mouse for one gets: Safari's
+/// driver and the devices' have none (a test skips them first).
+fn no_mouse(browser: Browser) -> WebDriverError {
+    WebDriverError::RequestFailed(format!("no real mouse in {browser:?}"))
+}
+
 /// A browser session on the run's site.
 #[derive(Clone)]
 pub struct Page {
@@ -190,21 +213,28 @@ impl Page {
     /// the page cancels it, the focus off the field it was in, then the
     /// pointer up and the click; nothing held, so nothing preloaded.
     pub async fn press(&self, css: &str) -> WebDriverResult<()> {
-        self.still().await?;
-        let (x, y) = self.centre(css).await?;
         match self.browser {
-            Browser::Chrome | Browser::Edge => {
-                for kind in ["mouseMoved", "mousePressed"] {
-                    self.mouse(kind, x, y).await?;
-                }
+            Browser::Chrome | Browser::Edge | Browser::Firefox => {
+                let at = self.hold(css).await?;
                 tokio::time::sleep(PRESS_HELD).await;
-                self.mouse("mouseReleased", x, y).await
+                self.let_go(at).await
             }
-            Browser::Firefox => self.pointer("mouse", x, y, PRESS_HELD).await,
             Browser::Android | Browser::AndroidTablet => {
-                self.pointer("touch", x, y, TAP_HELD).await
+                self.still().await?;
+                let (x, y) = self.centre(css).await?;
+                self.pointer(
+                    "touch",
+                    &[
+                        Step::Move(x, y),
+                        Step::Down,
+                        Step::Pause(TAP_HELD),
+                        Step::Up,
+                    ],
+                )
+                .await
             }
             Browser::Safari | Browser::Iphone | Browser::Ipad | Browser::IpadAir => {
+                self.still().await?;
                 let pointer = if self.browser.is_simulator() {
                     "touch"
                 } else {
@@ -254,6 +284,52 @@ impl Page {
         }
     }
 
+    /// The mouse moved onto the first element `css` finds, its button up: a
+    /// hover. A desktop's real pointer alone (Chrome and Edge through
+    /// DevTools, Firefox through WebDriver's); a test skips the others.
+    pub async fn hover(&self, css: &str) -> WebDriverResult<()> {
+        self.still().await?;
+        let (x, y) = self.centre(css).await?;
+        match self.browser {
+            Browser::Chrome | Browser::Edge => self.mouse("mouseMoved", x, y).await,
+            Browser::Firefox => self.pointer("mouse", &[Step::Move(x, y)]).await,
+            other => Err(no_mouse(other)),
+        }
+    }
+
+    /// The mouse's button pressed on the first element `css` finds and
+    /// kept down, the page still first: where the press preloads its page
+    /// (`PRELOAD`, src/views/layout.rs) and nothing is clicked yet. Where
+    /// the button went down, for [`Page::let_go`]. As [`Page::hover`], a
+    /// desktop's real pointer alone.
+    pub async fn hold(&self, css: &str) -> WebDriverResult<(f64, f64)> {
+        self.still().await?;
+        let (x, y) = self.centre(css).await?;
+        match self.browser {
+            Browser::Chrome | Browser::Edge => {
+                for kind in ["mouseMoved", "mousePressed"] {
+                    self.mouse(kind, x, y).await?;
+                }
+            }
+            Browser::Firefox => {
+                self.pointer("mouse", &[Step::Move(x, y), Step::Down])
+                    .await?;
+            }
+            other => return Err(no_mouse(other)),
+        }
+        Ok((x, y))
+    }
+
+    /// The mouse's button [`Page::hold`] pressed let go where it went down:
+    /// the click.
+    pub async fn let_go(&self, (x, y): (f64, f64)) -> WebDriverResult<()> {
+        match self.browser {
+            Browser::Chrome | Browser::Edge => self.mouse("mouseReleased", x, y).await,
+            Browser::Firefox => self.pointer("mouse", &[Step::Up]).await,
+            other => Err(no_mouse(other)),
+        }
+    }
+
     /// One mouse event at (`x`, `y`), the left button's, through DevTools.
     async fn mouse(&self, kind: &str, x: f64, y: f64) -> WebDriverResult<()> {
         self.devtools(
@@ -264,29 +340,113 @@ impl Page {
         .map(drop)
     }
 
-    /// WebDriver's own pointer, a mouse's or a finger's (`kind`), at
-    /// (`x`, `y`) in the window, pressed, held for `held`, and let go: no
-    /// element handed over.
-    async fn pointer(&self, kind: &str, x: f64, y: f64, held: Duration) -> WebDriverResult<()> {
-        // Whole pixels in the window, as WebDriver's pointer takes them.
-        let (x, y) = (x.round() as i64, y.round() as i64);
-        let held = u64::try_from(held.as_millis()).unwrap_or(300);
-        let press = json!([{
+    /// WebDriver's own pointer, a mouse's or a finger's (`kind`), through
+    /// `steps` at points in the window: no element handed over. Its button
+    /// stays as the last step left it, down after a [`Step::Down`], until a
+    /// later [`Step::Up`].
+    async fn pointer(&self, kind: &str, steps: &[Step]) -> WebDriverResult<()> {
+        let actions: Vec<Value> = steps
+            .iter()
+            .map(|step| match *step {
+                // Whole pixels in the window, as WebDriver's pointer takes them.
+                Step::Move(x, y) => json!({
+                    "type": "pointerMove", "duration": 0, "origin": "viewport",
+                    "x": x.round() as i64, "y": y.round() as i64,
+                }),
+                Step::Down => json!({ "type": "pointerDown", "button": 0 }),
+                Step::Pause(held) => json!({
+                    "type": "pause",
+                    "duration": u64::try_from(held.as_millis()).unwrap_or(300),
+                }),
+                Step::Up => json!({ "type": "pointerUp", "button": 0 }),
+            })
+            .collect();
+        let steps = json!([{
             "type": "pointer",
             "id": kind,
             "parameters": { "pointerType": kind },
-            "actions": [
-                { "type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y },
-                { "type": "pointerDown", "button": 0 },
-                { "type": "pause", "duration": held },
-                { "type": "pointerUp", "button": 0 },
-            ],
+            "actions": actions,
         }]);
         self.driver
             .handle()
-            .cmd(Command::PerformActions(Actions::from(press)))
+            .cmd(Command::PerformActions(Actions::from(steps)))
             .await
             .map(drop)
+    }
+
+    /// Load `path` and wait for its document, nothing more: a page whose
+    /// htmx, Alpine or WASM is refused never becomes [`Page::ready`].
+    pub async fn load(&self, path: &str) -> WebDriverResult<()> {
+        self.driver.goto(self.url(path)).await?;
+        self.until(
+            &format!("{path} loaded"),
+            &format!(
+                "return location.pathname + location.search === {path:?}
+                     && document.readyState === 'complete'"
+            ),
+        )
+        .await
+    }
+
+    /// The answers to the site's `path` (its path and query, exactly) made
+    /// by `answer` from now on, `window.fetch` wrapped in the page: htmx
+    /// takes the window's fetch for each request, so every browser can,
+    /// with no DevTools (as an islands app on this stack does it). `answer`
+    /// is a script with `url`, `original` (the real fetch, bound) and `args`
+    /// in scope, ending in a `Response`; the made answer keeps the real
+    /// one's address, which the site's own handling reads. Every other
+    /// fetch, a lazy island's WASM among them, goes as it was. A whole page
+    /// load ends it.
+    pub async fn answer_with(&self, path: &str, answer: &str) -> WebDriverResult<()> {
+        self.eval(&format!(
+            "const original = window.fetch.bind(window);
+             window.fetch = async (...args) => {{
+                 const url = new URL(typeof args[0] === 'string' ? args[0] : args[0].url, location.href);
+                 if (url.origin !== location.origin || url.pathname + url.search !== {path:?}) {{
+                     return original(...args);
+                 }}
+                 const made = await (async () => {{ {answer} }})();
+                 Object.defineProperty(made, 'url', {{ value: url.href }});
+                 return made;
+             }}"
+        ))
+        .await
+        .map(drop)
+    }
+
+    /// How many WASM files the page has fetched, the main one and each lazy
+    /// island's.
+    pub async fn wasm_fetched(&self) -> WebDriverResult<u64> {
+        Ok(self
+            .eval(
+                "return performance.getEntriesByType('resource')
+                     .filter(e => new URL(e.name).pathname.endsWith('.wasm')).length",
+            )
+            .await?
+            .as_u64()
+            .unwrap_or_default())
+    }
+
+    /// [`Page::wasm_fetched`] once it has stood still for a second, the
+    /// lazy islands' files come: what a later move must not add to.
+    pub async fn wasm_settled(&self) -> WebDriverResult<u64> {
+        let started = tokio::time::Instant::now();
+        let mut count = self.wasm_fetched().await?;
+        let mut since = tokio::time::Instant::now();
+        while since.elapsed() < WASM_QUIET {
+            tokio::time::sleep(POLL).await;
+            let now = self.wasm_fetched().await?;
+            if now != count {
+                count = now;
+                since = tokio::time::Instant::now();
+            }
+            if started.elapsed() > WAIT {
+                return Err(WebDriverError::Timeout(format!(
+                    "the WASM still coming after {WAIT:?}"
+                )));
+            }
+        }
+        Ok(count)
     }
 
     /// A move in place by the link `css`, to `path`, waited for.
@@ -301,13 +461,14 @@ impl Page {
     }
 
     /// A link to `href` added to `<main>` as `#e2e-link`, boosted as the
-    /// page's own links are: htmx processes the region again.
+    /// page's own links are: htmx processes the region again, where htmx is
+    /// there (a test may have refused it).
     pub async fn add_link(&self, href: &str) -> WebDriverResult<()> {
         self.eval(&format!(
             "const a = document.createElement('a');
              a.href = {href:?}; a.id = 'e2e-link'; a.textContent = 'e2e';
              document.querySelector('main').append(a);
-             htmx.process(document.getElementById('page'))"
+             window.htmx?.process(document.getElementById('page'))"
         ))
         .await
         .map(drop)

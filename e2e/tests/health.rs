@@ -2,12 +2,13 @@
 //! tests"), each from an islands app on this stack: no sideways scroll at
 //! five widths, a phone's tap targets 44px tall, nothing the accessibility
 //! audit finds, a turned phone's camera side kept clear, the top clear of a
-//! status bar over the page, Reduce Motion read and obeyed, and the islands
-//! waking on every load in one tab. A new page goes into [`PAGES`]. What
+//! status bar over the page, Reduce Motion read and obeyed, the islands
+//! waking on every load in one tab, no script error or CSP refusal, and the
+//! skip link first on Tab. A new page goes into [`PAGES`]. What
 //! needs DevTools' emulation (the insets, Reduce Motion asked for) runs in
 //! Chrome and Edge and skips elsewhere, saying why.
 
-use app_e2e::{Page, RESET, WebDriverResult, browse};
+use app_e2e::{Browser, Key, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
 
 /// One page of each kind: the home page with its lazy island, a form, a
@@ -20,6 +21,90 @@ const MISSING: &str = "/no-such-page";
 /// The 404 [`MISSING`] asks for, which Chrome logs.
 fn expect_the_miss(page: &Page) {
     page.allow_failed_load(404, MISSING);
+}
+
+/// What goes wrong on a page, recorded by the page from before its own
+/// scripts run ([`Page::preload`]): a script's error, a refused load, a
+/// rejected promise, a CSP refusal, a console error. The harness hears the
+/// same in Chrome and Edge through DevTools; in Firefox only this hears the
+/// CSP's refusals.
+const RECORD_TROUBLE: &str = "window.__e2eTrouble = [];
+  const note = said => window.__e2eTrouble.push(said);
+  window.addEventListener('error', e => note('error: ' + (e.message || e.target?.src || e.target?.href || e.type)), true);
+  window.addEventListener('unhandledrejection', e => note('rejection: ' + e.reason));
+  document.addEventListener('securitypolicyviolation', e => note('csp: ' + e.violatedDirective + ' ' + e.blockedURI));
+  const error = console.error.bind(console);
+  console.error = (...said) => { note('console: ' + said.map(String).join(' ')); error(...said); };";
+
+/// No page has a script error or a CSP refusal, recorded by the page
+/// itself ([`RECORD_TROUBLE`]), the not-found page's own 404 aside. Where a
+/// script runs before the page's: Chrome and Edge, Firefox through BiDi.
+#[tokio::test]
+async fn no_page_has_a_script_error_or_a_csp_refusal() {
+    browse(|page| async move {
+        if !(page.browser.has_devtools() || page.browser == Browser::Firefox) {
+            page.skip("no script before the page's own in this driver");
+            return Ok(());
+        }
+        expect_the_miss(&page);
+        page.preload(RECORD_TROUBLE).await?;
+        let mut found = Vec::new();
+        for path in PAGES {
+            page.open(path).await?;
+            // The page's scripts a moment to run.
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let said = page
+                .eval("return window.__e2eTrouble ?? ['the recorder did not run']")
+                .await?;
+            for said in said.as_array().into_iter().flatten() {
+                let said = said.as_str().unwrap_or_default();
+                // The not-found page's own status, which the browser reports.
+                if path == MISSING && said.contains("404") {
+                    continue;
+                }
+                found.push(format!("{path}: {said}"));
+            }
+        }
+        assert!(found.is_empty(), "trouble:\n{}", found.join("\n"));
+        Ok(())
+    })
+    .await;
+}
+
+/// The skip link is the first thing Tab reaches, and Enter on it takes the
+/// focus to `<main>`. A real keyboard's: Safari reaches links by Tab only
+/// with a setting of its own, and the devices have none; skipped there.
+#[tokio::test]
+async fn the_skip_link_is_the_first_tab_and_leads_to_main() {
+    browse(|page| async move {
+        if page.browser.is_safari() || page.browser.screen().is_some() {
+            page.skip("no keyboard that tabs to links");
+            return Ok(());
+        }
+        page.open(RESET).await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Tab)
+            .perform()
+            .await?;
+        page.until(
+            "the skip link in focus",
+            "return document.activeElement?.getAttribute('href') === '#content'",
+        )
+        .await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Enter)
+            .perform()
+            .await?;
+        page.until(
+            "the focus on main",
+            "return document.activeElement?.tagName === 'MAIN'",
+        )
+        .await?;
+        Ok(())
+    })
+    .await;
 }
 
 /// DevTools' safe-area insets set to `insets`, or the test skipped where
