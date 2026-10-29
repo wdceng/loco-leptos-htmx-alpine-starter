@@ -40,7 +40,7 @@ and committed by a person.
 
 | Platform | What you get |
 |---|---|
-| Web | The site; tested in current Chrome and Chrome 114 |
+| Web | The site; tested in Chrome, Edge, Firefox and Safari, and in Chrome 114 and Firefox 128 |
 | iPhone, iPad | The Simulator; a real device; the App Store build |
 | Android | The emulator or a phone on USB; the Play Store bundle |
 | Windows | An `.exe`, built from the Mac |
