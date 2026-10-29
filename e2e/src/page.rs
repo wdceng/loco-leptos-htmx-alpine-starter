@@ -7,7 +7,7 @@
 //! tests would read as a leak (the sister app found it, 2026-10-10). A
 //! press is a mouse's at a point the page's script measured: through
 //! DevTools in Chrome and Edge, WebDriver's own pointer in Firefox, the
-//! page's own events in Safari ([`Page::press`]).
+//! page's own events in Safari; on a device a finger's ([`Page::press`]).
 
 use std::time::Duration;
 
@@ -18,8 +18,12 @@ use thirtyfour::prelude::*;
 use tokio::task::AbortHandle;
 
 use crate::{
-    AWAKE_WITHIN, Browser, OPEN_WITHIN, POLL, PRESS_HELD, WAIT, devtools::Shared, session::skipped,
+    AWAKE_WITHIN, Browser, OPEN_WITHIN, POLL, PRESS_HELD, Screen, WAIT, devtools::Shared,
+    session::skipped,
 };
+
+/// How long a finger rests on the screen in a tap.
+const TAP_HELD: Duration = Duration::from_millis(50);
 
 /// A browser session on the run's site.
 #[derive(Clone)]
@@ -179,10 +183,12 @@ impl Page {
     /// shows (tests/requests/races.rs). The page still first.
     ///
     /// Chrome and Edge through DevTools' mouse; Firefox through WebDriver's
-    /// own pointer at the same point. Safari's driver sends no `mousedown`,
-    /// so there the page's own events: the pointer down and, unless the page
-    /// cancels it, the focus off the field it was in, then the pointer up
-    /// and the click; nothing held, so nothing preloaded.
+    /// own pointer at the same point; an Android emulator's Chrome a
+    /// finger's tap there, WebDriver's touch pointer. safaridriver sends no
+    /// `mousedown`, so in Safari, on the Mac or in a Simulator, the page's
+    /// own events: the pointer down (a finger's in a Simulator) and, unless
+    /// the page cancels it, the focus off the field it was in, then the
+    /// pointer up and the click; nothing held, so nothing preloaded.
     pub async fn press(&self, css: &str) -> WebDriverResult<()> {
         self.still().await?;
         let (x, y) = self.centre(css).await?;
@@ -194,12 +200,20 @@ impl Page {
                 tokio::time::sleep(PRESS_HELD).await;
                 self.mouse("mouseReleased", x, y).await
             }
-            Browser::Firefox => self.pointer(x, y).await,
-            Browser::Safari => self
-                .eval(&format!(
+            Browser::Firefox => self.pointer("mouse", x, y, PRESS_HELD).await,
+            Browser::Android | Browser::AndroidTablet => {
+                self.pointer("touch", x, y, TAP_HELD).await
+            }
+            Browser::Safari | Browser::Iphone | Browser::Ipad | Browser::IpadAir => {
+                let pointer = if self.browser.is_simulator() {
+                    "touch"
+                } else {
+                    "mouse"
+                };
+                self.eval(&format!(
                     "const e = document.querySelector({css:?});
                      const kind = {{ bubbles: true, cancelable: true, composed: true,
-                                     pointerType: 'mouse', isPrimary: true }};
+                                     pointerType: {pointer:?}, isPrimary: true }};
                      if (e.dispatchEvent(new PointerEvent('pointerdown', kind))
                          && e.dispatchEvent(new MouseEvent('mousedown', kind))) {{
                        document.activeElement?.blur?.();
@@ -208,7 +222,8 @@ impl Page {
                      e.click()"
                 ))
                 .await
-                .map(drop),
+                .map(drop)
+            }
         }
     }
 
@@ -249,16 +264,17 @@ impl Page {
         .map(drop)
     }
 
-    /// WebDriver's own mouse at (`x`, `y`) in the window, its left button
-    /// pressed, held as a person's is, and let go: no element handed over.
-    async fn pointer(&self, x: f64, y: f64) -> WebDriverResult<()> {
+    /// WebDriver's own pointer, a mouse's or a finger's (`kind`), at
+    /// (`x`, `y`) in the window, pressed, held for `held`, and let go: no
+    /// element handed over.
+    async fn pointer(&self, kind: &str, x: f64, y: f64, held: Duration) -> WebDriverResult<()> {
         // Whole pixels in the window, as WebDriver's pointer takes them.
         let (x, y) = (x.round() as i64, y.round() as i64);
-        let held = u64::try_from(PRESS_HELD.as_millis()).unwrap_or(300);
+        let held = u64::try_from(held.as_millis()).unwrap_or(300);
         let press = json!([{
             "type": "pointer",
-            "id": "mouse",
-            "parameters": { "pointerType": "mouse" },
+            "id": kind,
+            "parameters": { "pointerType": kind },
             "actions": [
                 { "type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y },
                 { "type": "pointerDown", "button": 0 },
@@ -306,6 +322,23 @@ impl Page {
     /// Whether the document marked by [`Page::mark`] is still the one shown.
     pub async fn in_place(&self) -> WebDriverResult<bool> {
         Ok(self.eval("return window.__e2eMark === true").await? == Value::Bool(true))
+    }
+
+    /// The page at a phone's width for a test of the phone's layout: a
+    /// desktop browser's page sized to an iPhone's 390 by 844, a phone's
+    /// screen as it is. A tablet's layout isn't the phone's, so there the
+    /// test is skipped. Whether it may go on.
+    pub async fn phone(&self) -> WebDriverResult<bool> {
+        match self.browser.screen() {
+            None => self.viewport(390, 844).await.map(|()| true),
+            Some(Screen::Phone) => Ok(true),
+            Some(screen) => {
+                self.skip(&format!(
+                    "a phone's test, this device's screen a {screen:?}'s"
+                ));
+                Ok(false)
+            }
+        }
     }
 
     /// A test that does not apply to this browser, said and kept: the

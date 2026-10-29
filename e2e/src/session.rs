@@ -24,8 +24,11 @@ pub(crate) struct Run {
     pub(crate) driver: String,
     pub(crate) dir: String,
     pub(crate) headed: bool,
-    /// The browser a low-bar lane starts instead of the installed one
-    /// (`E2E_BINARY`), none for every other lane.
+    /// The device a device's lane started (`E2E_DEVICE`): the Simulator's
+    /// UDID or the emulator's adb serial; empty for a desktop browser.
+    pub(crate) device: String,
+    /// The browser a low-bar or beta lane starts instead of the installed
+    /// one (`E2E_BINARY`), none for every other lane.
     pub(crate) binary: Option<String>,
 }
 
@@ -44,6 +47,7 @@ impl Run {
             driver: var("E2E_DRIVER"),
             dir: var("E2E_DIR"),
             headed: std::env::var_os("E2E_HEADED").is_some(),
+            device: std::env::var("E2E_DEVICE").unwrap_or_default(),
             binary: std::env::var("E2E_BINARY")
                 .ok()
                 .filter(|binary| !binary.is_empty()),
@@ -95,23 +99,56 @@ where
     let session = || {
         WebDriver::new(
             run.driver.as_str(),
-            run.browser.capabilities(run.headed, run.binary.as_deref()),
+            run.browser
+                .capabilities(run.headed, &run.device, run.binary.as_deref()),
         )
     };
     let opened = match session().await {
         Ok(driver) => Ok(driver),
         // Safari still paired with a session that never closed (its test
-        // lost the driver mid-request) refuses every new one. Safari quit
-        // (the run's own, e2e/run.sh refusing to start beside an open one)
-        // frees it, and the session is asked again.
-        Err(e) if run.browser == Browser::Safari && e.to_string().contains("already paired") => {
-            eprintln!("Safari still paired, quit and asked again");
-            let _ = std::process::Command::new("osascript")
-                .args(["-e", "quit app \"Safari\""])
-                .status();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let _ = std::process::Command::new("pkill")
-                .args(["-x", "Safari"])
+        // lost the driver mid-request) refuses every new one. Safari quit,
+        // in that Simulator or on the Mac (the run's own, e2e/run.sh
+        // refusing to start beside an open one), frees it, and the session
+        // is asked again.
+        Err(e) if run.browser.is_safari() && e.to_string().contains("already paired") => {
+            eprintln!(
+                "{:?}: Safari still paired, quit and asked again",
+                run.browser
+            );
+            if run.browser.is_simulator() {
+                let _ = std::process::Command::new("xcrun")
+                    .args(["simctl", "terminate", &run.device, "com.apple.mobilesafari"])
+                    .status();
+            } else {
+                let _ = std::process::Command::new("osascript")
+                    .args(["-e", "quit app \"Safari\""])
+                    .status();
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let _ = std::process::Command::new("pkill")
+                    .args(["-x", "Safari"])
+                    .status();
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            session().await.map_err(|e| e.to_string())
+        }
+        // An emulator's Chrome gone after a long run of pages ("chrome not
+        // reachable"). Chrome stopped on the device starts afresh with the
+        // next session.
+        Err(e) if run.browser.is_android() && e.to_string().contains("chrome not reachable") => {
+            eprintln!(
+                "{:?}: Chrome not reachable, stopped and asked again",
+                run.browser
+            );
+            let adb = std::env::var("E2E_ADB").unwrap_or_else(|_| "adb".to_owned());
+            let _ = std::process::Command::new(adb)
+                .args([
+                    "-s",
+                    &run.device,
+                    "shell",
+                    "am",
+                    "force-stop",
+                    "com.android.chrome",
+                ])
                 .status();
             tokio::time::sleep(Duration::from_secs(2)).await;
             session().await.map_err(|e| e.to_string())
@@ -140,9 +177,9 @@ where
             panic!("{:?} session: {reason}", run.browser)
         }
     };
-    // Chrome and Edge open at their size (`--window-size`); the others'
-    // windows are sized here.
-    let sized = if run.browser.has_devtools() {
+    // Chrome and Edge open at their size (`--window-size`), a device's
+    // screen is its own; Firefox's and Safari's windows are sized here.
+    let sized = if run.browser.has_devtools() || run.browser.screen().is_some() {
         Ok(())
     } else {
         driver.set_window_rect(0, 0, 1280, 900).await

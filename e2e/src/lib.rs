@@ -19,7 +19,7 @@ mod devtools;
 mod page;
 mod session;
 
-pub use browser::Browser;
+pub use browser::{Browser, Screen};
 pub use devtools::{Answer, Held};
 pub use page::Page;
 pub use session::browse;
@@ -29,10 +29,11 @@ pub use thirtyfour::prelude::*;
 pub(crate) const WAIT: Duration = Duration::from_secs(30);
 
 /// How long a page has to start its scripts and wake its islands
-/// ([`Page::ready`]): with four lanes at once the Mac's cores are shared by
-/// four servers and four browsers, and Firefox and Safari took more than
-/// 30 seconds now and then to start a debug build's WASM in an islands app
-/// on this stack. A page that wakes sooner ends the wait sooner.
+/// ([`Page::ready`]): with nine lanes at once the Mac's cores are shared by
+/// nine servers, the browsers, Simulators and emulators, and Firefox and
+/// Safari took more than 30 seconds now and then to start a debug build's
+/// WASM in an islands app on this stack. A page that wakes sooner ends the
+/// wait sooner.
 pub(crate) const AWAKE_WITHIN: Duration = Duration::from_secs(60);
 
 /// How long a page has to start loading before it is asked for again.

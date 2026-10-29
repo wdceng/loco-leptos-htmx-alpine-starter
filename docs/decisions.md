@@ -181,14 +181,16 @@ change of mind gets a new line, and the old one moves to
   tests, local only. Firefox 128, iOS 17.5 and Android 15 are left to the
   apps (`docs/testing.md`, "The Low Bar"): the harness rests on Chrome's
   DevTools.
-- 2026-10-29: **The browser tests run in four browsers' lanes**
-  (`e2e/run.sh desktop`), as an islands app on this stack runs them:
-  Chrome, Edge, Firefox and Safari, each with its own site, driver and
-  folder, side by side through cargo-nextest, the boot first, a failure
-  retried once and called flaky. Firefox 128 joins Chrome 114 on the low
-  bar. What needs DevTools stays Chrome's and Edge's, skipped elsewhere
-  with its reason; Firefox hears a page's errors through BiDi's log,
-  Safari's driver can't. The phones' lanes wait.
+- 2026-10-29: **The browser tests run in twenty lanes**, as an islands app
+  on this stack runs them: nine on the top bar (Chrome, Edge, Firefox,
+  Safari, Safari on three iOS Simulators, Chrome on two Android
+  emulators), seven on the low bar (Chrome 114, Firefox 128, iOS 17.5,
+  Android 15), four on the beta bar. Each lane has its own site, driver
+  and folder; families run side by side through cargo-nextest, the boot
+  first, a failure retried once and called flaky. What needs DevTools
+  stays Chrome's and Edge's, skipped elsewhere with its reason; Firefox
+  hears a page's errors through BiDi's log, Safari's driver and an
+  emulator's Chrome can't.
 - 2026-10-21: **A browser test presses as a person does:** the mouse
   through DevTools, held 300 ms so the press preloads, never the driver's
   element (the memory tests) nor a script's instant click, which hides the

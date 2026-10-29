@@ -112,7 +112,9 @@ impl Page {
                 (Some(cdp), Some(watcher))
             }
             Browser::Firefox => (None, Some(listen(&driver, heard.clone()).await?)),
-            Browser::Safari => (None, None),
+            // Safari's driver, on the Mac or in a Simulator, and Chrome's
+            // on an emulator pass no page's errors on.
+            _ => (None, None),
         };
         let page = Self {
             driver,
@@ -196,8 +198,13 @@ impl Page {
     /// The page's size in CSS pixels, as near as the browser goes: exactly
     /// in Chrome and Edge (DevTools' device metrics); in Firefox and Safari
     /// the window sized round it, whose windows have a least width of their
-    /// own, so a test reads the width it got where it matters.
+    /// own, so a test reads the width it got where it matters; on a device
+    /// nothing, its screen being its own.
     pub async fn viewport(&self, width: u32, height: u32) -> WebDriverResult<()> {
+        // A device's screen is its own: the test reads what it has.
+        if self.browser.screen().is_some() {
+            return Ok(());
+        }
         if self.browser.has_devtools() {
             return self
                 .devtools(

@@ -269,26 +269,47 @@ wait two sweeps (2 s each in a debug build), and `data-islands-live` on
 
 ### Browser tests
 
-`e2e/` drives Chrome, Edge, Firefox and Safari over WebDriver (thirtyfour)
-against a real build: the moves in place, the memory and the health
-tests. A crate of its own, so `cargo test` in the root runs none of it.
-The lanes are an islands app's on this stack, without its phones yet.
+`e2e/` drives browsers over WebDriver (thirtyfour) against a real build:
+the moves in place, the memory and the health tests. A crate of its own,
+so `cargo test` in the root runs none of it. Twenty lanes, as an islands
+app on this stack runs them: nine on the top bar (the four desktop
+browsers, Safari on three iOS Simulators, Chrome on two Android
+emulators), seven on the low bar ("The Low Bar", below), four on the beta
+bar.
 
 ```bash
-e2e/run.sh desktop                      # the four browsers side by side, one summary
-e2e/run.sh chrome                       # one browser: chrome, edge, firefox or safari
-e2e/run.sh firefox memory               # its memory tests only (nextest's filter)
+e2e/run.sh all                          # the nine top lanes; at once on a 48 GB M1, else main then tablets
+e2e/run.sh desktop                      # Chrome, Edge, Firefox and Safari side by side
+e2e/run.sh main                         # the two phones and the four desktop browsers
+e2e/run.sh phones                       # the iPhone and the Android phone
+e2e/run.sh tablets                      # the iPad, the iPad Air upright and the Android tablet
+e2e/run.sh low                          # the low bar's seven, in two batches
+e2e/run.sh beta                         # the browsers' next releases
+e2e/run.sh chrome                       # one lane
+e2e/run.sh firefox memory               # one lane, its memory tests only (nextest's filter)
 E2E_HEADED=1 e2e/run.sh chrome moves    # with the browser's window
-E2E_LANES="chrome safari" e2e/run.sh desktop   # some of the lanes, side by side
+E2E_LANES="android chrome" e2e/run.sh main   # some lanes, side by side
 cargo test --manifest-path e2e/Cargo.toml --lib   # the harness's own tests, no browser
 ```
 
-| Lane | Site | Driver |
-|---|---|---|
-| `chrome` | 5160 | chromedriver, 9515 |
-| `edge` | 5161 | msedgedriver, 9516 |
-| `firefox` | 5162 | geckodriver, 9517 |
-| `safari` | 5163 | safaridriver, 9518 |
+| Lane | Site | Driver | Browser |
+|---|---|---|---|
+| `chrome` | 5160 | 9515 | Chrome |
+| `edge` | 5161 | 9516 | Edge |
+| `firefox` | 5162 | 9517 | Firefox |
+| `safari` | 5163 | 9518 | Safari |
+| `iphone` | 5164 | 9519 | Safari, iPhone 18 Pro Simulator, iOS 27.2 |
+| `ipad` | 5165 | 9520 | Safari, iPad Pro 13-inch (M5) Simulator |
+| `android` | 5166 | 9521 | Chrome, `android-phone` emulator on 5560 |
+| `android-tablet` | 5167 | 9522 | Chrome, `android-tablet` emulator on 5562 |
+| `ipad-air` | 5168 | 9523 | Safari, iPad Air 11-inch (M4) upright: the middle layout |
+| `chrome-beta` | 5176 | 9531 | Chrome for Testing, the Beta channel |
+| `edge-beta` | 5177 | 9532 | Edge Beta |
+| `firefox-beta` | 5178 | 9533 | Firefox Developer Edition |
+| `safari-beta` | 5179 | 9534 | Safari Technology Preview |
+
+Never two families at once, nor beside another project's lanes: they
+share the Simulators and the emulators.
 
 The script builds the site into `target/e2e` with `--split`, once. Each
 lane then starts its own site (`LOCO_ENV=e2e`, `config/e2e.yaml`, a fresh
@@ -301,15 +322,27 @@ watch`. Each lane's files are in `target/e2e/<lane>/`: `run.txt`,
 
 Chrome's driver is the one in `~/Library/Caches/chromedriver` (the
 collector's, above), or `CHROMEDRIVER`, or the one on the `PATH`; the
-others are on the `PATH` (`prerequisites.md`).
+others are on the `PATH`, the beta bar's in `~/Library/Caches/e2e-beta`,
+and an emulator's is the one of its Chrome's version
+(`prerequisites.md`).
 
 - **What only DevTools can do runs in Chrome and Edge:** the safe-area
   insets, Reduce Motion asked for, a changed answer, a slow network,
-  memory. Firefox and Safari skip those tests, each with its reason in the
+  memory. The other lanes skip those tests, each with its reason in the
   lane's `skipped.txt`, counted apart in the summary.
 - **A page's errors are heard in Chrome, Edge and Firefox**, Firefox's
   through WebDriver BiDi's log (no CSP refusals there). Safari's driver
-  has neither DevTools nor BiDi: its lane hears none.
+  has neither DevTools nor BiDi, nor has Chrome's on an emulator: those
+  lanes hear none.
+- **A device's screen is its own:** a phone runs the phone's tests at its
+  screen, a tablet skips them, and a test that sizes the page reads what
+  the device has. A press there is a finger's tap.
+- **The devices' lanes start their device and shut it down after:** a
+  Simulator by name on its runtime, an emulator cold, with no window, its
+  port reversed to the Mac's. A Simulator lane whose first session fails
+  tries once more with the Simulator and its driver started afresh, what
+  it saw in `boot-why.txt`; an emulator that crashes is named in the
+  summary with its report.
 - **Quit Safari before its lane.** safaridriver waits behind an open
   Safari's windows; the lane refuses to start beside one, and quits its
   own at the end.
@@ -690,19 +723,25 @@ WebKit after Safari's and the iOS webviews', and untested so far.
 
 ## The Low Bar
 
-The oldest browsers the template supports, about 30 months back. Chrome
-114 and Firefox 128 have lanes here; the phones' are findings from an
-islands app on this stack, kept for when the phones' lanes come.
+The oldest browsers the template supports, about 30 months back: each top
+lane's twin with `-low`, the same tests on another binary or device.
+Edge and the Mac's Safari have none: no old Edge to download, and Safari
+comes with macOS.
 
 ```bash
-e2e/run.sh low                # both side by side: chrome-low and firefox-low
+e2e/run.sh low                # the seven: the phones and the desktop's, then the tablets
 e2e/run.sh chrome-low moves   # one of them, nextest's filter as on a top lane
 ```
 
-| Lane | Site | Driver |
-|---|---|---|
-| `chrome-low` | 5169 | chromedriver 114, 9524 |
-| `firefox-low` | 5170 | geckodriver, 9525 |
+| Lane | Site | Driver | Browser |
+|---|---|---|---|
+| `chrome-low` | 5169 | 9524 | Chrome for Testing 114, chromedriver 114 |
+| `firefox-low` | 5170 | 9525 | Firefox 128 |
+| `iphone-low` | 5171 | 9526 | Safari, iPhone 15 Simulator, iOS 17.5 |
+| `ipad-low` | 5172 | 9527 | Safari, iPad Pro 13-inch (M4) Simulator, iOS 17.5 |
+| `ipad-air-low` | 5173 | 9528 | Safari, iPad Air 11-inch (M2) Simulator, iOS 17.5 |
+| `android-low` | 5174 | 9529 | Chrome 124, `android-phone-low` emulator on 5564, Android 15 |
+| `android-tablet-low` | 5175 | 9530 | Chrome 124, `android-tablet-low` emulator on 5566 |
 
 Chrome for Testing 114 with chromedriver 114, and Firefox 128, from
 `~/Library/Caches/e2e-floor/` (below), or another folder in `E2E_LOW`.

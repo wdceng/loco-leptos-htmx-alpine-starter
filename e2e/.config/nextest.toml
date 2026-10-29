@@ -38,8 +38,37 @@ inherits = "default"
 inherits = "default"
 [profile.safari]
 inherits = "default"
+[profile.iphone]
+inherits = "default"
+[profile.ipad]
+inherits = "default"
+[profile.android]
+inherits = "default"
+[profile.android-tablet]
+inherits = "default"
+[profile.ipad-air]
+inherits = "default"
 # The low bar's (e2e/run.sh).
 [profile.chrome-low]
 inherits = "default"
 [profile.firefox-low]
+inherits = "default"
+[profile.iphone-low]
+inherits = "default"
+[profile.ipad-low]
+inherits = "default"
+[profile.ipad-air-low]
+inherits = "default"
+[profile.android-low]
+inherits = "default"
+[profile.android-tablet-low]
+inherits = "default"
+# The beta bar's (e2e/run.sh).
+[profile.chrome-beta]
+inherits = "default"
+[profile.edge-beta]
+inherits = "default"
+[profile.firefox-beta]
+inherits = "default"
+[profile.safari-beta]
 inherits = "default"

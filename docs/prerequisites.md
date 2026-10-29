@@ -69,8 +69,9 @@ open the folder.
 ## Browsers
 
 The browser tests (`e2e/run.sh`, `docs/testing.md`) drive Chrome, Edge,
-Firefox and Safari through their drivers, with cargo-nextest (2.6) and
-bash 4.3 or newer (`brew install bash`; macOS's own is 3.2).
+Firefox and Safari through their drivers, Safari on the iOS Simulators and
+Chrome on Android emulators, with cargo-nextest (2.6) and bash 4.3 or
+newer (`brew install bash`; macOS's own is 3.2).
 
 ```bash
 V=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version | awk '{print $3}') && mkdir -p ~/Library/Caches/chromedriver && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver.zip && unzip -o -q /tmp/chromedriver.zip -d ~/Library/Caches/chromedriver   # Chrome's, matching it (again after a Chrome update)
@@ -86,6 +87,59 @@ V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundl
   restart of that app. Without it: "Could not find profile folder".
 - The low bar's Chrome 114 and Firefox 128: `docs/testing.md`, "The Low
   Bar".
+
+### The devices
+
+iPhone and iPad (Xcode from the App Store first):
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app && sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch   # Xcode's system parts
+xcodebuild -downloadPlatform iOS -buildVersion 27.2   # the iOS whose Simulator safaridriver drives (about 8 GB)
+A=$(grep -l 24B114 /System/Library/AssetsV2/com_apple_MobileAsset_iOSSimulatorRuntime/*.asset/Info.plist | head -1) && xcrun simctl runtime add "$(dirname "$A")"/AssetData/Restore/*.dmg   # once after the download: iOS 27.2 as a disk image
+xcrun simctl list devices 'iOS 27.2'   # an "iPhone 18 Pro", an "iPad Pro 13-inch (M5)" and an "iPad Air 11-inch (M4)"
+```
+
+- **After every Xcode update, `sudo xcodebuild -runFirstLaunch` again.**
+  Without Xcode's new parts safaridriver opens no session on any
+  Simulator.
+- **The runtime must be added as its disk image.** `-downloadPlatform`
+  installs a cryptex, on which safaridriver finds "no session hosts".
+  `24B114` is iOS 27.2's build: change it with the runtime.
+
+Android (the command-line tools, no Android Studio):
+
+```bash
+brew install --cask temurin android-commandlinetools   # Java and sdkmanager
+yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"   # an Android 17 image with Chrome
+echo no | avdmanager create avd -n android-phone -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10    # a Pixel 10, once
+echo no | avdmanager create avd -n android-tablet -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet   # a Pixel Tablet, once
+M=145 && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["milestones"][sys.argv[1]]["version"])' $M) && mkdir -p ~/Library/Caches/chromedriver-android/$M && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver-android.zip && unzip -oq /tmp/chromedriver-android.zip -d ~/Library/Caches/chromedriver-android/$M   # chromedriver for the emulator's Chrome, M its major version
+```
+
+- `e2e/run.sh` reads the emulator's Chrome version as it boots and names
+  the chromedriver it misses: fetch that `M`.
+- The low bar's iOS 17.5 and Android 15 emulators: `docs/testing.md`,
+  "The Low Bar".
+
+### The beta bar
+
+The browsers' next releases, beside the installed ones and never over
+them, Chrome for Testing and the drivers in `~/Library/Caches/e2e-beta`
+(`E2E_BETA`):
+
+```bash
+B=~/Library/Caches/e2e-beta && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["channels"]["Beta"]["version"])') && M=${V%%.*} && U=https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64 && mkdir -p "$B" && curl -fL -o "$B/c.zip" $U/chrome-mac-arm64.zip && mkdir -p "$B/chrome-$M" && ditto -x -k "$B/c.zip" "$B/chrome-$M" && curl -fL -o "$B/d.zip" $U/chromedriver-mac-arm64.zip && mkdir -p "$B/chromedriver-$M" && ditto -x -k "$B/d.zip" "$B/chromedriver-$M" && rm "$B/c.zip" "$B/d.zip"   # Chrome for Testing's Beta and its driver (again for a new Beta; the lane takes the highest)
+brew install --cask microsoft-edge@beta && V=$(defaults read "/Applications/Microsoft Edge Beta.app/Contents/Info.plist" CFBundleShortVersionString) && D=~/Library/Caches/e2e-beta/msedgedriver-${V%%.*} && mkdir -p "$D" && curl -fL -o "$D/e.zip" "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && ditto -x -k "$D/e.zip" "$D" && rm "$D/e.zip"   # Edge Beta and its driver (again after an Edge Beta update)
+brew install --cask firefox@developer-edition   # Firefox's Beta in an app of its own
+brew install --cask safari-technology-preview   # Safari's next WebKit, with its own safaridriver
+sudo "/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver" --enable   # once; then its Settings, Developer: "Allow remote automation"
+```
+
+- **A new Chrome for Testing asks macOS first** for Bluetooth and the
+  local network, and waits frozen until someone clicks Allow on that
+  Mac's screen. Run each new version once where someone can click.
+- Quit Safari Technology Preview before `safari-beta`, as Safari before
+  `safari`.
 
 ## 7. The App
 

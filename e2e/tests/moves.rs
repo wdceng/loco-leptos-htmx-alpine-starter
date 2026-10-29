@@ -114,6 +114,8 @@ async fn a_move_focuses_no_field_on_its_way() {
     .await;
 }
 
+/// A device's screen can't be made shorter: where the reset page fits it,
+/// there is no scroll to put back, and the test is skipped.
 #[tokio::test]
 async fn back_comes_back_in_place_where_it_was_scrolled() {
     browse(|page| async move {
@@ -128,6 +130,10 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
             .await?;
         let before = page.eval("return window.scrollY").await?;
         let before = before.as_f64().unwrap_or_default();
+        if before == 0.0 && page.browser.screen().is_some() {
+            page.skip("the reset page fits this device's screen: no scroll to put back");
+            return Ok(());
+        }
         assert!(before > 0.0, "the reset page scrolls in 300 pixels");
         page.move_to("#e2e-link", "/").await?;
         page.eval("history.back()").await?;

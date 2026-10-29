@@ -57,12 +57,18 @@ async fn the_islands_wake_on_every_load_in_one_tab() {
     .await;
 }
 
+/// Five widths in a desktop browser; a device's own screen once.
 #[tokio::test]
 async fn no_page_scrolls_sideways_at_five_widths() {
     browse(|page| async move {
         expect_the_miss(&page);
+        let widths: &[u32] = if page.browser.screen().is_some() {
+            &[0]
+        } else {
+            &[360, 600, 768, 1024, 1440]
+        };
         let mut found = Vec::new();
-        for width in [360, 600, 768, 1024, 1440] {
+        for &width in widths {
             page.viewport(width, 900).await?;
             for path in PAGES {
                 page.open(path).await?;
@@ -74,11 +80,11 @@ async fn no_page_scrolls_sideways_at_five_widths() {
                              .filter(e => e.getBoundingClientRect().right > width + 1)
                              .slice(0, 4).map(e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
                                  + ' ' + String(e.className).slice(0, 50)) : [];
-                         return { over, wide }",
+                         return { over, wide, width }",
                     )
                     .await?;
                 if seen["over"] == Value::Bool(true) {
-                    found.push(format!("{path} at {width}: {}", seen["wide"]));
+                    found.push(format!("{path} at {}: {}", seen["width"], seen["wide"]));
                 }
             }
         }
@@ -119,11 +125,14 @@ async fn small_targets(page: &Page) -> WebDriverResult<Vec<String>> {
         .unwrap_or_default())
 }
 
+/// At a phone's width ([`Page::phone`]): skipped on a tablet.
 #[tokio::test]
 async fn a_phones_tap_targets_are_44px_tall() {
     browse(|page| async move {
         expect_the_miss(&page);
-        page.viewport(390, 844).await?;
+        if !page.phone().await? {
+            return Ok(());
+        }
         let mut found = Vec::new();
         for path in PAGES {
             page.open(path).await?;
