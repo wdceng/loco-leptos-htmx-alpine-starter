@@ -300,6 +300,7 @@ src-tauri/linux.sh                                                              
 cd src-tauri && cargo tauri ios dev                                                     # iPhone or iPad Simulator: pick one from the list
 cd src-tauri && cargo tauri android dev                                                 # Android emulator (start one first) or a phone on USB
 src-tauri/screens.sh                                                                    # the app on the eight devices and this Mac against the dev loop, booted where not up, photographed; `--https://<site>` for another (testing.md, "The app on the phones")
+src-tauri/links.sh                                                                      # the links that leave the app tapped on the Android phone's emulator, each to its own app, the app staying (testing.md, "The app on the phones")
 cd src-tauri && cargo tauri ios build                                                   # the App Store build; needs your Apple team (below)
 cd src-tauri && cargo tauri android build --aab                                         # the Play Store bundle; needs your signing key
 cd src-tauri && cargo tauri icon ../public/favicon/android-chrome-512x512.png -o /tmp/app-icons   # the desktop icons again, after the site's icon changes
@@ -381,7 +382,8 @@ The phones:
   program and a Google Play listing, each with its signing.
 - **Android builds with Java 21, not a Mac's default 27:** Gradle 9.6.1
   fails on 27 ("Unsupported class file major version 71"). `screens.sh`
-  sets it; without the profile line (`prerequisites.md`), put
+  and `links.sh` set it (`devices.sh`); without the profile line
+  (`prerequisites.md`), put
   `JAVA_HOME=$(/usr/libexec/java_home -v 21)` on `cargo tauri android`.
 - **The start page waits with the site up?** Read the webview's console:
   "No 'Access-Control-Allow-Origin' header" means `/up` got something

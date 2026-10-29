@@ -196,4 +196,25 @@ mod tests {
             "no site known, the web stays"
         );
     }
+
+    /// The opener's own script for links to a new tab stays off (`run`):
+    /// it caught their click and asked the app over IPC, which the site may
+    /// not, and such a link did nothing (an islands app on this stack,
+    /// 2026-10-29). The plugin's `init` turns it on. Read from this file's
+    /// code above its tests.
+    #[test]
+    fn the_opener_leaves_links_to_a_new_tab_to_on_navigation() {
+        let code = include_str!("lib.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or_default();
+        assert!(
+            !code.contains("tauri_plugin_opener::init()"),
+            "the opener set up by init(), its link script on"
+        );
+        assert!(
+            code.contains(".open_js_links_on_click(false)"),
+            "the opener's link script not turned off"
+        );
+    }
 }

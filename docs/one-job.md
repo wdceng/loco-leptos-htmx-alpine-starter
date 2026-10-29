@@ -81,6 +81,8 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The app: a window on the live site, on desktops and phones | `src-tauri/`, `run` in `src/lib.rs`, its start page `offline/index.html`, the app's one script; the phones' projects in `gen/` | `src-tauri/` |
 | A link that leaves the site in the app (a call, a mail, a text, another app, another site), handed to the system | `for_the_system` in `src/lib.rs`, the site from `site_of` | `src-tauri/` |
 | Pictures of the app on each device `testing.md` lists, one at a time, booted where it is off | `screens.sh` | `src-tauri/` |
+| The app's links that leave it, tapped on the Android emulator | `links.sh` | `src-tauri/` |
+| What the device scripts share: the site, the builds with it, an emulator up with the app open, the devices shut down | `devices.sh` (sourced) | `src-tauri/` |
 | The Linux app, an AppImage built in a Docker box of Ubuntu 22.04 | `linux.sh`, `linux/Dockerfile` | `src-tauri/` |
 | The site on a phone without a store | the home-screen app (the web manifest), beside the store app by choice (`decisions.md`) | `src/controllers/manifest.rs` |
 | "Is the site up?" for another origin (the app's start page) | `/up`, `up::PATH`; Loco's `/_ping` for everything else, since it allows no other origin | `src/controllers/up.rs` |

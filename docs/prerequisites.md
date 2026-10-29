@@ -2,8 +2,9 @@
 
 It's all Rust to build and run, no Node.js. Tailwind, wasm-bindgen and
 wasm-opt are standalone binaries that cargo-leptos downloads on first use.
-Node 24+ runs one check only, the stylesheet's lint (`npm install` once,
-then `npm run lint`).
+Node 24+ runs two checks only: the stylesheet's lint (`npm install` once,
+then `npm run lint`) and `src-tauri/links.sh`, which reads the app's page
+with Node's WebSocket.
 
 Install commands are each tool's own. Your package manager works too.
 

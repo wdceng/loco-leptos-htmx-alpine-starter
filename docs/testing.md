@@ -643,10 +643,22 @@ the dev loop's by default.
 src-tauri/screens.sh                          # the dev loop's site (`host` in config/development.yaml): builds the app once a platform, then one device at a time: boots it if off, photographs the app, shuts it down if it booted it
 src-tauri/screens.sh --https://example.com    # another site, one a run
 src-tauri/screens.sh --turn                   # stopping at each Simulator for its sideways picture (⌘← in DeviceHub, then Enter)
+src-tauri/links.sh                            # the links that leave the app, tapped on android-phone-full: a call, a mail, a text, another site and one in a new tab, put into the home page, each to its own app, the app still on its page; exits 1 on a miss
 xcrun simctl boot "iPhone 18 Pro" && open /Applications/Xcode.app/Contents/Applications/DeviceHub.app   # by hand: a Simulator up, the same for each iPad
 A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd android-phone-full -gpu swiftshader_indirect >/dev/null 2>&1 &)   # by hand: an emulator up, the same for android-tablet-full
 ```
 
+- **`links.sh` after a change of how the app opens links**
+  (`src-tauri/src/lib.rs`, the opener plugin): the opener's own script
+  once left every link to a new tab dead (an islands app on this stack,
+  2026-10-29). Android alone: an iPhone needs a real tap, which no
+  Simulator takes from the terminal, so check 5 below by hand. The
+  starter's pages have no link that leaves the site, so it puts five into
+  the home page first. It reads the page through the webview's debugging
+  socket with Node, the stylesheet lint's.
+- **`devices.sh` is what both scripts share:** the site and its `/up`, the
+  builds with the run's site, an emulator started and the app opened on
+  it, the devices shut down again. Sourced, never run.
 - **The site is the run's alone:** the app is built with its address (a
   copy of the start page and the CSP's `connect-src`, merged by the CLI's
   `--config`); `offline/index.html` and `tauri.conf.json` stay as they
@@ -665,8 +677,8 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
 - The pictures land in `src-tauri/target/screens/`, emptied first: each
   device's `<device>-upright.png` and `<device>-sideways.png` at the page's
   top, each emulator's `<device>-bottom.png` at the page's foot too. The
-  builds' output goes to `src-tauri/target/screens-build.log`, printed
-  only when a build fails.
+  builds' output goes to `src-tauri/target/app-build.log` (`devices.sh`,
+  both scripts'), printed only when a build fails.
 - A device this Mac lacks is skipped with a line. One another project has
   up is used as it is and left running.
 - An emulator turns by itself. A Simulator has no command to turn or
