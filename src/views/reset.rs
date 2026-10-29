@@ -1,0 +1,102 @@
+//! The password-reset page the forgot-password mail links to
+//! (controllers/reset.rs): the form, and what it says after a post. Plain
+//! HTML, no island: the form posts and the server answers with a page.
+
+use leptos::prelude::*;
+
+use crate::{
+    controllers::reset::PATH,
+    models::users::{PASSWORD_MAX, PASSWORD_MIN, RESET_TOKEN_EXPIRATION_MIN},
+    views::layout::{FIELD, LEAD, Notice, PROBLEM, TITLE},
+};
+
+/// The `id` of the line saying why the password was refused.
+const PASSWORD_PROBLEM: &str = "password-problem";
+
+/// The form: the token from the mail's link in a hidden field, and the new
+/// password. `problem` is what the server refused last time, if anything;
+/// then the field is `autofocus`, so the focus stays in it for the next
+/// try: htmx focuses it in the swapped-in page, and `Navigation` leaves an
+/// `autofocus` field alone instead of focusing `<main>`.
+///
+/// A refused field is `aria-invalid` and points at its line
+/// (`aria-describedby`). As the visitor leaves a changed field, Alpine
+/// marks it the same way from the browser's own check (`minlength`,
+/// `maxlength`), and clears the mark once it passes.
+///
+/// While it's on its way: a second press sends nothing (`hx-sync`; htmx's
+/// default would queue one more post, which finds the token used up and
+/// swaps "expired" over "changed"), the form is `aria-busy`, and the
+/// button takes the `busy:` look after 200 ms, so a fast answer never
+/// shows it. Not `disabled`, the same words: the look alone.
+#[component]
+pub fn ResetForm(token: String, problem: Option<String>) -> impl IntoView {
+    let refused = problem.is_some();
+    view! {
+        <h1 class=TITLE>"Choose a new password"</h1>
+        <p class=LEAD>
+            {format!("{PASSWORD_MIN} to {PASSWORD_MAX} characters. Any characters work.")}
+        </p>
+        {problem
+            .map(|problem| {
+                view! {
+                    <p id=PASSWORD_PROBLEM role="alert" class=PROBLEM>
+                        {problem}
+                    </p>
+                }
+            })}
+        // Alpine's CSP build takes one expression per attribute.
+        <form
+            method="post"
+            action=PATH
+            class="mt-8 max-w-sm"
+            hx-sync="this:drop"
+            x-data="{ sending: false }"
+            x-on:htmx:before:request="sending = true"
+            x-on:htmx:finally:request="sending = false"
+            x-bind:aria-busy="sending"
+        >
+            <input type="hidden" name="token" value=token />
+            <label for="password" class="block font-semibold">"New password"</label>
+            <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                autofocus=refused
+                required
+                minlength=PASSWORD_MIN
+                maxlength=PASSWORD_MAX
+                aria-invalid=refused.then_some("true")
+                aria-describedby=refused.then_some(PASSWORD_PROBLEM)
+                x-data=if refused { "{ invalid: true }" } else { "{ invalid: false }" }
+                x-on:change="invalid = !$el.checkValidity()"
+                x-bind:aria-invalid="invalid"
+                class=FIELD
+            />
+            <button
+                type="submit"
+                class="mt-6 min-h-11 rounded-md bg-primary px-4 py-2 font-semibold text-white transition-opacity busy:pointer-events-none busy:opacity-60 busy:delay-200"
+            >
+                "Save the new password"
+            </button>
+        </form>
+    }
+}
+
+/// After a good post: the password is changed.
+#[component]
+pub fn ResetDone() -> impl IntoView {
+    view! {
+        <Notice heading="Your password is changed" lead="Sign in with the new one from now on." />
+    }
+}
+
+/// The link's token is unknown, used or expired.
+#[component]
+pub fn ResetExpired() -> impl IntoView {
+    let lead = format!(
+        "A reset link works once, for {RESET_TOKEN_EXPIRATION_MIN} minutes. Ask for a new one.",
+    );
+    view! { <Notice heading="This link has expired" lead /> }
+}

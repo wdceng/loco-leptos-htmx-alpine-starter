@@ -1,0 +1,247 @@
+# Loco configuration file documentation
+
+# Application logging configuration
+logger:
+  # Enable or disable logging.
+  enable: true
+  # Enable pretty backtrace (sets RUST_BACKTRACE=1)
+  pretty_backtrace: true
+  # Log level, options: trace, debug, info, warn or error.
+  level: <%= get_env(name="LOG_LEVEL", default="debug") %>
+  # Define the logging format. options: compact, pretty or json
+  format: compact
+  # By default the logger has filtering only logs that came from your code or logs that came from `loco` framework. to see all third party libraries
+  # Uncomment the line below to override to see all third party libraries you can enable this config and override the logger filters.
+  # override_filter: trace
+
+# Web server configuration
+server:
+  # Port on which the server will listen. the server binding is 0.0.0.0:{PORT}
+  # Every Loco app defaults to 5150, so a second one on this machine will
+  # collide. Override without editing this file: `PORT=5151 cargo loco start`.
+  port: <%= get_env(name="PORT", default="5150") %>
+  # Binding for the server (which interface to bind to)
+  binding: <%= get_env(name="BINDING", default="localhost") %>
+  # The public origin, the start of every link in outgoing mail. The port is
+  # part of it: links are built from this value alone, not from `port`.
+  # Running on another port? Change it here too.
+  host: http://localhost:5150
+  # Value of the `X-Powered-By` response header. Empty removes the header:
+  # no reason to advertise the stack.
+  ident: ""
+  # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
+  middlewares:
+    # Which address the `RemoteIP` extractor and the rate limiter key on.
+    # Locally there is no proxy: the TCP peer.
+    remote_ip:
+      enable: true
+      source: ConnectInfo
+    # Cancels a request that has not produced response headers in time and
+    # answers 408, so a hung handler cannot hold a connection open forever.
+    # Milliseconds. Sized to the slowest legitimate path (a mail send) with
+    # margin, far below a CDN's origin limit (Cloudflare: 100 s).
+    timeout_request:
+      enable: true
+      timeout: 15000
+    # The largest request body a handler reads. The JSON API's calls are a
+    # few hundred bytes; Loco's default is 2 MB. Raise it here and in the
+    # other configs when a feature takes uploads.
+    limit_payload:
+      body_limit: 64kb
+    # Loco's github preset (HSTS, nosniff, X-Frame-Options, ...) plus what it
+    # lacks. Only added to responses that do not already carry the header:
+    # pages set their own nonce-based CSP (settings.security below), so the
+    # CSP override is the one for everything else: the files, robots.txt,
+    # the JSON API, the not-found line and the 429 page.
+    # Browsers ignore HSTS over plain http, so the same block is safe here.
+    secure_headers:
+      enable: true
+      preset: github
+      overrides:
+        # Replaces the preset's, which allows scripts from any https: origin
+        # and inline styles. Nothing that gets it runs a script, so it allows
+        # only the app's own stylesheet, images and fonts.
+        Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+        # Matches frame-ancestors 'none' in the CSP; preset says sameorigin.
+        X-Frame-Options: DENY
+        Referrer-Policy: strict-origin-when-cross-origin
+        Permissions-Policy: camera=(), microphone=(), geolocation=()
+        Cross-Origin-Opener-Policy: same-origin
+        # Cross-origin isolation: our files load only on our own pages, and
+        # our pages load nothing cross-origin. An embed from another domain
+        # (map, video, payment widget) would need that resource to opt in,
+        # or COEP dropped.
+        Cross-Origin-Resource-Policy: same-origin
+        Cross-Origin-Embedder-Policy: require-corp
+        # Preload-ready HSTS (one year, subdomains, consent). Replaces the
+        # preset's bare max-age. Behind a CDN such as Cloudflare the zone's
+        # HSTS setting overwrites this at the edge; the origin still sends the
+        # full form. Browsers ignore HSTS over plain http, so it is harmless
+        # locally.
+        Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+    # Loco's built-in welcome page for unmatched routes. Off: the app's own
+    # fallback (src/controllers/not_found.rs) answers them with a real 404,
+    # and src/app.rs takes this middleware out of the stack anyway.
+    fallback:
+      enable: false
+    # The cargo-leptos output (islands bundle, stylesheet, copies of public/)
+    # for any URL no controller claims. Served by the app's own fallback
+    # (src/controllers/not_found.rs), which reads this block in place of
+    # Loco's static middleware. `uri: "/"` makes it the router's fallback,
+    # so controller routes always win.
+    static:
+      enable: true
+      # target/site only exists after `cargo leptos build`; don't refuse to
+      # boot without it.
+      must_exist: false
+      folder:
+        uri: "/"
+        # The same variable Leptos reads for its site folder, so both follow
+        # it together: the watch loop's target/site by default, the release
+        # build's target/site-release when that one is run locally
+        # (docs/development.md, "Release Builds").
+        path: <%= get_env(name="LEPTOS_SITE_ROOT", default="target/site") %>
+      # Revalidate on every request: a plain refresh always shows the latest
+      # stylesheet. Without a Cache-Control header the browser would guess a
+      # lifetime from the file's age and could keep a stale copy for hours.
+      cache_control: "no-cache"
+
+# App settings, typed in src/settings.rs and parsed at boot: a missing or
+# unknown key refuses to start.
+settings:
+  rate_limit:
+    enable: true
+    # Tokens replenish one per `per_second` seconds; `burst` is the bucket
+    # size per visitor IP. Routes only; the static files have their own
+    # bucket below. Generous locally: the dev loop reloads pages constantly.
+    per_second: 1
+    burst: 300
+    # The auth API's own bucket, inside the one above: a request to
+    # /api/auth spends a token from both. Generous locally too.
+    auth:
+      per_second: 1
+      burst: 30
+  # The static files (src/controllers/not_found.rs): off locally.
+  # `no-cache` makes the browser recheck every file on every page view, and
+  # the live reload reloads constantly.
+  file_rate_limit:
+    enable: false
+  security:
+    # Where a security hole is reported: /.well-known/security.txt's
+    # Contact (docs/security.md). A `mailto:` or `https://` address.
+    contact: "mailto:security@example.com"
+    # Per-page CSP; {nonce} is replaced per request with the nonce Leptos
+    # stamps on its inline scripts. 'wasm-unsafe-eval' is what the islands
+    # bundle needs; nothing else is inline or third party. The ws:// sources
+    # are the `cargo leptos watch` live-reload socket (dev only).
+    content_security_policy: >-
+      default-src 'none';
+      script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval';
+      style-src 'self';
+      img-src 'self' data:;
+      font-src 'self';
+      manifest-src 'self';
+      connect-src 'self' ws://localhost:3001 ws://127.0.0.1:3001;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none'
+  # Outgoing mail (src/mailers/): the sender on every message, `Name
+  # <address>`. The local catcher on port 1025 accepts any sender.
+  mail:
+    from: SaaS Starter <noreply@example.com>
+  # Nightly restart (src/maintenance.rs): once a day at `hour` o'clock in
+  # `zone` (an IANA name; UTC as shipped, set your own) the server stops
+  # itself and the service manager starts it again. Off locally: nothing
+  # would restart the dev loop, and the app ignores the flag in development
+  # and test anyway.
+  nightly_restart:
+    enable: false
+    hour: 3
+    zone: UTC
+
+# Worker Configuration
+workers:
+  # specifies the worker mode. Options:
+  #   - BackgroundQueue - Workers operate asynchronously in the background, processing queued.
+  #   - ForegroundBlocking - Workers operate in the foreground and block until tasks are completed.
+  #   - BackgroundAsync - Workers operate asynchronously in the background, processing tasks with async capabilities.
+  mode: BackgroundAsync
+
+  
+
+# Mailer Configuration.
+mailer:
+  # Sending mail in development needs something listening on the port below.
+  # Run a local catcher — mailpit, MailHog or maildev all default to SMTP on
+  # 1025 with a web inbox on 8025. On a Mac `brew install mailpit && brew
+  # services start mailpit`, elsewhere `docker run -p 1025:1025 -p 8025:8025
+  # axllent/mailpit`, then read the mail at http://localhost:8025.
+  # Prefer not to run one? Set `stub: true` here (as `config/test.yaml` does)
+  # to record deliveries in memory instead of sending them.
+  # SMTP mailer configuration.
+  smtp:
+    # Enable/Disable smtp mailer.
+    enable: true
+    # SMTP server host. e.x localhost, smtp.gmail.com
+    host: <%= get_env(name="MAILER_HOST", default="localhost") %>
+    # SMTP server port
+    port: 1025
+    # Use secure connection (SSL/TLS).
+    secure: false
+    # auth:
+    #   user:
+    #   password:
+    # Override the SMTP hello name (default is the machine's hostname)
+    # hello_name:
+
+# Initializers Configuration
+# initializers:
+#  oauth2:
+#    authorization_code: # Authorization code grant type
+#      - client_identifier: google # Identifier for the OAuth2 provider. Replace 'google' with your provider's name if different, must be unique within the oauth2 config.
+#        ... other fields
+
+# Database Configuration
+database:
+  # Database connection URI
+  uri: <%= get_env(name="DATABASE_URL", default="sqlite://app_development.sqlite?mode=rwc") %>
+  # When enabled, the sql query will be logged.
+  enable_logging: <%= get_env(name="DB_LOGGING", default="false") %>
+  # Set the timeout duration when acquiring a connection.
+  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="500") %>
+  # Set the idle duration before closing a connection.
+  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
+  # Minimum number of connections for a pool.
+  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
+  # Maximum number of connections for a pool.
+  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="1") %>
+  # Run migration up when application loaded
+  auto_migrate: true
+  # Truncate database when application loaded. This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
+  dangerously_truncate: false
+  # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
+  dangerously_recreate: false
+
+# Authentication Configuration
+auth:
+  # JWT authentication
+  jwt:
+    # Secret key for token generation and verification. Loco decodes it as
+    # base64 before signing (a `-` in it signs nothing): this is "development
+    # only, not a secret" encoded. `tests/config.rs` checks it signs.
+    secret: ZGV2ZWxvcG1lbnQgb25seSwgbm90IGEgc2VjcmV0
+    # Token expiration time in seconds. One day: a JWT can't be revoked, so
+    # a stolen one works until it expires. Longer sessions and a logout need
+    # cookie sessions (docs/security.md).
+    expiration: 86400 # 1 day
+    # Where to read the token from. Omitted => `Authorization: Bearer <token>`.
+    # A cookie or query parameter is a single map with a `from:` tag:
+    #
+    # location:
+    #   from: Cookie
+    #   name: auth_token
+    #
+    # `from:` is one of Bearer, Cookie, Query. Cookie and Query also take a
+    # `name:`. A YAML list of these tries each in order and uses the first
+    # that yields a token. See https://loco.rs/docs/how-to/jwt-locations

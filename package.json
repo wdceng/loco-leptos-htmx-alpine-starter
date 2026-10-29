@@ -1,0 +1,16 @@
+{
+  "name": "app",
+  "private": true,
+  "description": "ESLint for style/tailwind.css. Node is only for this check; the build never needs it.",
+  "scripts": {
+    "lint": "eslint style"
+  },
+  "devDependencies": {
+    "@eslint/css": "^2.0.1",
+    "eslint": "^10.13.0",
+    "tailwind-csstree": "^0.4.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

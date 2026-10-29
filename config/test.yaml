@@ -1,0 +1,171 @@
+# Loco configuration file documentation
+
+# Application logging configuration
+logger:
+  # Enable or disable logging.
+  enable: false
+  # Enable pretty backtrace (sets RUST_BACKTRACE=1)
+  pretty_backtrace: true
+  # Log level, options: trace, debug, info, warn or error.
+  level: debug
+  # Define the logging format. options: compact, pretty or json
+  format: compact
+  # By default the logger has filtering only logs that came from your code or logs that came from `loco` framework. to see all third party libraries
+  # Uncomment the line below to override to see all third party libraries you can enable this config and override the logger filters.
+  # override_filter: trace
+
+# Web server configuration
+server:
+  # Port on which the server will listen. the server binding is 0.0.0.0:{PORT}
+  port: 5150
+  # The start of every link in outgoing mail; the port is part of it, as in
+  # development.yaml.
+  host: http://localhost:5150
+  # Empty removes the X-Powered-By header, as in every other environment.
+  ident: ""
+  # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
+  middlewares:
+    # The harness serves over a real loopback port, so the peer address is
+    # available and every test request keys on 127.0.0.1.
+    remote_ip:
+      enable: true
+      source: ConnectInfo
+    # Same value as the deployed environments so a test that hangs fails the
+    # same way production would (408 after 15 s).
+    timeout_request:
+      enable: true
+      timeout: 15000
+    # Same limit as everywhere; tests/requests/auth.rs proves a larger body
+    # is refused.
+    limit_payload:
+      body_limit: 64kb
+    # Same headers as the deployed environments so the request tests assert
+    # the real values. See development.yaml for the reasoning.
+    secure_headers:
+      enable: true
+      preset: github
+      overrides:
+        Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+        X-Frame-Options: DENY
+        Referrer-Policy: strict-origin-when-cross-origin
+        Permissions-Policy: camera=(), microphone=(), geolocation=()
+        Cross-Origin-Opener-Policy: same-origin
+        Cross-Origin-Resource-Policy: same-origin
+        Cross-Origin-Embedder-Policy: require-corp
+        Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+    # Loco's built-in welcome page for unmatched routes. Off, explicitly: a
+    # missing block means on everywhere but production. The app's own
+    # fallback (src/controllers/not_found.rs) answers misses.
+    fallback:
+      enable: false
+
+# App settings, typed in src/settings.rs and parsed at boot. Small burst so
+# a request test can exhaust the bucket, but larger than the longest auth
+# test's request count (register, verify, login, then the call under test);
+# each test boots a fresh app. The auth bucket's ten covers that chain too.
+settings:
+  rate_limit:
+    enable: true
+    per_second: 1
+    burst: 20
+    # The auth API's own bucket, production's numbers: ten calls pass, the
+    # eleventh is a 429 while the site-wide bucket still has tokens
+    # (tests/requests/rate_limit.rs).
+    auth:
+      per_second: 30
+      burst: 10
+  # The static files: off, the test environment serves none.
+  file_rate_limit:
+    enable: false
+  security:
+    contact: "mailto:security@example.com"
+    # Same policy as development, so the tests see what a developer sees.
+    content_security_policy: >-
+      default-src 'none';
+      script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval';
+      style-src 'self';
+      img-src 'self' data:;
+      font-src 'self';
+      manifest-src 'self';
+      connect-src 'self' ws://localhost:3001 ws://127.0.0.1:3001;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none'
+  # Outgoing mail: the stub mailer records the sender with the message.
+  mail:
+    from: SaaS Starter <noreply@example.com>
+  # Nightly restart (src/maintenance.rs): off, the harness boots the app
+  # inside the test process, and the app ignores the flag in test anyway.
+  nightly_restart:
+    enable: false
+    hour: 3
+    zone: UTC
+
+# Worker Configuration
+workers:
+  # specifies the worker mode. Options:
+  #   - BackgroundQueue - Workers operate asynchronously in the background, processing queued.
+  #   - ForegroundBlocking - Workers operate in the foreground and block until tasks are completed.
+  #   - BackgroundAsync - Workers operate asynchronously in the background, processing tasks with async capabilities.
+  mode: ForegroundBlocking
+
+  
+
+# Mailer Configuration.
+mailer:
+  stub: true
+  # SMTP mailer configuration.
+  smtp:
+    # Enable/Disable smtp mailer.
+    enable: true
+    # SMTP server host. e.x localhost, smtp.gmail.com
+    host: <%= get_env(name="MAILER_HOST", default="localhost") %>
+    # SMTP server port
+    port: 1025
+    # Use secure connection (SSL/TLS).
+    secure: false
+    # auth:
+    #   user:
+    #   password:
+
+# Initializers Configuration
+# initializers:
+#  oauth2:
+#    authorization_code: # Authorization code grant type
+#      - client_identifier: google # Identifier for the OAuth2 provider. Replace 'google' with your provider's name if different, must be unique within the oauth2 config.
+#        ... other fields
+
+# Database Configuration
+database:
+  # Database connection URI
+  uri: <%= get_env(name="DATABASE_URL", default="sqlite://app_test.sqlite?mode=rwc") %>
+  # When enabled, the sql query will be logged.
+  enable_logging: false
+  # Set the timeout duration when acquiring a connection.
+  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="500") %>
+  # Set the idle duration before closing a connection.
+  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
+  # Minimum number of connections for a pool.
+  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
+  # Maximum number of connections for a pool.
+  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="1") %>
+  # Run migration up when application loaded
+  auto_migrate: true
+  # Truncate database when application loaded. This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
+  dangerously_truncate: true
+  # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
+  dangerously_recreate: true
+
+# Authentication Configuration
+auth:
+  # JWT authentication
+  jwt:
+    # Secret key for token generation and verification. Loco decodes it as
+    # base64 before signing (a `-` in it signs nothing): this is "test only,
+    # not a secret" encoded. `tests/config.rs` checks it signs.
+    secret: dGVzdCBvbmx5LCBub3QgYSBzZWNyZXQ=
+    # Token expiration time in seconds. One day: a JWT can't be revoked, so
+    # a stolen one works until it expires. Longer sessions and a logout need
+    # cookie sessions (docs/security.md).
+    expiration: 86400 # 1 day

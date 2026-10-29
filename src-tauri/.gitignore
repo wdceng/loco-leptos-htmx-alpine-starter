@@ -1,0 +1,3 @@
+# Tauri's build output, and the permission schemas it writes at every build.
+/target/
+/gen/schemas

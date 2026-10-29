@@ -1,0 +1,318 @@
+[workspace]
+
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# One crate, two builds. The library compiles twice: natively with `ssr`
+# (linked into the Loco server) and to wasm32 with `hydrate` (the islands
+# bundle). `cdylib` is what wasm-bindgen needs; `rlib` is for the binary and
+# the tests.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Versions are written in full (major.minor.patch). Cargo still reads each as
+# "this or any compatible newer release", so the number is the lowest one
+# the project accepts, and Cargo.lock holds the one actually built.
+[workspace.dependencies]
+loco-rs = { version = "1.2.0" }
+
+# Leptos 0.8.22 as published, with one line more: the islands loader's
+# `requestIdleCallback` given a timeout, as Leptos's `hydration_script.js`
+# has (PR #4889). Chrome 114 to 123 (fixed in 124, April 2024) can stop
+# calling it after about 9 to 14 whole loads in one tab, and without the
+# timeout no island starts. The branch `leptos-0.8.22-idle-timeout` of the
+# fork; only `leptos` comes from it, the other Leptos crates from
+# crates.io. Built in at compile time, nothing at run time. Drop this block
+# once a Leptos release has the timeout: leptos-rs/leptos#4978 (issue
+# #4959), into `main`, the 0.9 line, so 0.9 or a backport to 0.8
+# (tools/upstream.sh; the loader test in tests/requests/home.rs). A newer
+# Leptos makes Cargo warn that the patch was not used.
+[patch.crates-io]
+leptos = { git = "https://github.com/wdceng/leptos", rev = "edce065baeb60c9cb4ba99ff6f3ff780ae1694e1" }
+
+[dependencies]
+# ---------------------------------------------------------------------------
+# Loco: everything the Rest API starter declared (`loco new`, "Rest API
+# (with DB and user auth)"). The server crates are `optional`, pulled in by
+# the `ssr` feature only, so they stay out of the browser bundle. serde and
+# serde_json are the exception: island props derive Serialize/Deserialize
+# in both halves.
+#
+# Unlike the lightweight-service starter, this app keeps Loco's default
+# features: `with-db` (Sea-ORM, migrations), `db-sqlite` (its SQLite
+# driver), `auth` (JWT), `worker`, `cache_inmem` and `cli`. The users model
+# and the auth controller depend on them.
+# ---------------------------------------------------------------------------
+loco-rs = { workspace = true, optional = true }
+axum = { version = "0.8.9", optional = true }
+tokio = { version = "1.53.3", default-features = false, features = [
+  "rt-multi-thread",
+  "sync", # src/hashing.rs: at most four password hashes at once
+  "time", # rate limiter housekeeping interval
+], optional = true }
+async-trait = { version = "0.1.92", optional = true }
+tracing = { version = "0.1.44", optional = true }
+tracing-subscriber = { version = "0.3.23", features = [
+  "env-filter",
+  "json",
+], optional = true }
+regex = { version = "1.13.1", optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154" }
+
+# Database and the typed API contract. All server only: none of these build
+# for wasm32. SQLite in every environment, on the server one file in the
+# unit's /var/lib directory; `sqlx-postgres` was dropped on purpose, so a
+# `postgres://` URL refuses to boot rather than silently working on one
+# machine only.
+migration = { path = "migration", optional = true }
+sea-orm = { version = "2.0.4", features = [
+  "sqlx-sqlite",
+  "runtime-tokio-rustls",
+  "macros",
+], optional = true }
+# The app's own queries: `sqlx::query!` checks the SQL against the migrated
+# schema at compile time, on the pool Sea-ORM opened (src/sql.rs). Must be
+# the version Sea-ORM depends on: a second sqlx in the graph is a different
+# `SqlitePool` type and src/sql.rs stops compiling. Builds without a
+# database (CI, the server build) read the committed `.sqlx/` cache.
+sqlx = { version = "0.9.0", default-features = false, features = [
+  "sqlite",
+  "macros",
+  "runtime-tokio",
+], optional = true }
+# Timestamps on the users model (via Sea-ORM) and the current year in the
+# footer, computed at render time. Default features stay on: Sea-ORM needs
+# them.
+chrono = { version = "0.4.45", optional = true }
+# Must track the version loco-rs depends on: the `Validate` derive comes
+# through Loco's prelude and its output names this crate. A different
+# version here is a second `validator` in the graph and the trait no longer
+# matches (E0277). Loco 1.2 pins 0.20.
+validator = { version = "0.20.0", optional = true }
+uuid = { version = "1.28.0", features = ["v4"], optional = true }
+# ts-rs derives the TypeScript bindings for the `dtos` (the typed JSON API
+# contract). The export itself is commented out in src/dtos/common.rs until
+# a TypeScript consumer of the JSON API exists.
+ts-rs = { version = "12.0.1", features = [
+  "chrono-impl",
+  "serde-compat",
+], optional = true }
+
+# ---------------------------------------------------------------------------
+# Leptos: the views. `leptos` builds in both halves. Server only (`ssr`):
+# `leptos_axum` turns a rendered page into an HTTP response, `any_spawner`
+# is the task executor Leptos renders on (started once at boot in app.rs).
+# The last two exist only for the browser bundle (`hydrate`).
+# ---------------------------------------------------------------------------
+leptos = { version = "0.8.22", features = ["islands"] }
+leptos_axum = { version = "0.8.10", optional = true }
+any_spawner = { version = "0.3.0", features = ["tokio"], optional = true }
+wasm-bindgen = { version = "0.2.129", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+# The browser's API for the islands (src/islands.rs), in both halves like
+# the islands themselves, which Leptos already builds against. Only what an
+# island names is switched on.
+web-sys = { version = "0.3.106", features = [
+  # src/collect.rs: an island's node watched until it has left the page,
+  # its `<leptos-island>` marked awake in a debug build.
+  "Element",
+  "Node",
+  # `Navigation`: the focus after a move, without scrolling.
+  "FocusOptions",
+  "HtmlAnchorElement",
+  "HtmlElement",
+  # `Navigation`: Back's scroll kept in the history entry and put back.
+  "History",
+  "Response",
+  "ScrollBehavior",
+  "ScrollRestoration",
+  "ScrollToOptions",
+] }
+
+# ---------------------------------------------------------------------------
+# Other: crates this project adds on its own (rate limiting, ...).
+# ---------------------------------------------------------------------------
+# Per-visitor token-bucket rate limiting (src/middleware/rate_limit.rs).
+# `default-features = false` drops the tonic (gRPC) integration the crate
+# enables by default; `axum` gives the Response<Body> conversion. Server only.
+tower_governor = { version = "0.8.0", default-features = false, features = [
+  "axum",
+], optional = true }
+# Only for naming the limiter's config types in `rate_limit`, where every
+# bucket is built. Already in the graph through tower_governor, so no extra
+# compile. Server only.
+governor = { version = "0.10.4", optional = true }
+# The router's fallback (src/controllers/not_found.rs): file serving and the
+# cache header, the same pieces Loco's static middleware uses, plus a real
+# 404. Already in the graph through Loco; named here to use its types.
+# Server only.
+tower-http = { version = "0.6.11", features = [
+  "fs",
+  "set-header",
+], optional = true }
+# Two boot checks on mail. `settings.mail.from` is parsed at boot
+# (src/settings.rs) the way Loco's mailer parses it when it sends, so a
+# sender it would refuse fails the start, not every mail. And a deployed
+# server logs in to SMTP once at boot (src/deploy_checks.rs). The version
+# and the features loco-rs uses, already in the graph, so no extra
+# compile. Server only.
+lettre = { version = "0.11.23", default-features = false, features = [
+  "builder",
+  "hostname",
+  "smtp-transport",
+  "tokio1-rustls-tls",
+], optional = true }
+# Nightly restart (src/maintenance.rs): the hour is read in a fixed IANA
+# zone from config, not the server's local time. `serde` lets the zone name
+# deserialize straight into a `Tz`, so a typo refuses to boot. Already in
+# the graph through loco-rs, so no extra compile. Server only.
+chrono-tz = { version = "0.10.4", features = ["serde"], optional = true }
+
+# The nightly restart stops the server by sending SIGTERM to its own
+# process, so Loco's graceful shutdown runs and requests in flight finish.
+# Unix only; elsewhere src/maintenance.rs falls back to a plain exit.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31.3", features = ["signal"], optional = true }
+
+[features]
+# Plain `cargo build` / `cargo test` / `cargo loco start` build the server.
+# cargo-leptos ignores the default and builds each half with only the
+# features listed under [package.metadata.leptos].
+default = ["ssr"]
+ssr = [
+  "leptos/ssr",
+  # Per-request CSP nonce in src/render.rs. Server only: its random-number
+  # dependency does not build for wasm32.
+  "leptos/nonce",
+  "dep:leptos_axum",
+  "dep:any_spawner",
+  "dep:loco-rs",
+  "dep:axum",
+  "dep:tokio",
+  "dep:async-trait",
+  "dep:tracing",
+  "dep:tracing-subscriber",
+  "dep:regex",
+  "dep:migration",
+  "dep:sea-orm",
+  "dep:sqlx",
+  "dep:chrono",
+  "dep:validator",
+  "dep:uuid",
+  "dep:ts-rs",
+  "dep:tower_governor",
+  "dep:governor",
+  "dep:tower-http",
+  "dep:lettre",
+  "dep:chrono-tz",
+  "dep:nix",
+]
+hydrate = [
+  "leptos/hydrate",
+  "dep:wasm-bindgen",
+  "dep:console_error_panic_hook",
+]
+
+[[bin]]
+# Named after the package rather than Loco's default `app-cli`: cargo-leptos
+# normalises binary names and trips over the suffix (see the Loco + Leptos
+# showcase).
+name = "app"
+path = "src/bin/main.rs"
+required-features = ["ssr"]
+
+# The server's test crates, native only: the island collector's browser
+# tests (wasm32, below) would build them for the browser too, where they
+# don't compile.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+serial_test = { version = "4.0.1" }
+rstest = { version = "0.28.0" }
+insta = { version = "1.49.0", features = ["redactions", "yaml", "filters"] }
+# The config canary (tests/config.rs) renders the staging and production
+# YAML with placeholder secrets instead of touching the process environment.
+# Both crates are already in the tree through loco-rs; same versions.
+tera = { version = "2.4.0" }
+serde_yaml = { version = "0.9.34" }
+
+# The island collector's tests, run in headless Chrome (src/collect.rs,
+# docs/testing.md, "The island collector"). It requires the exact
+# wasm-bindgen release Cargo.lock holds (0.3.79 pairs with 0.2.129): bump
+# the two together.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { version = "0.3.79" }
+
+[package.metadata.leptos]
+# Name of the js/wasm/css files. Mandatory: Leptos's config loader has no
+# default for it when it reads this file at boot. Must match
+# LEPTOS_OUTPUT_NAME in .cargo/config.toml.
+output-name = "app"
+# Everything cargo-leptos produces lands here. The app's own fallback
+# (src/controllers/not_found.rs) serves this folder. WARNING: erased on
+# every rebuild.
+site-root = "target/site"
+# Tailwind v4 entry point; cargo-leptos runs the Tailwind standalone binary.
+tailwind-input-file = "style/tailwind.css"
+# Static files copied verbatim into site-root (favicon, robots.txt, images).
+assets-dir = "public"
+# A changed file in public/ rebuilds the server during `cargo leptos watch`,
+# so build.rs recomputes its `?v=` hash (src/paths.rs) at once, not at the
+# next Rust edit.
+watch-additional-files = ["public"]
+# Must match where Loco listens (config/development.yaml).
+site-addr = "127.0.0.1:5150"
+# Server half builds with `ssr`, browser half with `hydrate`, nothing else.
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+lib-profile-release = "wasm-release"
+
+# Dev: fast incremental rebuilds of our own code; dependencies are optimised
+# once and cached, so they cost nothing on later builds.
+[profile.dev]
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# Release: the server binary, maximum optimisation.
+# Deliberately no `panic = "abort"`: Loco's catch_panic middleware relies on
+# unwinding to turn a handler panic into a 500 instead of killing the process.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+# Dev-server: work in progress, built to be redeployed often. A parallel
+# thin-LTO link replaces the single-threaded fat one, and rebuilds are
+# incremental. Stripped like release: Zig's linker doesn't merge debug
+# strings, so line tables made a sister app's binary 2 GB, and `strip =
+# "debuginfo"` drops the symbols too. The dev-server deploy
+# (docs/dev-server.md) builds with `--profile dev-server`; staging and
+# production build `--release`, so staging runs production's binary.
+# The WASM half is unaffected: it uses `wasm-release` below.
+[profile.dev-server]
+inherits = "release"
+opt-level = 2
+lto = "thin"
+codegen-units = 16
+incremental = true
+
+# Release profile for the browser (WASM) half, selected above via
+# `lib-profile-release`. Size beats speed for the islands bundle. `strip`
+# stays off because wasm-bindgen reads custom sections that stripping would
+# remove; cargo-leptos runs wasm-opt on the output anyway.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = false

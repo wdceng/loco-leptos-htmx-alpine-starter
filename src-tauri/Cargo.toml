@@ -1,0 +1,37 @@
+# The app: one window that opens the site, on macOS, Windows, Linux, iOS,
+# iPadOS and Android (tauri.conf.json). A crate of its own, in its own workspace
+# (the empty table below), so it never joins the site's: Tauri's
+# dependencies stay out of the site's lock, its feature resolution and its
+# builds, and the site's builds (`cargo leptos`, `cargo zigbuild`,
+# `cargo test`) never compile Tauri.
+[workspace]
+
+[package]
+name = "app-native"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# The phones start the app as a library (`run` in src/lib.rs), the
+# desktops through src/main.rs. Its name differs from the binary's, or
+# Windows' build mixes up the two outputs.
+[lib]
+name = "app_native_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+# A call, a mail or a text the page links to, handed to the phone's own app
+# (src/lib.rs, `for_the_system`).
+tauri-plugin-opener = "2.7.2"
+
+[profile.release]
+# A small app that only opens a window: size over link time.
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

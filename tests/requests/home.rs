@@ -1,0 +1,234 @@
+use app::{app::App, paths::assets::js::SAFE_AREA_JS, views::layout::APP_NAME};
+use chrono::Datelike;
+use loco_rs::testing::prelude::*;
+use serial_test::serial;
+
+#[tokio::test]
+#[serial]
+async fn home_renders_html() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let res = request.get("/").await;
+
+        assert_eq!(res.status_code(), 200);
+        let content_type = res.header("content-type");
+        assert!(
+            content_type.to_str().unwrap_or("").starts_with("text/html"),
+            "unexpected content type: {content_type:?}"
+        );
+
+        let body = res.text();
+        assert!(
+            body.starts_with("<!DOCTYPE html>"),
+            "not a document:\n{body}"
+        );
+        assert!(body.contains("<html lang=\"en\">"));
+        assert!(body.contains(&format!("<title>{APP_NAME}</title>")));
+        // Footer year is computed at render time, not hardcoded.
+        let year = chrono::Utc::now().year();
+        assert!(
+            body.contains(&format!("© {year} {APP_NAME}")),
+            "footer year missing or stale:\n{body}"
+        );
+        // One <h1> per page, and the skip link points at an element that
+        // exists.
+        assert_eq!(
+            body.matches("<h1").count(),
+            1,
+            "a page has exactly one <h1>:\n{body}"
+        );
+        assert!(
+            body.contains("href=\"#content\"") && body.contains("id=\"content\""),
+            "skip link or its target missing:\n{body}"
+        );
+        // The shell must wire up the islands bundle and the stylesheet. No
+        // hash file sits next to the test binary, so the names are plain.
+        assert!(
+            body.contains("/pkg/app.js"),
+            "hydration scripts missing:\n{body}"
+        );
+        assert!(
+            body.contains(r#"<link rel="stylesheet" href="/pkg/app.css">"#),
+            "stylesheet link missing or hashed:\n{body}"
+        );
+        // The home page is meant to be found: no robots tag.
+        assert!(
+            !body.contains(r#"name="robots""#),
+            "the home page must stay indexable:\n{body}"
+        );
+        // The manifest is fetched with cookies, or a Cloudflare challenge on
+        // staging answers it with an HTML page.
+        assert!(
+            body.contains(r#"crossorigin="use-credentials""#),
+            "manifest link without use-credentials:\n{body}"
+        );
+        // Leptos names the wasm file at compile time from LEPTOS_OUTPUT_NAME
+        // (set in .cargo/config.toml). Without it the loader asks for
+        // `app_bg.wasm`, which cargo-leptos never writes.
+        assert!(
+            body.contains(r#"("", "pkg", "app", "app")"#),
+            "loader script does not name app.wasm:\n{body}"
+        );
+    })
+    .await;
+}
+
+/// The lazy `IslandsCheck` (src/islands.rs) is rendered on the home page,
+/// wrapped as an island, in its server state. The browser switches it to
+/// "running" once its split chunk has loaded (docs/testing.md, "Islands in
+/// the browser").
+#[tokio::test]
+#[serial]
+async fn home_renders_the_lazy_islands_check() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let body = request.get("/").await.text();
+        let island = body
+            .find("<leptos-island")
+            .map(|start| &body[start..])
+            .unwrap_or_else(|| panic!("no island on the home page:\n{body}"));
+        assert!(
+            island.contains("IslandsCheck"),
+            "the island is not IslandsCheck:\n{island}"
+        );
+        assert!(
+            island.contains("Islands: not running."),
+            "the island's server state is missing:\n{island}"
+        );
+    })
+    .await;
+}
+
+/// The shell moves between pages in place (src/views/layout.rs): htmx's
+/// settings and the scripts in the order they must run, the page's region
+/// boosted with every page status, the live region, the `Navigation`
+/// island outside the region, and the build's name in the head and the
+/// header alike.
+#[tokio::test]
+#[serial]
+async fn the_shell_moves_between_pages_in_place() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let res = request.get("/").await;
+        let build = res.header("x-build").to_str().expect("ascii").to_string();
+        assert_eq!(build.len(), 16, "x-build: {build}");
+        let body = res.text();
+        assert!(
+            body.contains(&format!(r#"<meta name="build" content="{build}">"#)),
+            "the head's build differs from the header's:\n{body}"
+        );
+        assert!(body.contains(r#"<meta name="htmx-config""#), "{body}");
+
+        // htmx first, its extensions and the glue after it, Alpine last.
+        let order = [
+            "/vendor/htmx-4.0.0.min.js",
+            "/vendor/hx-alpine-compat-4.0.0.min.js",
+            "/vendor/hx-preload-4.0.0.min.js",
+            "/js/htmx-islands.js",
+            "/vendor/alpinejs-csp-3.17.4.min.js",
+        ];
+        let at: Vec<usize> = order
+            .iter()
+            .map(|script| {
+                body.find(&format!(r#"<script src="{script}?v="#))
+                    .unwrap_or_else(|| panic!("{script} not loaded:\n{body}"))
+            })
+            .collect();
+        assert!(at.is_sorted(), "scripts out of order: {order:?} at {at:?}");
+        // Each the way its author documents it, all in the head, the
+        // settings first: htmx and what follows it plain, so htmx sets up
+        // the page only after preload is in (htmx #4170); Alpine `defer`.
+        let head_end = body.find("</head>").expect("a head");
+        let config = body
+            .find(r#"<meta name="htmx-config""#)
+            .expect("htmx's settings");
+        assert!(config < at[0], "htmx's settings after htmx");
+        assert!(
+            at[order.len() - 1] < head_end,
+            "the scripts outside the head:\n{body}"
+        );
+        for (script, start) in order.iter().zip(&at) {
+            let tag = &body[*start
+                ..body[*start..]
+                    .find('>')
+                    .map_or(body.len(), |end| start + end)];
+            let alpine = script.contains("alpinejs");
+            assert_eq!(tag.contains("defer"), alpine, "{script}: {tag}");
+        }
+
+        let region = body
+            .find(r#"<div id="page""#)
+            .map(|start| {
+                &body[start
+                    ..body[start..]
+                        .find('>')
+                        .map_or(body.len(), |end| start + end)]
+            })
+            .unwrap_or_else(|| panic!("no page region:\n{body}"));
+        assert!(region.contains("hx-boost:inherited"), "{region}");
+        assert!(region.contains("hx-history-elt"), "{region}");
+        for status in [400, 404, 405, 408, 413, 415, 500] {
+            assert!(
+                region.contains(&format!("hx-status:{status}:inherited")),
+                "{status} is not shown in the region: {region}"
+            );
+        }
+        assert!(
+            body.contains(r#"<main id="content" tabindex="-1""#),
+            "{body}"
+        );
+        assert!(
+            body.contains(r#"<p id="page-announce" role="status""#),
+            "{body}"
+        );
+        let navigation = body
+            .find(r#"data-component="Navigation"#)
+            .unwrap_or_else(|| panic!("no Navigation island:\n{body}"));
+        let region_end = body.rfind("</footer></div>").expect("the region closes");
+        assert!(navigation > region_end, "Navigation is inside the region");
+    })
+    .await;
+}
+
+/// Leptos's islands loader, inline in every page, waits for the browser to
+/// be idle with a timeout, so a browser that never calls it idle still
+/// starts the islands (Chrome 114 to 123, fixed in 124, stopped after about
+/// 9 to 14 whole loads in one tab): the fork Cargo.toml's
+/// `[patch.crates-io]` builds in. Should this fail after a Leptos update,
+/// the release has its own way: drop the patch.
+#[tokio::test]
+#[serial]
+async fn the_islands_loader_waits_for_idle_two_seconds_at_most() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for path in ["/", "/reset?token=x"] {
+            let page = request.get(path).await.text();
+            assert!(
+                page.contains("window.requestIdleCallback(c, { timeout: 2000 });"),
+                "{path}: {page}"
+            );
+        }
+    })
+    .await;
+}
+
+/// The page reaches the glass (`viewport-fit=cover`), and the safe-area
+/// helper marks the camera's side before the stylesheet draws anything:
+/// before its link, and without `defer` or `async`, which would run it
+/// after the first paint and move the page's sides on load.
+#[tokio::test]
+#[serial]
+async fn the_page_reaches_the_glass_and_marks_its_safe_side_first() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let page = request.get("/").await.text();
+        assert!(
+            page.contains(
+                r#"<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">"#
+            ),
+            "{page}"
+        );
+        let helper = format!(r#"<script src="{SAFE_AREA_JS}"></script>"#);
+        let at = page.find(&helper).expect("the safe-area helper, plain");
+        let stylesheet = page
+            .find(r#"<link rel="stylesheet""#)
+            .expect("the stylesheet");
+        assert!(at < stylesheet, "the helper after the stylesheet:\n{page}");
+    })
+    .await;
+}

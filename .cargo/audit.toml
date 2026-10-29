@@ -1,0 +1,22 @@
+[advisories]
+ignore = [
+  # Timing side-channel in `rsa`, pulled in by jsonwebtoken through loco-rs's
+  # `auth` feature. Loco signs JWTs with HMAC (HS512 by default); no RSA key
+  # exists in this app, so the affected code never runs. No fixed release of
+  # `rsa` exists to upgrade to. Re-check when loco-rs or jsonwebtoken changes
+  # its crypto backend.
+  "RUSTSEC-2023-0071",
+  # Timing variability in `crypto-bigint` 0.5, pulled in by jsonwebtoken's
+  # `rust_crypto` backend through `p256`/`p384` (elliptic-curve keys). Loco
+  # signs with HMAC alone (HS512; loco-rs's auth/jwt.rs exposes no
+  # asymmetric algorithm), so the curve code never runs. The fix (0.7.6)
+  # needs jsonwebtoken 11, and loco-rs 1.2 requires ^10.3: re-check when
+  # Loco moves.
+  "RUSTSEC-2026-0387",
+  # `paste` (via leptos -> either_of) and `proc-macro-error2` (via
+  # leptos_macro): unmaintained compile-time proc-macro helpers, nothing of
+  # theirs reaches the binary or the wasm bundle. Only a Leptos release can
+  # replace them; re-check after each `leptos` upgrade.
+  "RUSTSEC-2024-0436",
+  "RUSTSEC-2026-0173",
+]

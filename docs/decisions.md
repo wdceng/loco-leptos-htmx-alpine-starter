@@ -1,0 +1,294 @@
+# Decisions
+
+One line per choice, dated, with its reason. Read before changing one; a
+change of mind gets a new line, and the old one moves to
+`tried-and-dropped.md` if it was tried.
+
+## Stack
+
+- 2026-09-28: **Loco's Rest API starter as the base**, not "SaaS App with
+  server side rendering". Leptos makes the pages, so the SaaS starter's
+  Tera views, translations and `/static` would only be removed.
+- 2026-09-28: **Loco 1.2, Sea-ORM 2.0.4, Rust 1.94 or newer.**
+- 2026-10-02: **SQLx `query!` for the app's own queries**, on Sea-ORM's
+  pool, checked at compile time. Loco's own models stay on Sea-ORM.
+- 2026-10-02: **Mails, error answers and the 429 page are Leptos**, not
+  Tera: compile-checked and escaped. Tera stays only in Loco's YAML configs.
+- 2026-10-04: **Tailwind's default look.** The template is public, so it
+  carries no house style: no brand colour, no self-hosted font, no shape
+  roles. An app adds its own.
+- 2026-10-17: **Tailwind scans `src/` only** (`source("../src")` on the
+  import). Its default scanned the docs and configs too, and their prose
+  made about a quarter of the CSS.
+- 2026-10-21: **The shell writes the app's name into every title**
+  (`full_title`, "Page | App"), and a page that only tells something is
+  one `Notice`. Three pages had written the title three ways, and four
+  the same heading, line and way home.
+- 2026-10-21: **One Reduce Motion rule, the scrollbar's room kept, no
+  scroll anchoring, controls 44px tall.** Not a look but how pages behave:
+  an islands app on this stack saw each go wrong (a move flashing the
+  footer, a page jumping sideways, a finger missing a 40px button). The
+  44px is Apple's and WCAG's AAA size; the browser tests check all four.
+
+- 2026-10-28: **A refused form says so one way:** the title starts with
+  "Error: " (`PageMeta::refused`), the field is red from its own
+  `aria-invalid` and points at its line (`aria-describedby`), and Alpine
+  marks a changed field as it's left. A screen reader hears what the eye
+  sees. From an islands app; a fifth colour token, `danger`, on Tailwind's
+  red-600.
+
+- 2026-10-28: **A desktop app in the template** (`src-tauri/`), as an
+  islands app on this stack has: a Tauri 2 window on the live site for
+  macOS and Windows, a start page that waits for `/up`, a crate and lock
+  of its own so the site's builds never compile Tauri, no capabilities,
+  unsigned. Every app built from the template starts with one.
+- 2026-10-28: **The same app on iOS, iPadOS and Android** (`src-tauri/gen/`),
+  the maintainer's call: every app built from the template can go to the
+  App Store and Google Play, and reach the device through Tauri's plugins
+  when it needs to (push, the camera). A second way to put the site on a
+  phone beside the home-screen app, agreed for that reason: the same
+  window, start page and live site, no second app. The home-screen app
+  stays for visitors who don't install. `gen/` is Tauri's generated
+  projects (`cargo tauri ios init`, `android init`), kept as generated.
+- 2026-10-28: **No Windows installer.** The app is a few MB that open the
+  live site: the `.exe` alone is enough, so `nsis` is out of
+  `bundle.targets` and NSIS needs no install.
+
+## Environments and builds
+
+- 2026-10-06: **Five environments**: development, test, dev-server,
+  staging, production. The dev-server is work in progress on a server,
+  staging the last look before production. `config/dev-server.yaml` stays
+  staging's copy, pinned by `tests/config.rs`.
+- 2026-10-07: **The local environment is Loco's `development`**, its
+  default when `LOCO_ENV` is unset. A rename to `dev-local` needed an
+  export in every shell for a name alone.
+- 2026-10-08: **Release builds go to `target/site-release`**
+  (`LEPTOS_SITE_ROOT`), so a release or deploy build never replaces the
+  watch loop's `target/site`.
+- 2026-10-08: **Deploys start with a check that their secrets file
+  exists**, before anything is built: a missing file would fail the upload
+  with the service already stopped.
+- 2026-10-21: **The Linux server binary is built with `cargo zigbuild`**,
+  natively on the Mac, with Zig as the linker. No Docker, no emulated
+  image; in a sister app the fast profile took 2m 48s against cross's
+  9m 39s, and the release binaries matched within 1 MB. The target names
+  glibc 2.31 (`x86_64-unknown-linux-gnu.2.31`), so Debian 11 and Ubuntu
+  20.04 or newer run it.
+- 2026-10-21: **Staging and production build `--release`**, so staging runs
+  production's exact binary. Only the dev server uses the fast profile,
+  renamed `dev-server` from `staging`. Every deployed profile is fully
+  stripped: with Zig's linker, line tables made a 2 GB binary.
+
+## Islands
+
+- 2026-10-15: **Lazy islands with `--split` on every cargo-leptos
+  command.** Apps built on the template are island-heavy; a lazy island's
+  wasm is fetched only by the pages that render it. `IslandsCheck` on the
+  home page keeps the split path in use, so CI builds and checks it. The
+  server refuses a build without `--split` (`src/assets.rs`).
+- 2026-10-15: **cargo-leptos is a patched build** (`tools/cargo-leptos/`):
+  0.3.11 at commit `0fb3de86` (PR #691, issue #690: stale names after a
+  hashed split build) against a sorted `wasm_split_cli_support` 0.2.3
+  (wasm-split-prototype #79: new names on every build). Both fixes were
+  merged upstream on 2026-10-16 (#79 as `cc582f1`, the same code as our
+  patch); neither is released yet. **Released yet?** `tools/upstream.sh`.
+  **Way back:** once it prints the cargo-leptos test and that passes,
+  `cargo install --locked cargo-leptos@<version>` in the README,
+  `prerequisites.md` and CI, delete `tools/cargo-leptos/` and the
+  `check.sh` gates in the deploy chains, and add a line here.
+- 2026-10-18: **Moves in place with htmx 4 and Alpine's CSP build**, as
+  the apps built on the template already did on their own: one tested
+  version here instead of one per app. htmx for what needs the server,
+  Alpine for small page state, an island for what neither can. Vendored
+  byte for byte from npm (`htmx.org` 4.0.0, `@alpinejs/csp` 3.17.4), each
+  checked against the package before it came in.
+- 2026-10-18: **The `parseHTMLUnsafe` workaround** in
+  `public/js/htmx-islands.js` (htmx #4147: Chrome drops the comments
+  Leptos hydrates by).
+- 2026-10-19: **It passes options instead of deleting the function**, the
+  htmx maintainer's way: Chrome 150 to 156 drops the comments only when
+  called with one argument. #4147 closed without a change in htmx.
+  **Way back:** once Chrome 156 is below the low bar (`testing.md`, "The
+  Low Bar"), drop it.
+- 2026-10-19: **Leptos from a fork, pinned by commit**
+  (`[patch.crates-io]` in `Cargo.toml`): 0.8.22 as published plus one
+  line, the islands loader's `requestIdleCallback` given a 2 s timeout, as
+  its own hydration script has. Chrome 114 to 123 can stop giving idle
+  time after many whole loads in one tab, found in an islands app: then no
+  island starts. The same fix as that app's, in the loader itself, not a
+  wrapper of every idle callback on the page (`tried-and-dropped.md`).
+  `the_islands_loader_waits_for_idle_two_seconds_at_most` checks the
+  loader. **Way back:** once a Leptos release's loader passes a timeout
+  (`tools/upstream.sh`), drop the block; a newer Leptos makes Cargo warn
+  the patch went unused.
+- 2026-10-28: **The fork's way back is leptos PR #4978,** the maintainer's
+  own fix, the same line as ours. Issue #4959 was closed before it merged,
+  so `tools/upstream.sh` watches the PR. It targets `main`, the 0.9 line:
+  the fork goes with the move to 0.9, or earlier if it's backported to
+  `leptos_0.8_latest`.
+- 2026-10-28: **htmx and Alpine loaded as their authors document them**
+  (htmx #4170): htmx, its extensions and the glue as plain tags in
+  `<head>`, Alpine `defer`. With `defer`, htmx 4 started on a timer and
+  could set up the first page before `hx-preload`'s file arrived, so that
+  page's links didn't preload: in any browser where the file came a
+  moment late, Chrome 114 being where the tests saw it. Read while the
+  page is still loading, htmx waits for `DOMContentLoaded`, the
+  extensions long in by then. The cost: the first visit's page shows once
+  those four files are in (about 16 KB gzip), cached a year after. Chosen
+  over another app on this stack's way (all five at the body's end), which has no such pause,
+  to follow the authors.
+- 2026-10-20: **A form drops a second press and looks busy while sent.**
+  htmx 4's default without `hx-sync` queues one more request: two presses
+  on the reset form sent two posts (a browser test proved it), the second
+  with a token the first used up. `hx-sync="this:drop"` on the form, not
+  the region: a second link press should win, not be dropped. The look,
+  from an islands app: the `busy:` variant on htmx's request class, after
+  200 ms, `aria-busy` through Alpine; no `disabled`, which drops the
+  button's name and value from the post.
+- 2026-10-19: **No htmx settle** (`"defaultSettleDelay":0` in
+  `HTMX_CONFIG`). Its default gives each new element whose `id` matches an
+  old one the old one's attributes for a frame, which only serves CSS
+  transitions from old to new, and `transitions` is off. An islands app's
+  menu, same `id` on every page, arrived open and faded shut after each
+  move. The template has no such element yet; the first app's would.
+- 2026-10-18: **The `Navigation` island** ports four behaviours from the
+  sister app's `Chores`: focus and announcement, Back's scroll, a newer
+  build loading plainly, a gateway's error loading plainly. Its
+  announcement is read a tick after the swap: htmx 4 sets the title after
+  `htmx:after:swap` (found in Chrome on 2026-10-18; the sister app read the
+  old title).
+- 2026-10-18: **The island collector** (`src/collect.rs`, from the sister
+  app): every island's body through `collected`, so an island htmx swaps
+  out is freed instead of kept until the next full load. **Way back:**
+  once leptos PR #4953 is released (`tools/upstream.sh`), its `$$dispose`
+  on each island element can be called from `public/js/htmx-islands.js`
+  before a swap, and `collect.rs` with every `collected(…)` can go; the
+  memory tests prove the swap.
+- 2026-10-18: **Lazy islands are plain in a test build**
+  (`cfg_attr(test, island)`): the collector's browser tests run a plain
+  wasm, which can't load a lazy island's split import.
+- 2026-10-18: **Browser tests in a crate of their own** (`e2e/`,
+  thirtyfour, Chrome only), the sister app's harness cut down to one lane:
+  the moves in place and the memory tests against a real `--split` build,
+  run locally (`ci.yaml` has a job for them, for projects that use
+  Actions; this repo doesn't). Their own environment `e2e` (port 5160, `target/e2e`), so a
+  run never touches the watch loop. DevTools' own socket (`cdp-events`)
+  hears the page's errors and changes an answer in flight; chromedriver
+  passes no events on.
+- 2026-10-19: **A low-bar lane in Chrome 114** (`e2e/run.sh low`), the
+  oldest Chrome the template supports, about 30 months back: the same
+  tests, local only. Firefox 128, iOS 17.5 and Android 15 are left to the
+  apps (`docs/testing.md`, "The Low Bar"): the harness rests on Chrome's
+  DevTools.
+- 2026-10-21: **A browser test presses as a person does:** the mouse
+  through DevTools, held 300 ms so the press preloads, never the driver's
+  element (the memory tests) nor a script's instant click, which hides the
+  race between htmx's swap and Alpine's click.
+- 2026-10-21: **Health tests on every page kind** (`e2e/tests/health.rs`):
+  no sideways scroll at five widths, 44px tap targets, the accessibility
+  audit, Reduce Motion, twenty loads in one tab. **axe-core vendored**
+  into `e2e/vendor/` (4.14.0, MPL-2.0, byte for byte from npm): the
+  template has no Node, and the site never serves it.
+- 2026-10-18: **The memory tests turn DevTools' log off** while they
+  measure: it keeps every element an entry names, and Chrome's notice
+  about the reset form kept one old `<main>` per Back. Without DevTools,
+  Chrome kept none (a probe).
+
+## Security
+
+- 2026-10-18: **A security review of the starter auth**, its 13 findings
+  and their status in `docs/security.md`. That page is updated with every
+  change to auth, sessions, headers or the CSP.
+- 2026-10-18: **JWTs live one day.** They can't be revoked; logout and
+  longer sessions come with cookie sessions, an app's step.
+- 2026-10-18: **Passwords: length only, 8 to 128 characters,** as NIST SP
+  800-63B advises. No composition rules; a breached-password check is an
+  app's choice.
+- 2026-10-18: **The reset link carries its token in the query**
+  (`/reset?token=…`), not Loco's `#token`: the page is server-rendered with
+  no JavaScript. Its answers send `no-referrer` and `no-store`.
+- 2026-10-18: **The security contact lives in the config**, not the
+  environment: it isn't a secret. Production refuses to boot while it's
+  still `example.com`.
+
+## Working
+
+- 2026-10-03: **Generators run in a scratch `git worktree`**, their files
+  brought over with editing tools, so every change shows as a diff.
+- 2026-10-05: **The maintainer commits:**
+  `git status --short && git add . && git commit -m "..." && git push`.
+  Commit messages name no tool or AI.
+- 2026-10-15: **CLAUDE.md holds rules only, under 8 KB.** Knowledge lives
+  in `docs/`, read when a task touches it; a rule a test can check becomes
+  a test.
+- 2026-10-27: **The page reaches the glass (`viewport-fit=cover`).** The
+  template starts every app, and an app's coloured header or photo should
+  run to a phone's edges from day one. The sides read the safe-area insets
+  through one pair of variables; a helper (`public/js/safe-area.js`) marks
+  the camera's side, as iOS reports the inset on both, and says `none`
+  where Chrome on an iPhone keeps its own view clear. `md` and `lg` ask for
+  480px of height too, so a phone on its side keeps the phone's layout.
+  From an islands app's measurements on an iPhone, iOS 27.2. It brings back
+  what was dropped on 2026-10-05 (`tried-and-dropped.md`).
+- 2026-10-28: **A turn glides the page's sides over 500ms.** The angle
+  that names the camera's side comes after the turn, so the side jumped;
+  the pair is registered with `@property` and eases out instead. 200ms
+  still read as a jump. `none` comes from the window's shape at once, so
+  Chrome on an iPhone no longer shows the inset for a moment. From an
+  islands app on an iPhone, iOS 27.
+- 2026-10-29: **The page's top adds the top inset, CSS first.** The app's
+  webview fills a phone's screen, so the status bar lies over the header
+  (iOS by `viewport-fit=cover`, Android by `enableEdgeToEdge`). The header,
+  the skip link and the 429 page add `--safe-area-top`, 0 in a browser and
+  the home-screen app. The webview padded in native code is the fallback
+  for old Capacitor apps, not this. `standalone:` stays its own job, room
+  beside iOS's blur. From an islands app on this stack.
+- 2026-10-29: **The app's pictures by script, iOS's top only**
+  (`src-tauri/screens.sh`). `adb` swipes and turns an emulator; `simctl`
+  has no command for either, so a Simulator's foot and side stay checks by
+  hand. Driving the Simulator app through System Events lost its device
+  windows in an islands app on this stack, and Facebook's `idb` is one more
+  install. Apple's UI tests (XCUITest) could swipe and turn: untried.
+- 2026-10-29: **The Linux app is an AppImage built in a Docker box of
+  Ubuntu 22.04** (`src-tauri/linux.sh`). Tauri's Linux bundlers run only
+  on Linux and the app links against WebKitGTK, so `cargo zigbuild`, the
+  server's way, cannot build it. AppImage alone, the program as the Mac's
+  `.app` and Windows' `.exe` are. Ubuntu 22.04 over Debian 12 for its
+  older glibc (2.35), which reaches one more long-term release. The
+  AppImage plugin unpacked in the box: Docker Desktop's emulation refused
+  its AppImage.
+- 2026-10-29: **Android's status bar takes the page's colour,** fading
+  down, with Google's `GradientProtection`: a scrolled page ran on under
+  the see-through bar. The colour is read from the page's `theme-color`,
+  so the app holds no copy. From an islands app on this stack.
+- 2026-10-29: **The app hands calls, mails and texts to the system.** On
+  Android the webview opened a footer's phone number itself and showed
+  its error page with no way back. `tauri-plugin-opener`, used from Rust
+  alone, keeps the app without a capabilities file. From an islands app on
+  this stack.
+- 2026-10-29: **The pictures take one device at a time, on emulators of
+  their own.** The script boots each device that is off and shuts it down
+  before the next: all booted at once took a Mac's load to 115. Its
+  `-full` emulators run at full density, so a camera cutout is its real
+  size; the shared half-density pair doubles it. From an islands app on
+  this stack.
+- 2026-10-27: **Two small helpers are the only project JavaScript:** the
+  htmx and islands glue, and the safe-area mark. Each one job, no page
+  logic; `src/paths.rs` names both.
+- 2026-10-22: **No linter runs on its own in the editor**
+  (`.vscode/settings.json`): no `cargo check` on save, which fought the
+  watch loop for `target/`. Clippy runs in the checks; rust-analyzer's own
+  errors stay. As in an islands app on this stack.
+- 2026-10-28: **The stylesheet is checked twice, as in an islands app on
+  this stack.** In the editor, `.css` opens in the Tailwind extension's
+  mode, which knows v4 (`source()` on the import broke VS Code's own
+  parser), with its lint on. In the checks, `npm run lint`: ESLint with a
+  Tailwind-aware parser, for unknown properties and features too new for
+  Baseline, which Tailwind's build passes silently. Node runs this check
+  only; the build still needs none.
+- 2026-10-21: **One job, one implementation is Rule no. 1,** first in
+  CLAUDE.md, and a one-job break that could come back gets a guard in
+  `tests/one_job.rs`. An islands app on this stack drifted into three
+  folds, two sending states and a title per page; its guards kept them
+  one.

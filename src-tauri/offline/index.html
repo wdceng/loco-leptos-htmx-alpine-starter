@@ -1,0 +1,200 @@
+<!doctype html>
+<!--
+  The app's start page, desktops and phones alike, built into the app (tauri.conf.json,
+  build.frontendDist): it opens without a connection, asks the site whether
+  it is up (`/up`, src/controllers/up.rs), and replaces itself with the site
+  the moment it answers `ok`. Without that answer it says why, no internet
+  or the site not reachable, and keeps trying, every few seconds and at
+  once when the system reports the connection back. Nothing here loads from
+  the network but the check itself. The site's address is SITE, below.
+
+  The app's one script written by hand: it runs only here, in the app,
+  never on the site, whose own are the two helpers in public/js/.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SaaS Starter</title>
+    <style>
+      /* The site's role colours (style/tailwind.css) as hex, Tailwind's own
+         values for their steps: white, gray-900, gray-600 and blue-600
+         (BRAND_HEX, src/views/layout.rs). */
+      :root {
+        color-scheme: light;
+        --surface: #ffffff;
+        --ink: #101828;
+        --ink-muted: #4a5565;
+        --primary: #155dfc;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--surface);
+        color: var(--ink);
+        font:
+          16px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      main {
+        max-width: 360px;
+        text-align: center;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        color: var(--ink-muted);
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        margin: 24px auto 0;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        color: var(--ink-muted);
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      /* The site's filled button, as ResetForm's (src/views/reset.rs): 44px
+         tall, 6px corners, 16px at the sides. */
+      button {
+        min-height: 44px;
+        margin-top: 24px;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--primary);
+        color: #ffffff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="connecting" role="status" aria-live="polite">
+        <h1>Connecting…</h1>
+        <div class="spinner" aria-hidden="true"></div>
+      </div>
+
+      <div id="problem" role="status" aria-live="polite" hidden>
+        <h1 id="problem-title">No internet connection</h1>
+        <p id="problem-text">Check your connection. The app will try again by itself.</p>
+        <button id="retry" type="button">Try again</button>
+      </div>
+    </main>
+    <script>
+      // The site this app opens. Its address lives here alone, and in the
+      // `connect-src` of tauri.conf.json.
+      const SITE = "https://example.com";
+      // The site's own answer that it is up: exactly `ok`, and readable
+      // from this page, which is not the site's origin (the route allows
+      // any origin).
+      const UP = SITE + "/up";
+      // How long one check may take, and the wait before the next one.
+      const TIMEOUT_MS = 5000;
+      const RETRY_MS = 5000;
+
+      // Why the site does not open: no network at all, or a network but no
+      // site (the server down, or an error page from what stands in front
+      // of it, Cloudflare or Caddy).
+      const MESSAGES = {
+        offline: [
+          "No internet connection",
+          "Check your connection. The app will try again by itself.",
+        ],
+        unreachable: [
+          "The site isn't reachable right now",
+          "The server isn't answering. The app will try again by itself.",
+        ],
+      };
+
+      const connecting = document.getElementById("connecting");
+      const problem = document.getElementById("problem");
+      const problemTitle = document.getElementById("problem-title");
+      const problemText = document.getElementById("problem-text");
+      const retry = document.getElementById("retry");
+      let timer = 0;
+      let checking = false;
+
+      // Only the site's own `ok` opens it; anything else, an error page
+      // included, counts as no answer. `quiet`: the automatic retries keep
+      // the message up rather than flashing "Connecting…" every few seconds.
+      // A click while a quiet check is on its way still shows "Connecting…",
+      // and that check's outcome takes it over.
+      async function check(quiet) {
+        if (!quiet) {
+          connecting.hidden = false;
+          problem.hidden = true;
+        }
+        if (checking) return;
+        checking = true;
+        clearTimeout(timer);
+        // A controller rather than `AbortSignal.timeout`, which WebKit got
+        // in Safari 16: a Mac left on an older system would never connect.
+        const abort = new AbortController();
+        const stop = setTimeout(() => abort.abort(), TIMEOUT_MS);
+        try {
+          const res = await fetch(UP, {
+            mode: "cors",
+            cache: "no-store",
+            signal: abort.signal,
+          });
+          if (!res.ok || (await res.text()).trim() !== "ok") throw new Error("not the site");
+          // Replaced, not followed: the start page leaves no step to go back to.
+          location.replace(SITE);
+        } catch {
+          // `onLine` false is certain; true only means some network is there.
+          const [title, text] = navigator.onLine ? MESSAGES.unreachable : MESSAGES.offline;
+          // Unchanged text stays as it is, so a screen reader is not told again.
+          if (problemTitle.textContent !== title) problemTitle.textContent = title;
+          if (problemText.textContent !== text) problemText.textContent = text;
+          connecting.hidden = true;
+          problem.hidden = false;
+          timer = setTimeout(check, RETRY_MS, true);
+        } finally {
+          clearTimeout(stop);
+          checking = false;
+        }
+      }
+
+      retry.addEventListener("click", () => check(false));
+      window.addEventListener("online", () => check(false));
+      check(false);
+    </script>
+  </body>
+</html>
