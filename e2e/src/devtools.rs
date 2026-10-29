@@ -1,17 +1,48 @@
-//! Chrome's DevTools over its own socket (thirtyfour's `cdp-events`;
-//! chromedriver passes commands on but no events): what the page logs, an
+//! What the browsers' own tools give a test: Chrome's and Edge's DevTools
+//! over their own socket (thirtyfour's `cdp-events`; the driver passes
+//! commands on but no events), WebDriver BiDi's log in Firefox, and
+//! axe-core's accessibility audit. Through DevTools: what the page logs, an
 //! answer of htmx's changed on its way in, what the page holds in memory,
-//! the visitor's settings emulated, and the accessibility audit.
+//! the window's exact size and the visitor's settings emulated. Firefox's
+//! BiDi hears what the page logs; Safari's driver has neither, so there a
+//! page's errors go unheard.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
 use futures_util::StreamExt;
 use serde_json::{Value, json};
+use thirtyfour::bidi::events::LogEntryAdded;
+use thirtyfour::bidi::modules::log::LogLevel;
 use thirtyfour::cdp::CdpSession;
+use thirtyfour::common::command::{Command, ExtensionCommand};
 use thirtyfour::prelude::*;
 use tokio::task::AbortHandle;
 
-use crate::Page;
+use crate::{Browser, Page, session::Run};
+
+/// A DevTools command sent to msedgedriver's own address,
+/// `/ms/cdp/execute`, for the driver's own session: thirtyfour's `cdp()`
+/// posts to Chrome's, `/goog/cdp/execute`, which msedgedriver answers
+/// "unknown command" (as an islands app on this stack found).
+#[derive(Debug)]
+struct EdgeDevTools {
+    method: String,
+    params: Value,
+}
+
+impl ExtensionCommand for EdgeDevTools {
+    fn parameters_json(&self) -> Option<Value> {
+        Some(json!({ "cmd": self.method, "params": self.params }))
+    }
+
+    fn method(&self) -> http::Method {
+        http::Method::POST
+    }
+
+    fn endpoint(&self) -> Arc<str> {
+        Arc::from("/ms/cdp/execute")
+    }
+}
 
 /// axe-core, byte for byte from its npm package, with its MPL-2.0 licence
 /// beside it (`e2e/vendor/`).
@@ -66,36 +97,52 @@ fn lock(heard: &Shared) -> std::sync::MutexGuard<'_, Heard> {
 }
 
 impl Page {
-    /// The page on `driver`, its DevTools session open and listened to:
-    /// the page's errors, warnings and refused resources noted, and htmx's
-    /// answers passed on as [`Page::answers`] says.
-    pub(crate) async fn start(driver: WebDriver, base: String) -> WebDriverResult<Self> {
-        let cdp = driver.cdp().connect().await?;
+    /// The page on `driver`, listened to where the browser lets it be: in
+    /// Chrome and Edge their DevTools session, the page's errors, warnings
+    /// and refused resources noted and htmx's answers passed on as
+    /// [`Page::answers`] says; in Firefox BiDi's log, its errors and
+    /// warnings noted; in Safari nothing.
+    pub(crate) async fn start(driver: WebDriver, run: &Run, test: &str) -> WebDriverResult<Self> {
         let heard = Shared::default();
-        // Subscribed before the domains are on, so nothing is missed.
-        let watcher = watch(cdp.clone(), heard.clone());
+        let (cdp, watcher) = match run.browser {
+            Browser::Chrome | Browser::Edge => {
+                let cdp = driver.cdp().connect().await?;
+                // Subscribed before the domains are on, so nothing is missed.
+                let watcher = watch(cdp.clone(), heard.clone());
+                (Some(cdp), Some(watcher))
+            }
+            Browser::Firefox => (None, Some(listen(&driver, heard.clone()).await?)),
+            Browser::Safari => (None, None),
+        };
         let page = Self {
             driver,
+            browser: run.browser,
             cdp,
-            base,
+            base: run.base.clone(),
+            dir: run.dir.clone(),
+            test: test.to_owned(),
             heard,
             watcher,
         };
-        // Once a session: `held` collects and reads with them.
-        for domain in [
-            "Runtime.enable",
-            "Log.enable",
-            "HeapProfiler.enable",
-            "Performance.enable",
-        ] {
-            page.devtools(domain, json!({})).await?;
+        if page.browser.has_devtools() {
+            // Once a session: `held` collects and reads with them.
+            for domain in [
+                "Runtime.enable",
+                "Log.enable",
+                "HeapProfiler.enable",
+                "Performance.enable",
+            ] {
+                page.devtools(domain, json!({})).await?;
+            }
         }
         Ok(page)
     }
 
     /// The watcher stopped, with the session.
     pub(crate) fn stop(&self) {
-        self.watcher.abort();
+        if let Some(watcher) = &self.watcher {
+            watcher.abort();
+        }
     }
 
     /// What the page logged that wasn't allowed.
@@ -146,14 +193,28 @@ impl Page {
         .map(drop)
     }
 
-    /// The page's size in CSS pixels, exactly (DevTools' device metrics).
+    /// The page's size in CSS pixels, as near as the browser goes: exactly
+    /// in Chrome and Edge (DevTools' device metrics); in Firefox and Safari
+    /// the window sized round it, whose windows have a least width of their
+    /// own, so a test reads the width it got where it matters.
     pub async fn viewport(&self, width: u32, height: u32) -> WebDriverResult<()> {
-        self.devtools(
-            "Emulation.setDeviceMetricsOverride",
-            json!({ "width": width, "height": height, "deviceScaleFactor": 1, "mobile": false }),
-        )
-        .await
-        .map(drop)
+        if self.browser.has_devtools() {
+            return self
+                .devtools(
+                    "Emulation.setDeviceMetricsOverride",
+                    json!({ "width": width, "height": height, "deviceScaleFactor": 1, "mobile": false }),
+                )
+                .await
+                .map(drop);
+        }
+        let frame = self
+            .eval("return [window.outerWidth - window.innerWidth, window.outerHeight - window.innerHeight]")
+            .await?;
+        let side =
+            |i: usize| u32::try_from(frame[i].as_u64().unwrap_or_default()).unwrap_or_default();
+        self.driver
+            .set_window_rect(0, 0, width + side(0), height + side(1))
+            .await
     }
 
     /// A media feature as the visitor's settings would set it, from now on
@@ -253,13 +314,73 @@ impl Page {
         })
     }
 
-    /// A DevTools command on the page's session.
+    /// A DevTools command on the page's session, Chrome's and Edge's alone:
+    /// a test that needs one skips the other browsers first
+    /// ([`Browser::has_devtools`]).
     pub async fn devtools(&self, method: &str, params: Value) -> WebDriverResult<Value> {
-        self.cdp
-            .send_raw(method, params)
+        let Some(cdp) = &self.cdp else {
+            return Err(WebDriverError::RequestFailed(format!(
+                "{method}: no DevTools in {:?}",
+                self.browser
+            )));
+        };
+        cdp.send_raw(method, params)
             .await
             .map_err(|e| WebDriverError::RequestFailed(format!("{method}: {e}")))
     }
+
+    /// A DevTools command on the driver's own session rather than the
+    /// page's socket: what the driver itself keeps (its browser log).
+    /// Edge's goes to msedgedriver's own address ([`EdgeDevTools`]).
+    pub async fn driver_devtools(&self, method: &str, params: Value) -> WebDriverResult<Value> {
+        match self.browser {
+            Browser::Chrome => self.driver.cdp().send_raw(method, params).await,
+            Browser::Edge => self
+                .driver
+                .handle()
+                .cmd(Command::ExtensionCommand(Box::new(EdgeDevTools {
+                    method: method.to_owned(),
+                    params,
+                })))
+                .await?
+                .value(),
+            other => Err(WebDriverError::RequestFailed(format!(
+                "{method}: no DevTools in {other:?}"
+            ))),
+        }
+    }
+}
+
+/// Listen to Firefox's log over WebDriver BiDi until stopped: the page's
+/// errors and warnings, a script's and the console's, noted in `heard`.
+/// BiDi has no CSP refusal or failed load of its own to report, so those go
+/// unheard here; Chrome's and Edge's lanes hear them.
+async fn listen(driver: &WebDriver, heard: Shared) -> WebDriverResult<AbortHandle> {
+    let bidi = driver.bidi().await?;
+    let mut entries = bidi
+        .subscribe::<LogEntryAdded>()
+        .await
+        .map_err(|e| WebDriverError::RequestFailed(format!("BiDi's log: {e}")))?;
+    Ok(tokio::spawn(async move {
+        // The connection kept open while the log is read.
+        let _bidi = bidi;
+        while let Some(entry) = entries.next().await {
+            let level = match entry.level {
+                LogLevel::Error => "error",
+                LogLevel::Warn => "warning",
+                _ => continue,
+            };
+            note(
+                &heard,
+                format!(
+                    "{}.{level}: {}",
+                    entry.entry_type,
+                    entry.text.as_deref().unwrap_or("")
+                ),
+            );
+        }
+    })
+    .abort_handle())
 }
 
 /// Listen to the session's events until stopped: problems noted in

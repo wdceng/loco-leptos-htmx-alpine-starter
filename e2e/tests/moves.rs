@@ -4,7 +4,8 @@
 //! `<main>` and the title read out; Back brings the page back where it was
 //! scrolled; a missing page shows in the region; a newer build and a
 //! gateway's error load the page plainly instead (`Navigation`,
-//! src/islands.rs).
+//! src/islands.rs). An answer changed on its way in and a slow network are
+//! DevTools': those run in Chrome and Edge and skip elsewhere, saying why.
 
 use app_e2e::{Answer, HOME_LINK, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
@@ -16,8 +17,13 @@ async fn home_title(page: &Page) -> WebDriverResult<String> {
 }
 
 /// From the reset page, the header's link home with htmx's answer changed
-/// as `answer` says: the home page must load whole, not swap in.
+/// as `answer` says: the home page must load whole, not swap in. The answer
+/// is changed through DevTools: skipped elsewhere.
 async fn loads_plainly(page: &Page, answer: Answer) -> WebDriverResult<()> {
+    if !page.browser.has_devtools() {
+        page.skip("no DevTools: no answer changed on its way in");
+        return Ok(());
+    }
     page.open(RESET).await?;
     page.mark().await?;
     page.answers(answer).await?;
@@ -245,10 +251,15 @@ async fn a_second_press_sends_no_second_post() {
 }
 
 /// While the form is on its way, slower than 200 ms, it's `aria-busy` and
-/// its button takes the `busy:` look; the answer's page holds neither.
+/// its button takes the `busy:` look; the answer's page holds neither. The
+/// slow network is DevTools': skipped elsewhere.
 #[tokio::test]
 async fn a_sent_form_looks_busy_until_its_answer() {
     browse(|page| async move {
+        if !page.browser.has_devtools() {
+            page.skip("no DevTools: no slow network");
+            return Ok(());
+        }
         // The e2e token is no real one: the post is refused as expired.
         page.allow_failed_load(400, "/reset");
         page.open(RESET).await?;

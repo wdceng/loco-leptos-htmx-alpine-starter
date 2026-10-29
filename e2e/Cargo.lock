@@ -16,6 +16,7 @@ name = "app-e2e"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "http",
  "serde_json",
  "thirtyfour",
  "tokio",

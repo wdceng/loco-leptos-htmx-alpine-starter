@@ -14,7 +14,9 @@
 //! for, rather than one total with a margin a slow leak hides in). The DOM
 //! is read as Chrome's detached trees, the nodes off the page something
 //! still keeps, never as its count of all nodes, which includes the ones
-//! Blink hasn't freed yet.
+//! Blink hasn't freed yet. Measured through DevTools: Chrome and Edge; the
+//! others skip the measured tests, and every browser runs the island's
+//! freeing, which the page itself counts.
 
 use std::time::Duration;
 
@@ -61,7 +63,7 @@ async fn round_trip(page: &Page) -> WebDriverResult<()> {
 /// names, and Chrome logs a notice about the reset form ("Password forms
 /// should have username fields") on every visit, so with it on each Back
 /// kept one old `<main>` (a probe, 2026-10-18). A browser without DevTools
-/// keeps none. Off in both sessions, the test's and chromedriver's own,
+/// keeps none. Off in both sessions, the test's and the driver's own,
 /// which has it on for its browser logs. The move tests keep the log for
 /// CSP and load errors.
 async fn measure<F, Fut>(page: &Page, what: &str, round: F) -> WebDriverResult<()>
@@ -69,12 +71,16 @@ where
     F: Fn() -> Fut,
     Fut: Future<Output = WebDriverResult<()>>,
 {
+    if !page.browser.has_devtools() {
+        page.skip("no DevTools: nothing to count");
+        return Ok(());
+    }
     if !page.can_count_detached().await? {
-        eprintln!("{what}: skipped, this Chrome's DevTools can't list detached nodes");
+        page.skip("this DevTools can't list detached nodes");
         return Ok(());
     }
     page.devtools("Log.disable", json!({})).await?;
-    page.driver.cdp().send_raw("Log.disable", json!({})).await?;
+    page.driver_devtools("Log.disable", json!({})).await?;
     for _ in 0..2 {
         round().await?;
     }

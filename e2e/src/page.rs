@@ -5,26 +5,38 @@
 //! hands a test in a cache inside the page, and one kept link of a page
 //! moved away from holds that page's whole detached tree, which the memory
 //! tests would read as a leak (the sister app found it, 2026-10-10). A
-//! press is a mouse's, sent through DevTools at a point the page's script
-//! measured.
+//! press is a mouse's at a point the page's script measured: through
+//! DevTools in Chrome and Edge, WebDriver's own pointer in Firefox, the
+//! page's own events in Safari ([`Page::press`]).
 
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use thirtyfour::cdp::CdpSession;
+use thirtyfour::common::command::{Actions, Command};
 use thirtyfour::prelude::*;
 use tokio::task::AbortHandle;
 
-use crate::{POLL, PRESS_HELD, WAIT, devtools::Shared};
+use crate::{
+    AWAKE_WITHIN, Browser, OPEN_WITHIN, POLL, PRESS_HELD, WAIT, devtools::Shared, session::skipped,
+};
 
 /// A browser session on the run's site.
 #[derive(Clone)]
 pub struct Page {
     pub driver: WebDriver,
-    pub(crate) cdp: CdpSession,
+    pub browser: Browser,
+    /// The DevTools socket, Chrome's and Edge's alone.
+    pub(crate) cdp: Option<CdpSession>,
     pub(crate) base: String,
+    /// The lane's folder (`target/e2e/<browser>/`).
+    pub(crate) dir: String,
+    /// The running test's name, for its skip.
+    pub(crate) test: String,
     pub(crate) heard: Shared,
-    pub(crate) watcher: AbortHandle,
+    /// What listens to the page: DevTools' events, or BiDi's log in
+    /// Firefox. Safari has neither.
+    pub(crate) watcher: Option<AbortHandle>,
 }
 
 impl Page {
@@ -34,18 +46,31 @@ impl Page {
         format!("{}{path}", self.base)
     }
 
-    /// Load `path` whole and wait until the page is [`Page::ready`].
+    /// Load `path` whole and wait until the page is [`Page::ready`]: its
+    /// address first, asked for again where the browser hasn't moved within
+    /// a few seconds, as safaridriver now and then returns from going to a
+    /// page without going, the page before still showing.
     pub async fn open(&self, path: &str) -> WebDriverResult<()> {
-        self.driver.goto(self.url(path)).await?;
-        self.until(
-            &format!("{path} loaded"),
-            &format!(
-                "return location.pathname + location.search === {path:?}
-                     && document.readyState === 'complete'"
-            ),
-        )
-        .await?;
-        self.ready().await
+        let there = format!("return location.pathname + location.search === {path:?}");
+        for _ in 0..3 {
+            self.driver.goto(self.url(path)).await?;
+            let started = tokio::time::Instant::now();
+            while started.elapsed() < OPEN_WITHIN {
+                if self.eval(&there).await?.as_bool() == Some(true) {
+                    self.until(
+                        &format!("{path} loaded"),
+                        "return document.readyState === 'complete'",
+                    )
+                    .await?;
+                    return self.ready().await;
+                }
+                tokio::time::sleep(POLL).await;
+            }
+        }
+        let at = self.path().await.unwrap_or_default();
+        Err(WebDriverError::Timeout(format!(
+            "{path} never loaded, the page at {at}"
+        )))
     }
 
     /// Wait until htmx and Alpine have started and every island on the
@@ -54,10 +79,11 @@ impl Page {
     /// loader says nothing when it's done. `e2e/run.sh` builds a debug
     /// site; a release one carries no mark.
     pub async fn ready(&self) -> WebDriverResult<()> {
-        self.until(
+        self.until_within(
             "htmx, Alpine and the islands",
             "return !!(window.htmx && window.Alpine)
                  && [...document.querySelectorAll('leptos-island')].every(i => i.hasAttribute('data-awake'))",
+            AWAKE_WITHIN,
         )
         .await
     }
@@ -151,14 +177,39 @@ impl Page {
     /// with it. With the answer there before the click, htmx can swap it in
     /// before Alpine's click runs, which an instant script click never
     /// shows (tests/requests/races.rs). The page still first.
+    ///
+    /// Chrome and Edge through DevTools' mouse; Firefox through WebDriver's
+    /// own pointer at the same point. Safari's driver sends no `mousedown`,
+    /// so there the page's own events: the pointer down and, unless the page
+    /// cancels it, the focus off the field it was in, then the pointer up
+    /// and the click; nothing held, so nothing preloaded.
     pub async fn press(&self, css: &str) -> WebDriverResult<()> {
         self.still().await?;
         let (x, y) = self.centre(css).await?;
-        for kind in ["mouseMoved", "mousePressed"] {
-            self.mouse(kind, x, y).await?;
+        match self.browser {
+            Browser::Chrome | Browser::Edge => {
+                for kind in ["mouseMoved", "mousePressed"] {
+                    self.mouse(kind, x, y).await?;
+                }
+                tokio::time::sleep(PRESS_HELD).await;
+                self.mouse("mouseReleased", x, y).await
+            }
+            Browser::Firefox => self.pointer(x, y).await,
+            Browser::Safari => self
+                .eval(&format!(
+                    "const e = document.querySelector({css:?});
+                     const kind = {{ bubbles: true, cancelable: true, composed: true,
+                                     pointerType: 'mouse', isPrimary: true }};
+                     if (e.dispatchEvent(new PointerEvent('pointerdown', kind))
+                         && e.dispatchEvent(new MouseEvent('mousedown', kind))) {{
+                       document.activeElement?.blur?.();
+                     }}
+                     e.dispatchEvent(new PointerEvent('pointerup', kind));
+                     e.click()"
+                ))
+                .await
+                .map(drop),
         }
-        tokio::time::sleep(PRESS_HELD).await;
-        self.mouse("mouseReleased", x, y).await
     }
 
     /// The centre of the first element `css` finds, in the window's
@@ -198,6 +249,30 @@ impl Page {
         .map(drop)
     }
 
+    /// WebDriver's own mouse at (`x`, `y`) in the window, its left button
+    /// pressed, held as a person's is, and let go: no element handed over.
+    async fn pointer(&self, x: f64, y: f64) -> WebDriverResult<()> {
+        // Whole pixels in the window, as WebDriver's pointer takes them.
+        let (x, y) = (x.round() as i64, y.round() as i64);
+        let held = u64::try_from(PRESS_HELD.as_millis()).unwrap_or(300);
+        let press = json!([{
+            "type": "pointer",
+            "id": "mouse",
+            "parameters": { "pointerType": "mouse" },
+            "actions": [
+                { "type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y },
+                { "type": "pointerDown", "button": 0 },
+                { "type": "pause", "duration": held },
+                { "type": "pointerUp", "button": 0 },
+            ],
+        }]);
+        self.driver
+            .handle()
+            .cmd(Command::PerformActions(Actions::from(press)))
+            .await
+            .map(drop)
+    }
+
     /// A move in place by the link `css`, to `path`, waited for.
     pub async fn move_to(&self, css: &str, path: &str) -> WebDriverResult<()> {
         self.press(css).await?;
@@ -231,5 +306,14 @@ impl Page {
     /// Whether the document marked by [`Page::mark`] is still the one shown.
     pub async fn in_place(&self) -> WebDriverResult<bool> {
         Ok(self.eval("return window.__e2eMark === true").await? == Value::Bool(true))
+    }
+
+    /// A test that does not apply to this browser, said and kept: the
+    /// reason on the test's output, and the test's name with it in the
+    /// lane's `skipped.txt`, which `run.sh` counts apart from the passed, a
+    /// test returning early being "ok" to the runner. The test then
+    /// returns.
+    pub fn skip(&self, reason: &str) {
+        skipped(&self.dir, &self.test, self.browser, reason);
     }
 }

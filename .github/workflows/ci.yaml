@@ -114,10 +114,11 @@ jobs:
 
   browser:
     # The browser tests in Chrome (docs/testing.md): the island collector's
-    # wasm tests, then e2e/run.sh, which builds the site with `--split` and
-    # runs the moves in place and the memory tests against it. The runner
-    # image ships Chrome with a matching chromedriver (CHROMEWEBDRIVER).
-    # What a failed test's page showed is kept as an artifact.
+    # wasm tests, then e2e/run.sh's Chrome lane, which builds the site with
+    # `--split` and runs the browser tests against it through cargo-nextest.
+    # The runner image ships Chrome with a matching chromedriver
+    # (CHROMEWEBDRIVER). What a failed test's page showed is kept as an
+    # artifact.
     name: Browser tests (Chrome)
     runs-on: ubuntu-latest
     env:
@@ -143,17 +144,19 @@ jobs:
       - uses: cargo-bins/cargo-binstall@v1.23.0
       # The test runner of the exact wasm-bindgen release Cargo.lock holds.
       - run: cargo binstall -y wasm-bindgen-cli@0.2.129
+      # The runner of the browser tests' lanes (e2e/run.sh).
+      - run: cargo binstall -y cargo-nextest
       - name: Island collector
         run: CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" cargo test --lib --target wasm32-unknown-unknown --no-default-features --features hydrate
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
-      - name: Moves in place and memory
-        run: CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" bash e2e/run.sh
+      - name: Browser tests
+        run: CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" bash e2e/run.sh chrome
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-tests
-          path: target/e2e/run/
+          path: target/e2e/chrome/
           if-no-files-found: ignore
 
   sqlx:

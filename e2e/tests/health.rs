@@ -3,7 +3,9 @@
 //! five widths, a phone's tap targets 44px tall, nothing the accessibility
 //! audit finds, a turned phone's camera side kept clear, the top clear of a
 //! status bar over the page, Reduce Motion read and obeyed, and the islands
-//! waking on every load in one tab. A new page goes into [`PAGES`].
+//! waking on every load in one tab. A new page goes into [`PAGES`]. What
+//! needs DevTools' emulation (the insets, Reduce Motion asked for) runs in
+//! Chrome and Edge and skips elsewhere, saying why.
 
 use app_e2e::{Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
@@ -18,6 +20,25 @@ const MISSING: &str = "/no-such-page";
 /// The 404 [`MISSING`] asks for, which Chrome logs.
 fn expect_the_miss(page: &Page) {
     page.allow_failed_load(404, MISSING);
+}
+
+/// DevTools' safe-area insets set to `insets`, or the test skipped where
+/// the browser has none to set: Firefox and Safari, and Chrome 114 (the low
+/// bar), whose DevTools lack them. Whether it may go on.
+async fn insets(page: &Page, insets: Value) -> WebDriverResult<bool> {
+    if !page.browser.has_devtools() {
+        page.skip("no DevTools: no emulated safe-area insets");
+        return Ok(false);
+    }
+    if page
+        .devtools("Emulation.setSafeAreaInsetsOverride", insets)
+        .await
+        .is_err()
+    {
+        page.skip("this DevTools can't set safe-area insets");
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 /// Chrome 114 to 123 stopped calling the page idle after 9 to 14 whole
@@ -153,17 +174,11 @@ const SIDES: &str = "const s = getComputedStyle(document.querySelector('main'));
 /// than the screen (Chrome on an iPhone keeps its own view clear) keeps no
 /// inset at all, and upright nothing moves. Which angle is which side was
 /// seen on an iPhone in four browsers (public/js/safe-area.js). DevTools'
-/// own insets, which Chrome 114 lacks: skipped there.
+/// own insets ([`insets`]).
 #[tokio::test]
 async fn a_phone_on_its_side_keeps_only_its_cameras_side_clear() {
     browse(|page| async move {
-        let insets = json!({ "insets": { "left": 59, "right": 59 } });
-        if page
-            .devtools("Emulation.setSafeAreaInsetsOverride", insets)
-            .await
-            .is_err()
-        {
-            eprintln!("skipped: this Chrome's DevTools can't set safe-area insets");
+        if !insets(&page, json!({ "insets": { "left": 59, "right": 59 } })).await? {
             return Ok(());
         }
         let turned = |angle: u32, screen: u32| {
@@ -238,18 +253,11 @@ const TOP: &str = "const link = document.querySelector('a[href=\"#content\"]');
 /// The page's top clear of a status bar lying over it, as in the app's
 /// webview on a phone (src-tauri/): a 59px top inset adds itself to the
 /// header's 24px and the skip link's 16px, and with the bar gone the usual
-/// gaps glide back. DevTools' own insets, which Chrome 114 lacks: skipped
-/// there.
+/// gaps glide back. DevTools' own insets ([`insets`]).
 #[tokio::test]
 async fn the_page_keeps_clear_of_a_status_bar_over_it() {
     browse(|page| async move {
-        let insets = json!({ "insets": { "top": 59 } });
-        if page
-            .devtools("Emulation.setSafeAreaInsetsOverride", insets)
-            .await
-            .is_err()
-        {
-            eprintln!("skipped: this Chrome's DevTools can't set safe-area insets");
+        if !insets(&page, json!({ "insets": { "top": 59 } })).await? {
             return Ok(());
         }
         page.viewport(393, 852).await?;
@@ -282,11 +290,10 @@ async fn the_page_keeps_clear_of_a_status_bar_over_it() {
 
 /// The Reduce Motion rule (style/tailwind.css) is in the stylesheet as the
 /// browser read it, not only in the source: the build's CSS minifier can
-/// split or drop a rule (found in an islands app, 2026-10-21). Then, with
-/// Reduce Motion asked for, the reset form's button, which fades into its
-/// busy look, has no transition.
+/// split or drop a rule, and a browser can refuse one it can't parse (found
+/// in an islands app, 2026-10-21). Read in every browser.
 #[tokio::test]
-async fn reduce_motion_is_read_and_stops_every_transition() {
+async fn the_reduce_motion_rule_is_read() {
     browse(|page| async move {
         page.open(RESET).await?;
         let read = page
@@ -300,6 +307,22 @@ async fn reduce_motion_is_read_and_stops_every_transition() {
             )
             .await?;
         assert_eq!(read, Value::Bool(true), "the Reduce Motion rule dropped");
+        Ok(())
+    })
+    .await;
+}
+
+/// With Reduce Motion asked for, the reset form's button, which fades into
+/// its busy look, has no transition. Asked for through DevTools' emulation:
+/// Chrome and Edge.
+#[tokio::test]
+async fn reduce_motion_stops_every_transition() {
+    browse(|page| async move {
+        if !page.browser.has_devtools() {
+            page.skip("no DevTools: no emulated Reduce Motion");
+            return Ok(());
+        }
+        page.open(RESET).await?;
         let button = "return getComputedStyle(document.querySelector('main form [type=submit]')).transitionProperty";
         assert_ne!(
             page.eval(button).await?,

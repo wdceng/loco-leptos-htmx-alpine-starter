@@ -66,6 +66,27 @@ Nothing to install. They land in `~/.cache/cargo-leptos` on the first build.
 `.vscode/extensions.json` recommends both, so VS Code offers them when you
 open the folder.
 
+## Browsers
+
+The browser tests (`e2e/run.sh`, `docs/testing.md`) drive Chrome, Edge,
+Firefox and Safari through their drivers, with cargo-nextest (2.6) and
+bash 4.3 or newer (`brew install bash`; macOS's own is 3.2).
+
+```bash
+V=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version | awk '{print $3}') && mkdir -p ~/Library/Caches/chromedriver && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver.zip && unzip -o -q /tmp/chromedriver.zip -d ~/Library/Caches/chromedriver   # Chrome's, matching it (again after a Chrome update)
+brew install geckodriver        # Firefox
+sudo safaridriver --enable      # Safari, once; then Safari, Settings, Developer: "Allow remote automation"
+V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundleShortVersionString) && D=$(mktemp -d) && curl -sfL -o "$D/e.zip" "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && unzip -oq "$D/e.zip" -d "$D" && mv "$D/msedgedriver" /opt/homebrew/bin/ && xattr -d com.apple.quarantine /opt/homebrew/bin/msedgedriver 2>/dev/null; msedgedriver --version   # Edge's, matching it (again after an Edge update)
+```
+
+- **A driver that no longer matches its browser** fails the session with
+  "only supports … version": fetch it again.
+- **Firefox needs Full Disk Access for the app the run starts from**
+  (Terminal, or VS Code): System Settings, Privacy & Security, then a
+  restart of that app. Without it: "Could not find profile folder".
+- The low bar's Chrome 114 and Firefox 128: `docs/testing.md`, "The Low
+  Bar".
+
 ## 7. The App
 
 Only for `src-tauri/`. macOS and Windows:

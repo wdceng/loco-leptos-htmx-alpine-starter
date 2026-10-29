@@ -218,8 +218,9 @@ requests. Same list as the pre-deploy checks in `staging.md` and `production.md`
 - `cargo audit`
 - the `.sqlx/` cache check: a fresh test database, migrated, then
   `cargo sqlx prepare --check -- --all-targets`
-- the browser tests in Chrome: the island collector's, then `e2e/run.sh`
-  (below). A failed run keeps `target/e2e/run/` as an artifact
+- the browser tests in Chrome: the island collector's, then
+  `e2e/run.sh chrome` (below). A failed run keeps `target/e2e/chrome/` as
+  an artifact
 
 Every job builds with `SQLX_OFFLINE=true`, from the committed cache, like
 the server build.
@@ -268,24 +269,52 @@ wait two sweeps (2 s each in a debug build), and `data-islands-live` on
 
 ### Browser tests
 
-`e2e/` drives headless Chrome over WebDriver (thirtyfour) against a real
-build: the moves in place and the memory tests. A crate of its own, so
-`cargo test` in the root runs none of it.
+`e2e/` drives Chrome, Edge, Firefox and Safari over WebDriver (thirtyfour)
+against a real build: the moves in place, the memory and the health
+tests. A crate of its own, so `cargo test` in the root runs none of it.
+The lanes are an islands app's on this stack, without its phones yet.
 
 ```bash
-e2e/run.sh                      # all of them
-e2e/run.sh memory               # only the memory tests (cargo test's filter)
-E2E_HEADED=1 e2e/run.sh moves   # with Chrome's window
+e2e/run.sh desktop                      # the four browsers side by side, one summary
+e2e/run.sh chrome                       # one browser: chrome, edge, firefox or safari
+e2e/run.sh firefox memory               # its memory tests only (nextest's filter)
+E2E_HEADED=1 e2e/run.sh chrome moves    # with the browser's window
+E2E_LANES="chrome safari" e2e/run.sh desktop   # some of the lanes, side by side
+cargo test --manifest-path e2e/Cargo.toml --lib   # the harness's own tests, no browser
 ```
 
-It uses the chromedriver in `~/Library/Caches/chromedriver` (the
-collector's, above), or `CHROMEDRIVER`, or the one on the `PATH`.
+| Lane | Site | Driver |
+|---|---|---|
+| `chrome` | 5160 | chromedriver, 9515 |
+| `edge` | 5161 | msedgedriver, 9516 |
+| `firefox` | 5162 | geckodriver, 9517 |
+| `safari` | 5163 | safaridriver, 9518 |
 
-The script builds the site into `target/e2e` with `--split`, starts it on
-port 5160 (`LOCO_ENV=e2e`, `config/e2e.yaml`, a fresh SQLite file) and
-chromedriver on 9515, runs the tests one at a time, and stops both. It
-never touches the watch loop's `target/site`, port 5150 or database, so it
-runs beside `cargo leptos watch`.
+The script builds the site into `target/e2e` with `--split`, once. Each
+lane then starts its own site (`LOCO_ENV=e2e`, `config/e2e.yaml`, a fresh
+SQLite file) and driver on its own ports, runs the boot test alone, then
+the rest one at a time through cargo-nextest, a failure tried once more
+and called flaky if it then passes. It never touches the watch loop's
+`target/site`, port 5150 or database, so it runs beside `cargo leptos
+watch`. Each lane's files are in `target/e2e/<lane>/`: `run.txt`,
+`server.log`, `driver.log`, `skipped.txt` and `failures/`.
+
+Chrome's driver is the one in `~/Library/Caches/chromedriver` (the
+collector's, above), or `CHROMEDRIVER`, or the one on the `PATH`; the
+others are on the `PATH` (`prerequisites.md`).
+
+- **What only DevTools can do runs in Chrome and Edge:** the safe-area
+  insets, Reduce Motion asked for, a changed answer, a slow network,
+  memory. Firefox and Safari skip those tests, each with its reason in the
+  lane's `skipped.txt`, counted apart in the summary.
+- **A page's errors are heard in Chrome, Edge and Firefox**, Firefox's
+  through WebDriver BiDi's log (no CSP refusals there). Safari's driver
+  has neither DevTools nor BiDi: its lane hears none.
+- **Quit Safari before its lane.** safaridriver waits behind an open
+  Safari's windows; the lane refuses to start beside one, and quits its
+  own at the end.
+- **A lane that stops opening sessions is marked broken** after two tests
+  in a row: the rest fail at once, and the summary says since when.
 
 - **Moves** (`e2e/tests/moves.rs`): the lazy island wakes; a link moves in
   place with its title, the focus on `<main>` and the title read out; no
@@ -313,7 +342,7 @@ runs beside `cargo leptos watch`.
   any other line still fails it.
 
 What a failed test's page showed (screenshot, HTML, the server log's tail,
-and every line the page logged) is in `target/e2e/run/failures/`.
+and every line the page logged) is in `target/e2e/<lane>/failures/`.
 
 - **The memory tests turn DevTools' log off.** It keeps every element a
   log entry names, and Chrome notes the reset form on each visit, which
@@ -321,10 +350,12 @@ and every line the page logged) is in `target/e2e/run/failures/`.
 - **A changed answer keeps DevTools pausing answers for the session.**
   Turned off mid-test, Chrome 114 left a paused wasm fetch hanging, and
   the next page's islands never started.
-- **A press is a mouse's, sent through DevTools** (`Page::press`): held
+- **A press is a mouse's at a measured point** (`Page::press`): through
+  DevTools in Chrome and Edge, WebDriver's own pointer in Firefox, held
   300 ms so it preloads, as a person's does. Never the driver's element:
   chromedriver keeps each one it hands a test, and that holds the old page
-  in memory.
+  in memory. Safari's driver sends no `mousedown`, so there it's the
+  page's own events, nothing held.
 
 ## Manual Testing
 
@@ -660,18 +691,25 @@ WebKit after Safari's and the iOS webviews', and untested so far.
 ## The Low Bar
 
 The oldest browsers the template supports, about 30 months back. Chrome
-114 has a lane here; the rest are findings from an islands app on this
-stack, kept for when an app adds them.
+114 and Firefox 128 have lanes here; the phones' are findings from an
+islands app on this stack, kept for when the phones' lanes come.
 
 ```bash
-e2e/run.sh low          # the same tests in Chrome for Testing 114
-e2e/run.sh low moves    # cargo test's filter, as on the top lane
+e2e/run.sh low                # both side by side: chrome-low and firefox-low
+e2e/run.sh chrome-low moves   # one of them, nextest's filter as on a top lane
 ```
 
-It uses Chrome for Testing 114 and chromedriver 114 from
-`~/Library/Caches/e2e-floor/` (below), or `E2E_BINARY` and `CHROMEDRIVER`.
-Local only, never in `ci.yaml`. The two leak tests skip there,
-saying why (no `DOM.getDetachedDomNodes`); the rest run.
+| Lane | Site | Driver |
+|---|---|---|
+| `chrome-low` | 5169 | chromedriver 114, 9524 |
+| `firefox-low` | 5170 | geckodriver, 9525 |
+
+Chrome for Testing 114 with chromedriver 114, and Firefox 128, from
+`~/Library/Caches/e2e-floor/` (below), or another folder in `E2E_LOW`.
+The installed geckodriver drives Firefox from 115 on. Local only, never in
+`ci.yaml`. In Chrome 114 the two leak tests and the two inset tests skip,
+saying why (no `DOM.getDetachedDomNodes`, no safe-area insets); the rest
+run.
 
 - **htmx's `fetch()` is resource type `XHR` in Chrome 114,** `Fetch` in
   155: the harness pauses both, or a changed answer never reaches the page.
@@ -693,7 +731,11 @@ ditto -x -k chrome-mac-arm64.zip ~/Library/Caches/e2e-floor/chrome-114          
 ditto -x -k chromedriver_mac_arm64.zip ~/Library/Caches/e2e-floor/chromedriver-114  # where run.sh looks
 ```
 
-- Firefox 128.0.3 from `ftp.mozilla.org`, geckodriver 0.34 or newer.
+```bash
+# Firefox 128, Tailwind v4's floor
+F=~/Library/Caches/e2e-floor && curl -fL -o "$F/firefox-128.dmg" "https://ftp.mozilla.org/pub/firefox/releases/128.0.3/mac/en-US/Firefox%20128.0.3.dmg" && hdiutil attach -nobrowse -quiet -mountpoint /tmp/ff128 "$F/firefox-128.dmg" && mkdir -p "$F/firefox-128" && cp -R /tmp/ff128/Firefox.app "$F/firefox-128/" && hdiutil detach -quiet /tmp/ff128 && rm "$F/firefox-128.dmg"
+```
+
 - iOS 17.5: the `.dmg` from developer.apple.com/download/all, then
   `xcrun simctl runtime add <dmg>`. A disk image, not a cryptex, or
   safaridriver opens no session.

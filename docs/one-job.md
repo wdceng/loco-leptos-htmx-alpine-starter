@@ -85,8 +85,10 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The site on a phone without a store | the home-screen app (the web manifest), beside the store app by choice (`decisions.md`) | `src/controllers/manifest.rs` |
 | "Is the site up?" for another origin (the app's start page) | `/up`, `up::PATH`; Loco's `/_ping` for everything else, since it allows no other origin | `src/controllers/up.rs` |
 | A library in the page | a vendored file in `public/vendor/`, its version in its name, loaded by `Scripts` | `src/views/layout.rs` |
-| A browser test: a Chrome session, its page, waits, memory | `browse`, `Page` (`open`, `until`, `still`, `move_to`, `held`) | `e2e/src/` |
-| A press in a browser test: a mouse's, held for the preload, through DevTools, never the driver's element | `Page::press` | `e2e/src/page.rs` |
+| A browser test: a session in the lane's browser, its page, waits, memory | `browse`, `Page` (`open`, `until`, `still`, `move_to`, `held`) | `e2e/src/` |
+| Which browser a lane drives, and what it can do (DevTools or not) | `Browser` (`has_devtools`) | `e2e/src/browser.rs` |
+| A browser test that doesn't apply to this browser, said and counted | `Page::skip` | `e2e/src/page.rs` |
+| A press in a browser test: a mouse's, held for the preload, never the driver's element | `Page::press` | `e2e/src/page.rs` |
 | The visitor's settings in a browser test (Reduce Motion) | `Page::emulate` | `e2e/src/devtools.rs` |
 | The accessibility audit | `Page::axe` (axe-core in `e2e/vendor/`) | `e2e/src/devtools.rs` |
 | The pages and links browser tests share | `RESET`, `HOME_LINK` | `e2e/src/lib.rs` |

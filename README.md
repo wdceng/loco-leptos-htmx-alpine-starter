@@ -138,8 +138,8 @@ time cargo nextest run                  # all, the usual way: faster than cargo 
 cargo nextest run reset                 # those whose name holds it
 cargo test                              # all, the plain way
 cargo llvm-cov nextest --summary-only   # all, with each file's coverage
-e2e/run.sh                              # the browser tests, current Chrome
-e2e/run.sh low                          # the same in Chrome 114, the low bar
+e2e/run.sh desktop                      # the browser tests in Chrome, Edge, Firefox and Safari
+e2e/run.sh low                          # the same in Chrome 114 and Firefox 128, the low bar
 src-tauri/screens.sh                    # pictures of the app on each phone, tablet and this Mac, against the dev loop
 ```
 

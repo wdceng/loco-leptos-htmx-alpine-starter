@@ -1,9 +1,9 @@
-# The browser tests (docs/testing.md, "Browser tests"): headless Chrome,
-# driven over WebDriver, against the site `e2e/run.sh` builds and serves
-# (config/e2e.yaml). A crate of its own, in its own workspace (the empty
-# table below): thirtyfour and its tree stay out of the site's lock and
-# builds, and `cargo test` in the repo root runs none of these. The harness
-# is the library (src/lib.rs), the tests are under tests/.
+# The browser tests (docs/testing.md, "Browser tests"): Chrome, Edge,
+# Firefox and Safari, driven over WebDriver, against the site `e2e/run.sh`
+# builds and serves (config/e2e.yaml). A crate of its own, in its own
+# workspace (the empty table below): thirtyfour and its tree stay out of the
+# site's lock and builds, and `cargo test` in the repo root runs none of
+# these. The harness is the library (src/lib.rs), the tests are under tests/.
 [workspace]
 
 [package]
@@ -21,17 +21,23 @@ name = "e2e"
 path = "tests/main.rs"
 
 [dependencies]
-# WebDriver, with Chrome's DevTools: `cdp-events` opens DevTools' own
-# socket, so a test hears the page's errors and can change an answer on its
-# way in (src/devtools.rs). Without the defaults' driver download: run.sh
-# starts chromedriver itself.
+# WebDriver: Chrome, Edge, Firefox and Safari through their own drivers.
+# `cdp-events` opens Chrome's and Edge's DevTools socket, so a test hears
+# the page's errors and can change an answer on its way in
+# (src/devtools.rs); `bidi`, WebDriver BiDi, is Firefox's way to hear them.
+# Without the defaults' driver download: run.sh starts each driver itself.
 thirtyfour = { version = "0.37.8", default-features = false, features = [
   "reqwest",
   "rustls",
   "cdp",
   "cdp-events",
+  "bidi",
 ] }
 tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "time"] }
 serde_json = { version = "1.0.154" }
-# DevTools' events as a stream. In the tree through thirtyfour.
+# DevTools' and BiDi's events as a stream. In the tree through thirtyfour.
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+# The method of Edge's DevTools command over HTTP, which thirtyfour's own
+# `cdp()` sends to Chrome's address alone (src/devtools.rs, `EdgeDevTools`).
+# In the tree through thirtyfour; same version.
+http = { version = "1.5.0" }
