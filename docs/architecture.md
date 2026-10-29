@@ -108,7 +108,8 @@ like every public file. Leptos itself comes from a fork pinned in
 idle time. Two glues: `public/js/htmx-islands.js` wakes the islands htmx
 swaps in (and
 works around Chrome's `parseHTMLUnsafe` losing the comments Leptos
-hydrates by, htmx #4147), and htmx's Alpine extension
+hydrates by, htmx #4147, by removing it, so htmx parses with DOMParser),
+and htmx's Alpine extension
 does the same for Alpine. What a swap needs beyond htmx is the
 `Navigation` island, ported from the project this template shares its
 stack with:

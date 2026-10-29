@@ -3,6 +3,13 @@
 What was tried and reverted, and why. Nothing here is suggested again
 without a new reason.
 
+- **Passing options to `parseHTMLUnsafe`** for htmx #4147 (2026-10-19,
+  dropped 2026-10-29), the htmx maintainer's way. A Chrome without the
+  options overload (145 on the Android emulator, no Sanitizer API) threw
+  "Overload resolution failed" on every swap: the address moved, nothing
+  else did. Deleting the function, as the islands app on this stack does,
+  lets htmx use DOMParser in every browser (`decisions.md`).
+
 - **A wrapper giving every idle callback a 2 s timeout**
   (`public/js/island-loader-timeout.js`, 2026-10-19, dropped the same
   day). It worked, loaded before Leptos's loader, but capped every

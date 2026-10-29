@@ -3,18 +3,16 @@
 // script in the template: plumbing, no page logic (CLAUDE.md, "Islands,
 // htmx and Alpine").
 
-// In blocks, so these consts stay out of the page's global scope.
-{
-  // 1. Chrome 150 to 156 drops the comments Leptos hydrates by when
-  //    parseHTMLUnsafe gets one argument; with options it keeps them
-  //    (https://github.com/bigskysoftware/htmx/issues/4147, the htmx
-  //    maintainer's way). Remove once Chrome 156 is below the low bar.
-  const parse = Document.parseHTMLUnsafe?.bind(Document);
-  if (parse) {
-    Document.parseHTMLUnsafe = (html, options) => parse(html, { ...options });
-  }
-}
+// 1. Chrome 150 to 156 drop the comments Leptos hydrates by in
+//    parseHTMLUnsafe (https://github.com/bigskysoftware/htmx/issues/4147);
+//    without it htmx falls back to DOMParser, which keeps them, in every
+//    browser, as an islands app on this stack does it. Passing options
+//    instead, the htmx maintainer's way, throws in a Chrome without the
+//    options overload (145 on Android), and every swap failed. Remove once
+//    Chrome 156 is below the low bar.
+delete Document.parseHTMLUnsafe;
 
+// In blocks, so these consts stay out of the page's global scope.
 {
   // 2. Wake islands htmx swaps in, as Leptos's own router does.
   //    Islands already on the page are Leptos's first pass: mark them.

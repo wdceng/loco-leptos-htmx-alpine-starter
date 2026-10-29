@@ -111,6 +111,12 @@ change of mind gets a new line, and the old one moves to
   called with one argument. #4147 closed without a change in htmx.
   **Way back:** once Chrome 156 is below the low bar (`testing.md`, "The
   Low Bar"), drop it.
+- 2026-10-29: **It deletes the function again**, as the islands app on
+  this stack does: htmx then parses with DOMParser in every browser. The
+  options threw "Overload resolution failed" in a Chrome without the
+  options overload (145, the Android phone lane, a probe of every swap),
+  so no move in place worked there (`tried-and-dropped.md`). A browser
+  test checks the function is gone. **Way back:** as above.
 - 2026-10-19: **Leptos from a fork, pinned by commit**
   (`[patch.crates-io]` in `Cargo.toml`): 0.8.22 as published plus one
   line, the islands loader's `requestIdleCallback` given a 2 s timeout, as

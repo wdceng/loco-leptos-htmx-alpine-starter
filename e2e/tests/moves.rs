@@ -38,11 +38,19 @@ async fn loads_plainly(page: &Page, answer: Answer) -> WebDriverResult<()> {
     page.ready().await
 }
 
+/// The lazy island wakes, and htmx parses with DOMParser in every browser:
+/// public/js/htmx-islands.js removes `parseHTMLUnsafe` (htmx #4147), whose
+/// options-passing workaround threw on every swap in Chrome 145.
 #[tokio::test]
 async fn a_full_load_wakes_the_lazy_island() {
     browse(|page| async move {
         page.open("/").await?;
         assert!(page.says("Islands: running").await?, "the lazy island runs");
+        assert_eq!(
+            page.eval("return typeof Document.parseHTMLUnsafe").await?,
+            Value::from("undefined"),
+            "parseHTMLUnsafe removed, so htmx uses DOMParser"
+        );
         let title = page.driver.title().await?;
         assert!(
             !title.contains("<!>"),
