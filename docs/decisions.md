@@ -92,7 +92,9 @@ change of mind gets a new line, and the old one moves to
   hashed split build) against a sorted `wasm_split_cli_support` 0.2.3
   (wasm-split-prototype #79: new names on every build). Both fixes were
   merged upstream on 2026-10-16 (#79 as `cc582f1`, the same code as our
-  patch); neither is released yet. **Released yet?** `tools/upstream.sh`.
+  patch). #79's fix is released in `wasm_split_cli_support` 0.2.4; #691
+  is not, cargo-leptos 0.3.11 is still the newest (checked 2026-10-30).
+  **Released yet?** `tools/upstream.sh`.
   **Way back:** once it prints the cargo-leptos test and that passes,
   `cargo install --locked cargo-leptos@<version>` in the README,
   `prerequisites.md` and CI, delete `tools/cargo-leptos/` and the

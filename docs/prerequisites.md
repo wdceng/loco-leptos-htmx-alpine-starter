@@ -26,13 +26,17 @@ Install commands are each tool's own. Your package manager works too.
 | 2.1 | **cargo-watch** | Only for `cargo loco watch`, which reloads just the server. The usual loop is `cargo leptos watch --split -- start` | `cargo install --locked cargo-watch` |
 | 2.2 | **cargo-audit** | Scans `Cargo.lock` for known vulnerabilities. CI runs 0.22.2. `.cargo/audit.toml` lists ignored advisories | `cargo install --locked cargo-audit@0.22.2` |
 | 2.3 | **cargo-zigbuild**, with Zig and the Linux target | Builds the Linux x86_64 server binary natively, Zig as its linker (`dev-server.md`, `staging.md`, `production.md`) | `brew install zig` (or https://ziglang.org/download/), then `cargo install --locked cargo-zigbuild && rustup target add x86_64-unknown-linux-gnu` |
-| 2.4 | **cargo-binstall** | Installs prebuilt cargo tools instead of compiling them. CI uses it for cargo-audit | `cargo install --locked cargo-binstall` |
+| 2.4 | **cargo-update** | `cargo install-update -a` updates every cargo tool. Set once to keep sqlx-cli on 0.9.0 and to install nextest `--locked`. It leaves the patched cargo-leptos alone (a path install) | `cargo install --locked cargo-update --features vendored-openssl && cargo install-update-config --version "=0.9.0" sqlx-cli && cargo install-update-config --enforce-lock cargo-nextest` |
 | 2.5 | **loco** | The Loco CLI, only for `loco new` and generators. Not needed here: `cargo loco` is a cargo alias in `.cargo/config.toml` that runs the app binary | `cargo install --locked loco` |
 | 2.6 | **cargo-nextest** | One process per test (`cargo nextest run`). `.config/nextest.toml` keeps app-booting tests on one thread | `cargo install --locked cargo-nextest` |
 | 2.7 | **cargo-sweep** | Clears old native, wasm32 and Linux builds out of `target/` | `cargo install --locked cargo-sweep` |
 | 2.8 | **sea-orm-cli** | Only for `cargo loco db entities`, which regenerates `src/models/_entities/`. `cargo loco doctor` flags it if missing | `cargo install --locked sea-orm-cli` |
 | 2.9 | **sqlx-cli** | `cargo sqlx prepare` refreshes the `.sqlx/` query cache after a migration or a new query (`development.md`). Same version as the `sqlx` crate, 0.9.0 | `cargo install --locked sqlx-cli@0.9.0 --no-default-features --features sqlite` |
 | 2.10 | **cargo-llvm-cov** | Each file's test coverage (`cargo llvm-cov nextest --summary-only`) | `rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov` |
+| 2.11 | **cargo-cache** | Shows and trims `~/.cargo`'s downloads (`cargo cache --autoclean`) | `cargo install --locked cargo-cache` |
+
+- **cargo-update without `vendored-openssl` breaks when brew's OpenSSL
+  moves on.** It linked `openssl@3`, gone once brew had only `openssl@4`.
 
 ## 3. Local Services
 
@@ -75,6 +79,7 @@ Chrome on Android emulators, with cargo-nextest (2.6) and bash 4.3 or
 newer (`brew install bash`; macOS's own is 3.2).
 
 ```bash
+brew install --cask google-chrome microsoft-edge firefox   # the desktop lanes' browsers, kept current by `brew upgrade`
 V=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version | awk '{print $3}') && mkdir -p ~/Library/Caches/chromedriver && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver.zip && unzip -o -q /tmp/chromedriver.zip -d ~/Library/Caches/chromedriver   # Chrome's, matching it (again after a Chrome update)
 brew install geckodriver        # Firefox
 sudo safaridriver --enable      # Safari, once; then Safari, Settings, Developer: "Allow remote automation"
@@ -110,7 +115,7 @@ xcrun simctl list devices 'iOS 27.2'   # an "iPhone 18 Pro", an "iPad Pro 13-inc
 Android (the command-line tools, no Android Studio):
 
 ```bash
-brew install --cask temurin android-commandlinetools   # Java and sdkmanager
+brew install --cask temurin@21 android-commandlinetools   # Java 21, the one Gradle needs too, and sdkmanager
 yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"   # an Android 17 image with Chrome
 echo no | avdmanager create avd -n android-phone -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10    # a Pixel 10, once
 echo no | avdmanager create avd -n android-tablet -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet   # a Pixel Tablet, once
@@ -231,6 +236,7 @@ rustup target list --installed | grep wasm32 && tools/cargo-leptos/check.sh
 
 ```bash
 rustup update                    # Rust, clippy, rustfmt
+cargo install-update -a          # the cargo tools (2.4)
 tools/cargo-leptos/install.sh    # after tools/cargo-leptos/ changed
 ```
 
