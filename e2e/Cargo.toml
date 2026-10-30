@@ -26,14 +26,14 @@ path = "tests/main.rs"
 # the page's errors and can change an answer on its way in
 # (src/devtools.rs); `bidi`, WebDriver BiDi, is Firefox's way to hear them.
 # Without the defaults' driver download: run.sh starts each driver itself.
-thirtyfour = { version = "0.37.8", default-features = false, features = [
+thirtyfour = { version = "0.38.1", default-features = false, features = [
   "reqwest",
   "rustls",
   "cdp",
   "cdp-events",
   "bidi",
 ] }
-tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
 serde_json = { version = "1.0.154" }
 # DevTools' and BiDi's events as a stream. In the tree through thirtyfour.
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }

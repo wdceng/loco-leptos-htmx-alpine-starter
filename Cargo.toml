@@ -51,7 +51,7 @@ leptos = { git = "https://github.com/wdceng/leptos", rev = "edce065baeb60c9cb4ba
 # ---------------------------------------------------------------------------
 loco-rs = { workspace = true, optional = true }
 axum = { version = "0.8.9", optional = true }
-tokio = { version = "1.53.3", default-features = false, features = [
+tokio = { version = "1.54.1", default-features = false, features = [
   "rt-multi-thread",
   "sync", # src/hashing.rs: at most four password hashes at once
   "time", # rate limiter housekeeping interval
@@ -96,7 +96,7 @@ chrono = { version = "0.4.45", optional = true }
 # version here is a second `validator` in the graph and the trait no longer
 # matches (E0277). Loco 1.2 pins 0.20.
 validator = { version = "0.20.0", optional = true }
-uuid = { version = "1.28.0", features = ["v4"], optional = true }
+uuid = { version = "1.29.0", features = ["v4"], optional = true }
 # ts-rs derives the TypeScript bindings for the `dtos` (the typed JSON API
 # contract). The export itself is commented out in src/dtos/common.rs until
 # a TypeScript consumer of the JSON API exists.
