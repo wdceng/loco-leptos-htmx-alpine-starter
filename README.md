@@ -180,6 +180,7 @@ crates.io whether it is; how to undo each workaround is under "Way back" in
 | [dev-server.md](docs/dev-server.md), [staging.md](docs/staging.md), [production.md](docs/production.md) | Deploying to a Linux server. Read production.md first: Caddy, Cloudflare, firewall, mail |
 | [architecture.md](docs/architecture.md) | Why it's built this way |
 | [prerequisites.md](docs/prerequisites.md) | Every tool |
+| [push.md](docs/push.md) | Adding web push later, and the mistakes to skip |
 | [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md), `.claude/skills/loco/` | For AI coding agents |
 
 ## License

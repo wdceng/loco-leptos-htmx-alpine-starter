@@ -156,6 +156,77 @@ fn dev_server_is_staging_on_its_own_host() {
     );
 }
 
+/// The variables a config reads with `get_env` and no `default`, which
+/// refuse the boot when unset: its code lines alone, a comment naming one
+/// left out.
+fn required_variables(config: &str) -> Vec<String> {
+    config
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .flat_map(|line| line.split("get_env(").skip(1))
+        .filter_map(|call| {
+            let call = call.split(')').next()?;
+            let name = call.split("name=\"").nth(1)?.split('"').next()?;
+            (!call.contains("default=")).then(|| name.to_owned())
+        })
+        .collect()
+}
+
+/// A deployed environment's example secrets file names every variable its
+/// config requires, set or commented, and holds nothing a shell can't read:
+/// each line a comment, blank, or `NAME=value`, since the deploy docs load
+/// it with `. ./secrets.env`. An islands app on this stack lost both
+/// (2026-10-30): a required `PUSH_KEY` missing from its examples, a server
+/// made from them never starting, and a comment without its `#` stopping
+/// every command after it (docs/push.md).
+#[rstest]
+#[case::dev_server(dev_server())]
+#[case::staging(staging())]
+#[case::production(Environment::Production)]
+fn every_required_variable_is_in_the_example_secrets(#[case] env: Environment) {
+    let config = std::fs::read_to_string(config_path(&env)).expect("the config");
+    let path = format!("secrets.{env}.env.example");
+    let example = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    for (number, line) in example.lines().enumerate() {
+        let line = line.trim();
+        let assignment = line.split_once('=').is_some_and(|(name, _)| {
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        });
+        assert!(
+            line.is_empty() || line.starts_with('#') || assignment,
+            "{path}:{}: neither a comment nor NAME=value, which `. ./secrets.env` stops on: {line}",
+            number + 1
+        );
+    }
+    let named: Vec<&str> = example
+        .lines()
+        .filter_map(|line| line.trim_start_matches(['#', ' ']).split_once('='))
+        .map(|(name, _)| name)
+        .collect();
+    for name in required_variables(&config) {
+        assert!(
+            named.contains(&name.as_str()),
+            "{env}: config/{env}.yaml requires {name} (no default), which {path} doesn't name"
+        );
+    }
+}
+
+/// The reading itself: a call without a default is required, one with a
+/// default or in a comment is not.
+#[test]
+fn a_required_variable_is_a_get_env_without_a_default() {
+    let config = r#"
+# `get_env(name="X")` with no default fails at startup
+a: '<%= get_env(name="NEEDED") %>'
+b: '<%= get_env(name="OPTIONAL", default="x") %>'
+c: '<%= get_env(name="TWO") %> <%= get_env(name="THREE", default="") %>'
+"#;
+    assert_eq!(required_variables(config), ["NEEDED", "TWO"]);
+}
+
 #[rstest]
 #[case::development(Environment::Development)]
 // `case::test` would make rstest drop the function without a warning.

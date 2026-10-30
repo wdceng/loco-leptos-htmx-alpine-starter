@@ -75,6 +75,8 @@ Each of these brings its own risks. The template has none of them yet.
   protection** on every form, an origin check at least. An islands app on
   this stack has both.
 - **A second factor:** passkeys or an authenticator app, recovery codes.
+- **Web push:** cookie sessions first (above), then `push.md`, the steps
+  and the mistakes an islands app on this stack made adding it.
 - **Your own htmx and Alpine attributes:** the libraries are in the
   template; what you write with them is yours. Addresses from `paths`,
   selectors and Alpine expressions as named constants, each Alpine
