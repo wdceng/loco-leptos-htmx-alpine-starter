@@ -59,7 +59,8 @@ LOCO_CONFIG_FOLDER=/path/to/copy cargo loco start  # try an edited copy of confi
 
 ## Lint and Format
 
-CI runs these, so run them before you push:
+Run these before you push; CI runs the same when Actions is on
+(`testing.md`, "CI"):
 
 ```bash
 cargo fmt
@@ -106,7 +107,8 @@ cargo loco db migrate                                                          #
 DATABASE_URL=sqlite://app_development.sqlite cargo sqlx prepare -- --all-targets   # then the cache
 ```
 
-Commit `.sqlx/` with the change. CI fails if you forget.
+Commit `.sqlx/` with the change: a build whose query is missing from the
+cache fails, every build being offline.
 
 - **Never `export DATABASE_URL`.** Every config reads it, so `cargo test`
   would run against that database and wipe it. Set it on the one command.

@@ -243,6 +243,16 @@ change of mind gets a new line, and the old one moves to
 - 2026-10-18: **The security contact lives in the config**, not the
   environment: it isn't a secret. Production refuses to boot while it's
   still `example.com`.
+- 2026-10-30: **A new account's name and email rules are refused with
+  their reason** (400, `name_or_email_problem`), like the password's, not
+  Loco's silent 200: checked before the account is looked up, so the
+  answer still says nothing about who exists. The `user:create` task the
+  same.
+- 2026-10-30: **Who may ask for a magic link is a setting**
+  (`settings.magic_link.allowed_domains`, empty for any address), not
+  Loco's regex of `example.com` and `gmail.com` in the controller: an app
+  narrows it in its config, a wrong entry refuses the boot. `regex` left
+  the app with it, now a test dependency.
 
 ## Working
 

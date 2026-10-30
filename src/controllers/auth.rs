@@ -233,8 +233,7 @@ async fn magic_link_verify(
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let Ok(user) = users::Model::find_by_magic_token(&ctx.db, &token).await else {
-        // we don't want to expose our users email. if the email is invalid we still
-        // returning success to the caller
+        // An unknown or expired token is refused, as the verify link's is.
         return unauthorized("unauthorized!");
     };
 

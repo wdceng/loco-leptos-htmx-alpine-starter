@@ -248,7 +248,7 @@ cargo-leptos downloaded the test runner with wasm-bindgen, and chromedriver
 must match your Chrome.
 
 ```bash
-CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=~/Library/Caches/cargo-leptos/wasm-bindgen-0.2.129/wasm-bindgen-0.2.129/wasm-bindgen-0.2.129-aarch64-apple-darwin/wasm-bindgen-test-runner CHROMEDRIVER=~/Library/Caches/chromedriver/chromedriver-mac-arm64/chromedriver cargo test --lib --target wasm32-unknown-unknown --no-default-features --features hydrate   # the collector's four tests
+CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=~/Library/Caches/cargo-leptos/wasm-bindgen-0.2.130/wasm-bindgen-0.2.130/wasm-bindgen-0.2.130-aarch64-apple-darwin/wasm-bindgen-test-runner CHROMEDRIVER=~/Library/Caches/chromedriver/chromedriver-mac-arm64/chromedriver cargo test --lib --target wasm32-unknown-unknown --no-default-features --features hydrate   # the collector's four tests
 ```
 
 Freed after two sweeps off the page, kept while on it, one strike then

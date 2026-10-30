@@ -62,7 +62,6 @@ tracing-subscriber = { version = "0.3.23", features = [
   "env-filter",
   "json",
 ], optional = true }
-regex = { version = "1.13.1", optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154" }
 
@@ -114,12 +113,12 @@ ts-rs = { version = "12.0.1", features = [
 leptos = { version = "0.8.22", features = ["islands"] }
 leptos_axum = { version = "0.8.10", optional = true }
 any_spawner = { version = "0.3.0", features = ["tokio"], optional = true }
-wasm-bindgen = { version = "0.2.129", optional = true }
+wasm-bindgen = { version = "0.2.130", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 # The browser's API for the islands (src/islands.rs), in both halves like
 # the islands themselves, which Leptos already builds against. Only what an
 # island names is switched on.
-web-sys = { version = "0.3.106", features = [
+web-sys = { version = "0.3.107", features = [
   # src/collect.rs: an island's node watched until it has left the page,
   # its `<leptos-island>` marked awake in a debug build.
   "Element",
@@ -199,7 +198,6 @@ ssr = [
   "dep:async-trait",
   "dep:tracing",
   "dep:tracing-subscriber",
-  "dep:regex",
   "dep:migration",
   "dep:sea-orm",
   "dep:sqlx",
@@ -241,13 +239,17 @@ insta = { version = "1.49.0", features = ["redactions", "yaml", "filters"] }
 # Both crates are already in the tree through loco-rs; same versions.
 tera = { version = "2.4.0" }
 serde_yaml = { version = "0.9.34" }
+# The links and llms.txt tests read addresses out of rendered pages. Loco's
+# starter declared it for the magic link's allowed domains, now a setting
+# (`settings.magic_link`), so the app itself no longer uses it.
+regex = { version = "1.13.1" }
 
 # The island collector's tests, run in headless Chrome (src/collect.rs,
 # docs/testing.md, "The island collector"). It requires the exact
-# wasm-bindgen release Cargo.lock holds (0.3.79 pairs with 0.2.129): bump
+# wasm-bindgen release Cargo.lock holds (0.3.80 pairs with 0.2.130): bump
 # the two together.
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-wasm-bindgen-test = { version = "0.3.79" }
+wasm-bindgen-test = { version = "0.3.80" }
 
 [package.metadata.leptos]
 # Name of the js/wasm/css files. Mandatory: Leptos's config loader has no

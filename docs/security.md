@@ -28,7 +28,7 @@ updates it in the same commit.
 | Bypassing the CDN | Firewall to Cloudflare only, the origin key | `production.md` | by hand |
 | Secrets in production | Refused at boot while empty or a placeholder; the security contact too | `src/deploy_checks.rs` | `src/deploy_checks.rs` |
 | Personal data in logs | No email address in any log line; the journal keeps 30 days | `src/controllers/auth.rs`, `production.md` | by hand |
-| Known-vulnerable crates | `cargo audit` in CI and before a production deploy | `.cargo/audit.toml` | CI |
+| Known-vulnerable crates | `cargo audit` as the production deploy's first gate (`production.md`), and in CI when Actions is on | `.cargo/audit.toml` | the deploy chain |
 
 ## The review of 2026-10-18
 

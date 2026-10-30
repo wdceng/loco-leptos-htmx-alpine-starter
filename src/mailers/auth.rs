@@ -62,11 +62,11 @@ impl AuthMailer {
     ///
     /// When email sending is failed
     pub async fn send_welcome(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        let link = format!(
-            "{}/api/auth/verify/{}",
-            Self::origin(ctx),
-            user.email_verification_token.as_deref().unwrap_or_default()
-        );
+        let token = user
+            .email_verification_token
+            .as_deref()
+            .ok_or_else(|| Error::string("the user has no email verification token"))?;
+        let link = format!("{}/api/auth/verify/{token}", Self::origin(ctx));
         Self::send(
             ctx,
             user,
@@ -88,11 +88,14 @@ impl AuthMailer {
     pub async fn forgot_password(ctx: &AppContext, user: &users::Model) -> Result<()> {
         // A query, not Loco's `#token`: the reset page is server-rendered
         // and can't read what follows `#` (controllers/reset.rs).
+        let token = user
+            .reset_token
+            .as_deref()
+            .ok_or_else(|| Error::string("the user has no reset token"))?;
         let link = format!(
-            "{}{}?token={}",
+            "{}{}?token={token}",
             Self::origin(ctx),
-            crate::controllers::reset::PATH,
-            user.reset_token.as_deref().unwrap_or_default()
+            crate::controllers::reset::PATH
         );
         Self::send(
             ctx,
@@ -113,7 +116,7 @@ impl AuthMailer {
         let token = user
             .magic_link_token
             .as_deref()
-            .ok_or_else(|| Error::string("the user model not contains magic link token"))?;
+            .ok_or_else(|| Error::string("the user has no magic link token"))?;
         let link = format!("{}/api/auth/magic-link/{token}", Self::origin(ctx));
         Self::send(
             ctx,
