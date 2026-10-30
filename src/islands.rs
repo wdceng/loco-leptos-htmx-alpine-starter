@@ -381,11 +381,12 @@ fn blur_focused() {
 /// Shows whether the browser half runs: the server renders "not running",
 /// and the island switches to "running" once its chunk has loaded and
 /// hydrated. Lazy, so it also proves the split build works. Home page only.
-// Lazy everywhere but a test build: the browser tests (src/collect.rs) run
-// a plain wasm, not cargo-leptos's split one, and a lazy island's import of
-// `__wasm_split_placeholder__` would stop the test page from loading.
-#[cfg_attr(not(test), island(lazy))]
-#[cfg_attr(test, island)]
+// Lazy everywhere but the browser tests' build (src/collect.rs): they run a
+// plain wasm, not cargo-leptos's split one, and a lazy island's import of
+// `__wasm_split_placeholder__` would stop the test page from loading. As an
+// islands app on this stack writes it.
+#[cfg_attr(not(all(test, target_family = "wasm")), island(lazy))]
+#[cfg_attr(all(test, target_family = "wasm"), island)]
 pub fn IslandsCheck() -> impl IntoView {
     collected(|| {
         let (running, set_running) = signal(false);

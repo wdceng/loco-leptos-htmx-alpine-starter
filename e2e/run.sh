@@ -179,7 +179,7 @@ summary() {
 
 # Why a lane stopped before its tests, in its own words: the first line of
 # its run.txt that says so, never the last.
-stopped_because='^(port .* is taken|the site or the driver did not start|Safari is open|Safari Technology Preview is open|no |the .* did not boot|did not boot |chromedriver |the emulator crashed)'
+stopped_because='^(port .* is taken|the site or the driver did not start|Safari is open|Safari Technology Preview is open|no |the .* did not boot|did not boot |chromedriver |the emulator crashed|the low bar.s Chrome)'
 
 # Each lane's boot said as soon as it is known, while the others still
 # start (the lane's boot.txt, written by the lane below): "booted ipad-air
@@ -475,6 +475,13 @@ print(found[0] if found else "")' "$runtime" "$device_name")
       "$adb" -s "$device" reverse "tcp:$site" "tcp:$site" >/dev/null
       local chrome
       chrome=$("$adb" -s "$device" shell dumpsys package com.android.chrome | grep -m1 -o 'versionName=[0-9]*' | cut -d= -f2)
+      # The low bar's Chrome is the image's own 124, the Play Store off: on
+      # 2026-10-29 it had moved both low emulators to 156, and the lanes ran
+      # on 156's driver without a word (docs/testing.md, The Low Bar).
+      if [[ $browser == *-low && $chrome != "${E2E_ANDROID_LOW_CHROME:-124}" ]]; then
+        echo "the low bar's Chrome is $chrome on $avd, not ${E2E_ANDROID_LOW_CHROME:-124} (docs/testing.md, The Low Bar)" >&2
+        exit 1
+      fi
       local chromedriver=${CHROMEDRIVER_ANDROID:-$HOME/Library/Caches/chromedriver-android/$chrome/chromedriver-mac-arm64/chromedriver}
       if [[ ! -x $chromedriver ]]; then
         echo "chromedriver $chrome for the emulator's Chrome is missing: $chromedriver (docs/prerequisites.md, the devices)" >&2

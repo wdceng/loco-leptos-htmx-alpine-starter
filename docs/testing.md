@@ -803,7 +803,17 @@ F=~/Library/Caches/e2e-floor && curl -fL -o "$F/firefox-128.dmg" "https://ftp.mo
   `xcrun simctl runtime add <dmg>`. A disk image, not a cryptex, or
   safaridriver opens no session.
 - Android 15: `system-images;android-35;google_apis_playstore;arm64-v8a`,
-  chromedriver 124.
+  chromedriver 124. Each low emulator once with its window, then:
+
+```bash
+A=/opt/homebrew/share/android-commandlinetools/platform-tools/adb && $A shell dumpsys package com.android.chrome | grep -m1 versionName && $A shell pm uninstall-system-updates com.android.chrome && $A shell dumpsys package com.android.chrome | grep -m1 versionName   # Chrome back to the image's 124
+$A shell pm disable-user --user 0 com.android.vending   # the Play Store off, so it cannot move Chrome again
+```
+
+- **The low emulators' Play Store stays off.** It moved both to Chrome 156
+  on 2026-10-29, and the low lanes ran on 156's driver without a word;
+  `e2e/run.sh` now stops a low lane whose Chrome is not 124. Going back
+  resets Chrome's data, so switch its translate offer off again after.
 
 Traps that looked like site bugs and weren't:
 
