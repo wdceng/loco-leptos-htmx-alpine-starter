@@ -18,6 +18,16 @@ app's queries in SQLx, the extra environments, `public/` through
 `git worktree`, never in the repo). Its checks ("Before you hand over")
 replace "Before you call it done" below.
 
+Three more, where this skill says the opposite of the code:
+
+- **`tokio::spawn` at boot is the shape here:** a loop or a check started
+  once, as `maintenance.rs`, `rate_limit.rs` and `deploy_checks.rs` do.
+  Work a request starts that must outlive it still goes to a worker.
+- **A password goes through `src/hashing.rs`**, never `loco_rs::hash`
+  directly: it is Loco's hash, run off the async threads, four at once.
+- **The nightly restart is `src/maintenance.rs`'s SIGTERM**, not a task and
+  a scheduler entry: what restarts is the process itself.
+
 ## The three rules that prevent most mistakes
 
 1. **Generate, then edit.** `cargo loco generate <thing>` writes the file *and*
@@ -82,7 +92,7 @@ Then, by subject:
 | File | When |
 |---|---|
 | **`doctrine.md`** | **Read this before writing any Loco code.** What good looks like, the seven Rust-forced divergences from Rails, the task/worker/scheduler decision table, and the ranked smell list. |
-| `api-index.md` | You need to know whether a `loco_rs` symbol exists or what it is called. Generated from rustdoc — it cannot drift. Check here *before* guessing an API name. |
+| `api-index.md` | You need to know whether a `loco_rs` symbol exists or what it is called. Generated from rustdoc for one version (below). Check here *before* guessing an API name. |
 | `sea-orm-index.md` | **Anything touching the database.** A Loco app is Loco *plus* Sea-ORM, and the ORM is API you write directly, not a detail the framework hides. Its query surface is almost entirely traits — `ColumnTrait`, `QueryFilter`, `QueryOrder`, `PaginatorTrait` — so the method you want is on a trait, not on the type it appears to belong to. |
 | `recipes/model-and-migration.md` | Adding or changing a model, columns, relations, migrations |
 | `recipes/endpoint.md` | Adding a controller, route, params, response |
@@ -99,6 +109,12 @@ Then, by subject:
 
 `api-index.md` and `sea-orm-index.md` are the complete public surfaces of
 `loco_rs` and `sea-orm`, generated from rustdoc JSON and grouped by module.
+
+**They are loco-rs 1.2.0's and sea-orm 2.0.4's.** The `cargo xtask
+api-index` that made them is not in this repo, so nothing regenerates them
+at an upgrade. When `Cargo.lock` holds another version, a name missing here
+may exist: the registry source answers instead (the escape hatch below).
+
 Symbols that sound plausible but **do not exist**: `loco_rs::app::AppState`,
 `loco_rs::jobs::Job`, `loco_rs::controller::Controller`,
 `loco_rs::mailer::send_mail`, `loco_rs::db::Pool`. If you are about to write an
