@@ -141,10 +141,14 @@ plus:
 - **A gate in front.** In the Cloudflare zone, add `<domain>` to the list
   in the custom rule `Staging hosts: challenge` (`docs/staging.md`).
   Visitors pass a check, scanners don't.
-- **`/up` skips the gate,** for the app's start page, which reads
-  it with a `fetch` and can't pass a challenge: add `<domain>` to the rule
-  `/up: skip challenge` too (`docs/staging.md`). Check:
-  `curl -s https://<domain>/up` prints `ok`.
+- **Paths without a browser skip the gate.** What fetches them has no
+  person to pass a challenge: the app's start page reads `/up` with a
+  `fetch`. Add `<domain>` to the rule `Paths without a browser: skip
+  challenge` too (`docs/staging.md`). Check: `curl -s https://<domain>/up`
+  prints `ok`.
+- **A new such path goes into that rule's list,** never a rule of its own:
+  an image a mail links, a service worker's fetch (`push.md`), a
+  `/.well-known/` file another company reads (`docs/staging.md`).
 - To see what the app sends without Cloudflare's headers:
   `curl -sI http://127.0.0.1:5152/` on the server.
 
@@ -299,8 +303,9 @@ ssh <server> -t "nano /etc/caddy/Caddyfile"
 ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy"
 ```
 
-Then add `<domain>` to the Cloudflare rule `Staging hosts: challenge`. Until
-then the host is open to scanners.
+Then add `<domain>` to the Cloudflare rules `Staging hosts: challenge` and
+`Paths without a browser: skip challenge`. Until then the host is open to
+scanners.
 
 ## Manual run (without systemd)
 

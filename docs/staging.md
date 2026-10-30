@@ -130,11 +130,22 @@ plus:
   `Staging hosts: challenge`, hostname is in a list that includes
   `<domain>`, action Managed Challenge. Visitors pass a check, scanners
   don't.
-- **`/up` skips the gate,** for the app's start page, which reads
-  it with a `fetch` and can't pass a challenge. A custom rule before it,
-  `/up: skip challenge`: hostname is in the same list **and** URI Path
-  equals `/up`, action Skip. Check: `curl -s https://<domain>/up` prints
-  `ok`.
+- **Paths without a browser skip the gate.** What fetches them has no
+  person to pass a challenge: the app's start page reads `/up` with a
+  `fetch`. A custom rule placed first, `Paths without a browser: skip
+  challenge`: hostname is in the same list **and** URI Path is in a list,
+  action Skip, all remaining custom rules:
+
+  ```
+  (http.host in {"<domain>"} and http.request.uri.path in {"/up"})
+  ```
+
+  Check: `curl -s https://<domain>/up` prints `ok`.
+- **A new such path goes into that list,** never a rule of its own: an
+  image a mail links (a mail program's image proxy fetches it), a service
+  worker's fetch (`push.md`), a `/.well-known/` file another company reads
+  (Android's app links). An islands app on this stack met four, one at a
+  time.
 - To see what the app sends without Cloudflare's headers:
   `curl -sI http://127.0.0.1:5151/` on the server.
 
@@ -289,8 +300,9 @@ ssh <server> -t "nano /etc/caddy/Caddyfile"
 ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy"
 ```
 
-Then add `<domain>` to the Cloudflare rule `Staging hosts: challenge`. Until
-then the host is open to scanners.
+Then add `<domain>` to the Cloudflare rules `Staging hosts: challenge` and
+`Paths without a browser: skip challenge`. Until then the host is open to
+scanners.
 
 ## Manual run (without systemd)
 

@@ -50,14 +50,26 @@ with the mistakes it made on the way.
    tree's `rustls`.
 4. **The service worker:** served by a route with a CSP of its own
    (`connect-src 'self'`), never from `public/`. Every page's CSP gets
-   `worker-src 'self'`, pinned in `tests/config.rs`.
+   `worker-src 'self'`, pinned in `tests/config.rs`. On a gated host its
+   `…/push/latest` goes into the rule `Paths without a browser: skip
+   challenge` (`staging.md`).
 5. **The switch,** an island on the app's account page. It says what it
    does: busy while the browser asks (no second tap), a line where the
    browser refused, a line where the browser has no notifications at all,
    and a sample notification once on.
 6. **Sign-out** of a browser stops that browser's pushes, the person's
    other browsers ringing on.
-7. **The tests:** request tests for the routes and the choice of devices,
+7. **The badge (optional):** the count waiting on the app's icon
+   (`navigator.setAppBadge`), set by the service worker from the answer it
+   shows and kept right by the page at every look; cleared at none and at
+   sign-out. Only where the site runs as an installed app: an iPhone's
+   home-screen app, Safari's in the Mac's Dock, an installed Chrome or
+   Edge.
+   - web-sys has no binding: the island calls it by name (`Reflect`).
+   - The count as a plain number: a BigInt is refused.
+   - The promise awaited, so a refusal stays out of the console, which the
+     browser tests fail on.
+8. **The tests:** request tests for the routes and the choice of devices,
    a unit test of the token, browser tests with a key of each lane's own,
    and the CSP line in `tests/config.rs`.
 
@@ -73,6 +85,9 @@ with the mistakes it made on the way.
 - **The service worker not under `public/`.** The files there are served
   under the files' CSP, which stopped it; and not under `src/`, which
   Tailwind reads.
+- **The worker's fetch past the gate.** On a host behind Cloudflare's
+  challenge the worker gets the challenge, not the answer, and has no
+  person to pass it: its path went into the skip rule's list (2026-10-30).
 - **A tap must show something.** A switch that did its work silently was
   taken for broken.
 - **Sign-out must reach a device switched on without the browser cookie
@@ -84,5 +99,5 @@ with the mistakes it made on the way.
   a key in the developer's shell must never reach the tests.
 - **An iPhone or iPad takes pushes only in the home-screen app,** iOS 16.4
   and up. In Safari the switch says how to add the app.
-- **The app's webviews likely have no push and no `Notification`** (the
-  Tauri app, unverified): there the switch stays hidden.
+- **The app's webviews likely have no push, no `Notification` and no
+  badge** (the Tauri app, unverified): there the switch stays hidden.
