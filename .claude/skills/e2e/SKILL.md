@@ -56,4 +56,5 @@ Chrome's slow first start (`DevToolsActivePort`, retried once, `e2e/src/session.
 
 - iOS: after an Xcode update, `sudo xcodebuild -runFirstLaunch` first (docs/prerequisites.md). Xcode 27 has no Simulator app: its window is DeviceHub.
 - Android, the low bar: the emulators' Play Store is off and their Chrome the image's 124; `run.sh` stops a low lane whose Chrome is anything else ("the low bar's Chrome is …"). The fix is in docs/testing.md, The Low Bar, and the translate offer goes off again after it.
+- Android: emulator 37.2.13 crashes every lane in its OpenGL layer; `run.sh` refuses it ("emulator 37.2.13… crashes"), 37.2.12 holds, the way back in docs/prerequisites.md. `E2E_EMULATOR_GPU=swiftshader_indirect` draws in software for a probe.
 - Android: Chrome's "Translate page?" bubble eats the first tap outside it. A bubble in a failure's screenshot means that AVD has the offer on (Settings › Languages).

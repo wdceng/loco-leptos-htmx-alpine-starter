@@ -124,6 +124,18 @@ M=145 && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/la
 
 - `e2e/run.sh` reads the emulator's Chrome version as it boots and names
   the chromedriver it misses: fetch that `M`.
+- **Emulator 37.2.13 crashes, 37.2.12 holds.** 37.2.13 crashed every lane
+  in its own OpenGL layer, on the GPU and in software alike (2026-10-30);
+  `e2e/run.sh` refuses it. `sdkmanager --update` brings it back: update the
+  rest by name. The way back, Google's own 37.2.12 (build 16428233, about
+  400 MB), in place of `emulator/`:
+
+  ```bash
+  S=/opt/homebrew/share/android-commandlinetools && curl -fL -o /tmp/emulator-37.2.12.zip https://dl.google.com/android/repository/emulator-darwin_aarch64-16428233.zip && rm -rf "$S/emulator" && ditto -x -k /tmp/emulator-37.2.12.zip "$S" && rm /tmp/emulator-37.2.12.zip && "$S/emulator/emulator" -version | head -1   # prints 37.2.12.0
+  ```
+
+  The zip holds no `package.xml`, so `sdkmanager` may not list it as
+  installed afterwards.
 - The low bar's iOS 17.5 and Android 15 emulators: `docs/testing.md`,
   "The Low Bar".
 
@@ -196,7 +208,7 @@ rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-andro
 The emulators `testing.md` names ("The app on the phones"):
 
 ```bash
-yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"   # adb, the emulator, an Android 17 image
+yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"   # adb, the emulator (37.2.12, not 37.2.13: Browsers, the devices), an Android 17 image
 echo no | avdmanager create avd -n android-phone -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10         # a Pixel 10, once (its profile from cmdline-tools 23.0)
 echo no | avdmanager create avd -n android-tablet -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet   # a Pixel Tablet, once
 sed -i '' -e 's/^hw.lcd.width=.*/hw.lcd.width=540/' -e 's/^hw.lcd.height=.*/hw.lcd.height=1212/' -e 's/^hw.lcd.density=.*/hw.lcd.density=210/' ~/.android/avd/android-phone.avd/config.ini    # the phone at half resolution, the same 412×923 CSS layout

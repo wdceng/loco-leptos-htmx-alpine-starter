@@ -179,7 +179,7 @@ summary() {
 
 # Why a lane stopped before its tests, in its own words: the first line of
 # its run.txt that says so, never the last.
-stopped_because='^(port .* is taken|the site or the driver did not start|Safari is open|Safari Technology Preview is open|no |the .* did not boot|did not boot |chromedriver |the emulator crashed|the low bar.s Chrome)'
+stopped_because='^(port .* is taken|the site or the driver did not start|Safari is open|Safari Technology Preview is open|no |the .* did not boot|did not boot |chromedriver |the emulator crashed|emulator [0-9.]+ crashes|the low bar.s Chrome)'
 
 # Each lane's boot said as soon as it is known, while the others still
 # start (the lane's boot.txt, written by the lane below): "booted ipad-air
@@ -450,14 +450,26 @@ print(found[0] if found else "")' "$runtime" "$device_name")
         exit 1
       fi
       device=emulator-$emulator_port
+      # Emulator 37.2.13 crashed every lane in its own OpenGL layer
+      # (`libgfxstream_backend`, an islands app on this stack, 2026-10-30),
+      # on the GPU and in software alike; 37.2.12 holds. Refused before it
+      # starts rather than lost mid-lane.
+      local emulator_version
+      emulator_version=$("$android_sdk/emulator/emulator" -version 2>/dev/null | grep -m1 -oE 'version [0-9.]+' | cut -d' ' -f2 || true)
+      if [[ $emulator_version == 37.2.13* ]]; then
+        echo "emulator $emulator_version crashes in its OpenGL layer: back to 37.2.12 (docs/prerequisites.md, the devices)" >&2
+        exit 1
+      fi
       # With no window, on the Mac's GPU (`-gpu host`): `auto` drew in
-      # software, on the cores the tests need. Its Vulkan off, Android's
-      # Chrome drawing through OpenGL ES: through Vulkan, MoltenVK crashed
-      # the emulator mid-lane now and then (`emulator_crash` below). A cold
-      # boot (`-no-snapshot`): resumed from the state the lane before left,
-      # Chrome came back on the day before's clock and lost its connection.
+      # software, on the cores the tests need. `E2E_EMULATOR_GPU` names
+      # another drawing for a probe (`swiftshader_indirect`, in software).
+      # Its Vulkan off, Android's Chrome drawing through OpenGL ES: through
+      # Vulkan, MoltenVK crashed the emulator mid-lane now and then
+      # (`emulator_crash` below). A cold boot (`-no-snapshot`): resumed from
+      # the state the lane before left, Chrome came back on the day before's
+      # clock and lost its connection.
       "$android_sdk/emulator/emulator" -avd "$avd" -port "$emulator_port" \
-        -no-window -no-audio -no-boot-anim -no-snapshot -gpu host -feature -Vulkan >"$lane/emulator.log" 2>&1 &
+        -no-window -no-audio -no-boot-anim -no-snapshot -gpu "${E2E_EMULATOR_GPU:-host}" -feature -Vulkan >"$lane/emulator.log" 2>&1 &
       emulator_pid=$!
       pids+=($!)
       local waited=0
