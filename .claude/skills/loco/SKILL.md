@@ -9,6 +9,15 @@ Loco is **Rails for Rust**. When unsure how something should work, the answer is
 almost always "the way Rails does it." Where Loco diverges it is because Rust
 forced it, never because Loco disagreed with Rails.
 
+## In this project, CLAUDE.md wins
+
+Where this skill and `CLAUDE.md` differ, `CLAUDE.md` wins: its table "Where
+this project differs from Loco's guide" (Leptos pages and mails, no Tera, the
+app's queries in SQLx, the extra environments, `public/` through
+`paths::assets`) and "How to change files" (generators in a scratch
+`git worktree`, never in the repo). Its checks ("Before you hand over")
+replace "Before you call it done" below.
+
 ## The three rules that prevent most mistakes
 
 1. **Generate, then edit.** `cargo loco generate <thing>` writes the file *and*

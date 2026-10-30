@@ -26,12 +26,16 @@ The fix is made here, the tree copied to `/tmp/starter-checks`, the run started 
 ```bash
 rsync -a --delete --exclude .git --exclude target/ --exclude '*.sqlite*' --exclude 'secrets*.env' --exclude node_modules ./ m1:/tmp/starter-checks/   # the tree to the M1, its builds kept
 ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "e2e/run.sh all > /tmp/starter-e2e-all.log 2>&1; e2e/run.sh low > /tmp/starter-e2e-low.log 2>&1; e2e/run.sh beta > /tmp/starter-e2e-beta.log 2>&1"'   # the three bars, one after another
-ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "e2e/run.sh android moves"'   # one lane, one test file (nextest's filter)
+ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5 5 5 5 5\" E2E_STAGGER=1 e2e/run.sh android moves"'   # one lane, one test file, the start gaps shrunk
 ```
+
+- **A rerun of one lane or one test shrinks the gaps** (`E2E_DEVICE_GAPS`, `E2E_STAGGER`), or minutes go to waiting.
+- **Wait on the background task's notice,** never on a loop of `pgrep -f`: it matches the waiting command itself.
 
 ## Reading a run
 
-- Each lane's line: `ssh m1 'grep -hE "^== [a-z0-9-]+: " /tmp/starter-e2e-*.log'` (passed, flaky, failed, skipped).
+- Each lane's line: `ssh m1 'grep -hE "^== [a-z0-9-]+: " /tmp/starter-e2e-*.log'` (passed, flaky, failed, skipped). Before it, "booted <lane> in N s" or "did not boot <lane>: why"; `BROKEN` for a lane whose driver stopped opening sessions.
+- **Flaky is not passed:** report it with its lane; a second run of that lane alone says whether it's the test or the load.
 - `target/e2e/<lane>/`: `run.txt`, `server.log`, `driver.log`, `skipped.txt` (each skip with its reason), `failures/` (`<test>.txt` with the address and what failed, `.png`, `.html`, `.server.log`); a Simulator that would not boot: `boot-why.txt`.
 - On the M1: `ssh m1 'cat /tmp/starter-checks/target/e2e/<lane>/failures/<test>.txt'`, or `scp` the folder.
 - I read the logs and report; Davor gets no `tail -f` or watch command.
@@ -39,13 +43,17 @@ ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "e2e/run.sh android 
 ## A failure
 
 - **In one browser: probe first.** A small probe test that prints what the page saw (the events, the element on top, the address, the history state); run it, name the cause with evidence, then fix the harness or the site. A guess in the islands app on this stack (2026-10-10) broke three browsers that had passed.
-- **In several browsers:** suspect the site.
+- **In several browsers:** suspect the site first, then the harness.
+- **A site bug is fixed,** not only reported, and named in the summary with its cause.
 - **A departure from the islands app's code** (`public/js/`, the harness) is tested on its lanes before it counts: passing `parseHTMLUnsafe` options broke every swap in Chrome 145 (2026-10-29).
-- After any harness change, run the other browsers again.
+- After any harness change (`e2e/src/`, `run.sh`), rerun the lanes that passed before, not only the one that failed.
+
+## Already handled, don't fix again
+
+Chrome's slow first start (`DevToolsActivePort`, retried once, `e2e/src/session.rs`); a Simulator's lost runtime profile after a Mac restart (`code=401`, CoreSimulator restarted and the boot retried); a Simulator whose first session fails (restarted once, `boot-why.txt`); the emulators' Vulkan (off: MoltenVK crashed); Safari open on the Mac (refused, "Safari is open"); a crashed emulator (named in the summary with its report); a missing chromedriver for an emulator's Chrome (named, with the `M` to fetch).
 
 ## Known on the devices
 
-- iOS: after an Xcode update, `sudo xcodebuild -runFirstLaunch` first (docs/prerequisites.md). After a Mac restart, "runtime profile not found" until `killall -9 com.apple.CoreSimulator.CoreSimulatorService`. Xcode 27 has no Simulator app: its window is DeviceHub.
-- Android: `run.sh` reads the emulator's Chrome as it boots and names the chromedriver it misses. The Play Store moves the low emulators' Chrome on (124 to 156, 2026-10-29); fetch the driver it names.
+- iOS: after an Xcode update, `sudo xcodebuild -runFirstLaunch` first (docs/prerequisites.md). Xcode 27 has no Simulator app: its window is DeviceHub.
+- Android: the Play Store moves the low emulators' Chrome on (124 to 156, 2026-10-29); fetch the driver `run.sh` names.
 - Android: Chrome's "Translate page?" bubble eats the first tap outside it. A bubble in a failure's screenshot means that AVD has the offer on (Settings › Languages).
-- An emulator that crashes is named in the lane's summary with its report.
