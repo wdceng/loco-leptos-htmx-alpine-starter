@@ -80,8 +80,8 @@ doing one thing.
   Without it no island runs; the server refuses to boot that build.
 - **Lazy (`#[island(lazy)]`) when only some pages use an island,** and
   render every island only where it's needed: rendered means fetched.
-- **cargo-leptos is the patched build** (`tools/cargo-leptos/`,
-  `check.sh`) until `docs/decisions.md` says its fixes are released.
+- **cargo-leptos is #691's commit** (`tools/cargo-leptos/`, `check.sh`)
+  until `docs/decisions.md` says its fixes are released.
 - **Thin islands:** content passed in as `children`, props plain data.
 
 ## Rules the compiler or tests can't enforce

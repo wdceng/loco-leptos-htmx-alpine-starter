@@ -93,7 +93,7 @@ main script imports `__wasm_split_placeholder__`, a module no browser can
 load, so not one island runs. `src/assets.rs` refuses to boot that build,
 and one whose main script names a loader the site folder lacks. Released
 cargo-leptos 0.3.11 gets hashed split names wrong in two ways, so every
-machine and CI build the patched one in `tools/cargo-leptos/`
+machine and CI install it from #691's commit (`tools/cargo-leptos/`)
 (`development.md`, "Lazy islands"). The home page's `IslandsCheck` keeps
 the split path in use, so CI builds and checks it.
 

@@ -182,7 +182,7 @@ is one (`src/islands.rs`).
 
 ```bash
 tools/cargo-leptos/check.sh   # does this machine's cargo-leptos have both fixes?
-tools/cargo-leptos/install.sh # if not: build and install it (~3 min)
+tools/cargo-leptos/install.sh # if not: install it from #691's commit (a few minutes)
 ```
 
 - **`--split` on every cargo-leptos command:** the watch loop, local
@@ -195,18 +195,19 @@ tools/cargo-leptos/install.sh # if not: build and install it (~3 min)
 - **`hash.txt` gains `split:` and `manifest:` lines.** It travels with the
   binary as before.
 
-**Why the patched cargo-leptos.** Released cargo-leptos (0.3.11) has two
+**Why cargo-leptos from a commit.** Released cargo-leptos (0.3.11) has two
 bugs with `--split` and hashed names. The watch loop doesn't hash, so they
 show only in release builds:
 
 | Bug | Effect | Fix |
 |---|---|---|
 | [cargo-leptos #690](https://github.com/leptos-rs/cargo-leptos/issues/690) | The main `.js`/`.wasm` keep their old names after the loader's name is written into them. After a deploy, a cached main script imports a loader that's gone: no island runs until a hard refresh | [PR #691](https://github.com/leptos-rs/cargo-leptos/pull/691), commit `0fb3de86`. Merged 2026-10-16, not released |
-| [wasm-split-prototype #79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | The loader's imports come out in random order, so every build gets new names and visitors download it all again | `tools/cargo-leptos/wasm-split-sort.patch`, the same code as upstream's `cc582f1`. Merged 2026-10-16, not released, and released cargo-leptos still locks 0.2.3 |
+| [wasm-split-prototype #79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | The loader's imports come out in random order, so every build gets new names and visitors download it all again | Released in `wasm_split_cli_support` 0.2.4, but released cargo-leptos still locks 0.2.3 |
 
-`install.sh` builds cargo-leptos at that commit, against the patched crate.
-CI uses the same script, and checks that two hashed builds give the same
-names and that the main script names a loader that exists.
+`install.sh` installs cargo-leptos at that commit without `--locked`, so it
+takes 0.2.4: the commit's own lock holds 0.2.3. CI uses the same script,
+and checks that two hashed builds give the same names and that the main
+script names a loader that exists.
 
 **Released yet?**
 

@@ -4,9 +4,12 @@
 # Reads GitHub's and crates.io's public APIs; no login needed.
 #
 #   1. cargo-leptos PR #691 (issue #690): stale names after a hashed split
-#      build. Workaround: the patched cargo-leptos (tools/cargo-leptos/).
+#      build. Workaround: cargo-leptos from #691's commit
+#      (tools/cargo-leptos/).
 #   2. wasm-split-prototype #79: the split loader's imports unsorted, new
-#      names on every build. Workaround: the same patched cargo-leptos.
+#      names on every build. Fixed in wasm_split_cli_support 0.2.4, which
+#      the same install takes unlocked; a release counts once its own lock
+#      has it.
 #   3. leptos PR #4953: an island's state disposed when it leaves the page.
 #      Workaround: an island collector, until it is released.
 #   4. htmx #4147: Chrome 150 to 156's parseHTMLUnsafe drops the comments
@@ -21,7 +24,7 @@
 # see "act:" lines. Exit 1: an API could not be read.
 set -euo pipefail
 
-PATCHED_SPLIT=0.2.3   # wasm_split_cli_support version tools/cargo-leptos/ patches
+PATCHED_SPLIT=0.2.3   # the unsorted wasm_split_cli_support; a release must lock a newer one
 
 get() { curl -sfL -A "loco-leptos-htmx-alpine-starter upstream check" "$1" || { echo "cannot read $1" >&2; exit 1; }; }
 field() { tr ',' '\n' | sed -n "s/.*\"$1\": *\"\{0,1\}\([^\",}]*\)\"\{0,1\}.*/\1/p" | head -1; }
@@ -89,7 +92,7 @@ act: cargo-leptos $cl_tag has both split fixes. Test the plain release, installe
   cp target/release/hash.txt /tmp/hash.txt.saved 2>/dev/null; for run in 1 2; do PATH=/tmp/cargo-leptos-plain/bin:\$PATH LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-check cargo leptos build --release --split --frontend-only >/dev/null && ls target/site-check/pkg | sort > /tmp/names-\$run.txt; done &&
   diff /tmp/names-1.txt /tmp/names-2.txt && grep -oh '__wasm_split\.[A-Za-z0-9_-]*\.js' target/site-check/pkg/app.*.js | head -1 | xargs -I{} test -f target/site-check/pkg/{} && echo "PLAIN $cl_tag PASSES";
   cp /tmp/hash.txt.saved target/release/hash.txt 2>/dev/null; rm -rf target/site-check
-     If it passes: "Way back" for the patched cargo-leptos in docs/decisions.md.
+     If it passes: "Way back" for cargo-leptos from #691's commit in docs/decisions.md.
 EOF
 fi
 if [ "$fix3" = yes ]; then

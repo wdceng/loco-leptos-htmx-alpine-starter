@@ -54,5 +54,5 @@ without a new reason.
 - **Plain released cargo-leptos with `--split` and hashed names**
   (2026-10-15). 0.3.11 leaves the main script's name stale after a deploy
   (#690) and renames everything on every build (wasm-split-prototype #79).
-  The patched build in `tools/cargo-leptos/` replaces it until both fixes
-  are released.
+  cargo-leptos from #691's commit (`tools/cargo-leptos/`) replaces it
+  until both fixes are in a release.

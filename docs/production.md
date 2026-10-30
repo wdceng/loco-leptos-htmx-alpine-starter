@@ -79,7 +79,7 @@ ssh <server> "journalctl -u app-prod -f"
   has no `replace-me` left. A placeholder mail account would boot fine and
   only fail when the first mail is sent. A missing file would fail at the
   upload, after the service was already stopped.
-- **No patched cargo-leptos, no deploy.** `tools/cargo-leptos/check.sh` stops
+- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
   the chain when this machine's cargo-leptos lacks the split fixes
   (`development.md`, "Lazy islands").
 - A failing step stops the chain. A failed build never touches the server.

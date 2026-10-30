@@ -77,7 +77,7 @@ ssh <server> "journalctl -u app-dev -f"
 - **No `secrets.dev-server.env`, no deploy.** The first line stops the
   chain before anything is built; without it the upload near the end would
   fail with the unit already stopped.
-- **No patched cargo-leptos, no deploy.** `tools/cargo-leptos/check.sh` stops
+- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
   the chain when this machine's cargo-leptos lacks the split fixes
   (`development.md`, "Lazy islands").
 - The `dev-server` profile is faster to rebuild than `--release`. It's

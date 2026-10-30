@@ -93,7 +93,7 @@ cd src-tauri && cargo tauri android dev           # the Android emulator, or a p
 
 ## Trade-offs
 
-- **A patched cargo-leptos and a pinned Leptos fork** until their fixes
+- **cargo-leptos from a commit and a pinned Leptos fork** until their fixes
   ship ("Fixed upstream" below).
 - **`--split` on every build:** the server refuses to start a build
   without it.
@@ -127,7 +127,7 @@ You need Rust (https://rustup.rs). Then, in the project folder:
 
 ```sh
 rustup target add wasm32-unknown-unknown   # compile for the browser
-tools/cargo-leptos/install.sh              # the patched build tool (~3 min)
+tools/cargo-leptos/install.sh              # the build tool, from the commit with its fix
 cargo leptos watch --split -- start        # builds the server, the WASM and Tailwind, runs on http://localhost:5150
 ```
 
@@ -164,8 +164,8 @@ crates.io whether it is; how to undo each workaround is under "Way back" in
 
 | Problem | Reported | Upstream fix | Here | Goes when |
 |---|---|---|---|---|
-| cargo-leptos: with `--split` and hashed names, the main files kept an old name | [#690](https://github.com/leptos-rs/cargo-leptos/issues/690) | [#691](https://github.com/leptos-rs/cargo-leptos/pull/691), merged | A patched cargo-leptos (`tools/cargo-leptos/`) | A cargo-leptos release with #691 that locks wasm-split 0.2.4 |
-| wasm-split: unsorted imports, new file names on every build | [#79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | [#80](https://github.com/WorldSEnder/wasm-split-prototype/pull/80), released in 0.2.4 | The same patched build | The same cargo-leptos release |
+| cargo-leptos: with `--split` and hashed names, the main files kept an old name | [#690](https://github.com/leptos-rs/cargo-leptos/issues/690) | [#691](https://github.com/leptos-rs/cargo-leptos/pull/691), merged | cargo-leptos from #691's commit (`tools/cargo-leptos/`) | A cargo-leptos release with #691 that locks wasm-split 0.2.4 |
+| wasm-split: unsorted imports, new file names on every build | [#79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | [#80](https://github.com/WorldSEnder/wasm-split-prototype/pull/80), released in 0.2.4 | The same install, unlocked, so it takes 0.2.4 | The same cargo-leptos release |
 | Leptos: an island's state stayed in memory after htmx swapped it out | [#4952](https://github.com/leptos-rs/leptos/issues/4952) | [#4953](https://github.com/leptos-rs/leptos/pull/4953), merged, for 0.9 | An island collector (`src/collect.rs`) | Leptos 0.9; `htmx-islands.js` then calls its `$$dispose` |
 | Leptos: the islands loader waited for idle time forever, so Chrome 114 to 123 could start no island | [#4959](https://github.com/leptos-rs/leptos/issues/4959) | [#4978](https://github.com/leptos-rs/leptos/pull/4978) by Leptos's author, merged, for 0.9 | Leptos from our fork, the wait capped at 2 s, pinned in `Cargo.toml` | The Leptos release with #4978 (0.9, or a backport to 0.8) |
 | htmx: Chrome 150 to 156 drops the comments Leptos hydrates by | [#4147](https://github.com/bigskysoftware/htmx/issues/4147) | Chrome 157 | `public/js/htmx-islands.js` removes `parseHTMLUnsafe`, so htmx parses with DOMParser | **Stays** while Chrome 150 to 156 are above the low bar |

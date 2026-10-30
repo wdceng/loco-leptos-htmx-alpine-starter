@@ -15,7 +15,7 @@ Install commands are each tool's own. Your package manager works too.
 | 1.1 | **C toolchain** | Linker and system libraries for the native build | Xcode Command Line Tools on macOS (`xcode-select --install`), `build-essential` on Debian/Ubuntu, Visual Studio Build Tools on Windows |
 | 1.2 | **Rust**, stable 1.94+ | Compiles both halves. Loco 1.2 and Sea-ORM 2.0.4 need 1.94+ | https://rustup.rs |
 | 1.3 | **wasm32 target** | Compiles the islands bundle | `rustup target add wasm32-unknown-unknown` |
-| 1.4 | **cargo-leptos**, patched | Builds both halves, runs Tailwind and the live-reload dev loop. 0.3.11 plus the two split fixes lazy islands need, the same build as CI (`development.md`, "Lazy islands"). About 3 minutes; once per machine, and again when `tools/cargo-leptos/` changes | `tools/cargo-leptos/install.sh` |
+| 1.4 | **cargo-leptos**, from #691's commit | Builds both halves, runs Tailwind and the live-reload dev loop. 0.3.11 plus the two split fixes lazy islands need, the same build as CI (`development.md`, "Lazy islands"). Once per machine, and again when `tools/cargo-leptos/` changes | `tools/cargo-leptos/install.sh` |
 
 `clippy` and `rustfmt` come with Rust.
 
@@ -26,7 +26,7 @@ Install commands are each tool's own. Your package manager works too.
 | 2.1 | **cargo-watch** | Only for `cargo loco watch`, which reloads just the server. The usual loop is `cargo leptos watch --split -- start` | `cargo install --locked cargo-watch` |
 | 2.2 | **cargo-audit** | Scans `Cargo.lock` for known vulnerabilities. CI runs 0.22.2. `.cargo/audit.toml` lists ignored advisories | `cargo install --locked cargo-audit@0.22.2` |
 | 2.3 | **cargo-zigbuild**, with Zig and the Linux target | Builds the Linux x86_64 server binary natively, Zig as its linker (`dev-server.md`, `staging.md`, `production.md`) | `brew install zig` (or https://ziglang.org/download/), then `cargo install --locked cargo-zigbuild && rustup target add x86_64-unknown-linux-gnu` |
-| 2.4 | **cargo-update** | `cargo install-update -a` updates every cargo tool. Set once to keep sqlx-cli on 0.9.0 and to install nextest `--locked`. It leaves the patched cargo-leptos alone (a path install) | `cargo install --locked cargo-update --features vendored-openssl && cargo install-update-config --version "=0.9.0" sqlx-cli && cargo install-update-config --enforce-lock cargo-nextest` |
+| 2.4 | **cargo-update** | `cargo install-update -a` updates every cargo tool. Set once to keep sqlx-cli on 0.9.0 and to install nextest `--locked`. It leaves cargo-leptos (1.4, a git install) alone; `--git` would move it off #691's commit | `cargo install --locked cargo-update --features vendored-openssl && cargo install-update-config --version "=0.9.0" sqlx-cli && cargo install-update-config --enforce-lock cargo-nextest` |
 | 2.5 | **loco** | The Loco CLI, only for `loco new` and generators. Not needed here: `cargo loco` is a cargo alias in `.cargo/config.toml` that runs the app binary | `cargo install --locked loco` |
 | 2.6 | **cargo-nextest** | One process per test (`cargo nextest run`). `.config/nextest.toml` keeps app-booting tests on one thread | `cargo install --locked cargo-nextest` |
 | 2.7 | **cargo-sweep** | Clears old native, wasm32 and Linux builds out of `target/` | `cargo install --locked cargo-sweep` |

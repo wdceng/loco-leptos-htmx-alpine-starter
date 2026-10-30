@@ -75,7 +75,7 @@ ssh <server> "journalctl -u app-stg -f"
 - **No `secrets.staging.env`, no deploy.** The first line stops the chain
   before anything is built; without it the upload near the end would fail
   with the unit already stopped.
-- **No patched cargo-leptos, no deploy.** `tools/cargo-leptos/check.sh` stops
+- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
   the chain when this machine's cargo-leptos lacks the split fixes
   (`development.md`, "Lazy islands").
 - `--release`, as production: staging runs the binary production will.

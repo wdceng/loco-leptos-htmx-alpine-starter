@@ -69,15 +69,12 @@ jobs:
 
   leptos:
     # Both halves plus Tailwind, as cargo-leptos builds them, with `--split`
-    # for the lazy islands. cargo-leptos is the patched build every machine
-    # uses until both split fixes are released (tools/cargo-leptos/install.sh,
-    # pinned to a commit and a patch in this repository), cached on the
-    # script and the patch. It downloads the Tailwind and wasm-bindgen
-    # binaries itself.
+    # for the lazy islands. cargo-leptos is PR #691's commit, the build every
+    # machine uses until both split fixes are released
+    # (tools/cargo-leptos/install.sh), cached on the script. It downloads
+    # the Tailwind and wasm-bindgen binaries itself.
     name: cargo leptos build
     runs-on: ubuntu-latest
-    env:
-      CARGO_LEPTOS_SRC: /home/runner/cargo-leptos-split
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -91,7 +88,6 @@ jobs:
             ~/.cargo/bin/cargo-leptos
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
-            /home/runner/cargo-leptos-split
           key: cargo-leptos-${{ runner.os }}-${{ hashFiles('tools/cargo-leptos/**') }}
       - if: steps.cargo-leptos.outputs.cache-hit != 'true'
         run: tools/cargo-leptos/install.sh
@@ -121,8 +117,6 @@ jobs:
     # artifact.
     name: Browser tests (Chrome)
     runs-on: ubuntu-latest
-    env:
-      CARGO_LEPTOS_SRC: /home/runner/cargo-leptos-split
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -136,7 +130,6 @@ jobs:
             ~/.cargo/bin/cargo-leptos
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
-            /home/runner/cargo-leptos-split
           key: cargo-leptos-${{ runner.os }}-${{ hashFiles('tools/cargo-leptos/**') }}
       - if: steps.cargo-leptos.outputs.cache-hit != 'true'
         run: tools/cargo-leptos/install.sh

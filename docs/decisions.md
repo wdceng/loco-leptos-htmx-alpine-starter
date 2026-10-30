@@ -94,7 +94,13 @@ change of mind gets a new line, and the old one moves to
   merged upstream on 2026-10-16 (#79 as `cc582f1`, the same code as our
   patch). #79's fix is released in `wasm_split_cli_support` 0.2.4; #691
   is not, cargo-leptos 0.3.11 is still the newest (checked 2026-10-30).
-  **Released yet?** `tools/upstream.sh`.
+- 2026-10-30: **cargo-leptos from #691's commit, no patch, no local copy**
+  (`tools/cargo-leptos/install.sh`): `cargo install --git … --rev
+  0fb3de86`, without `--locked`, so `wasm_split_cli_support` resolves to
+  the sorted 0.2.4 (the commit's own lock holds 0.2.3). The same install as
+  the other apps on this stack, which share each Mac's one cargo-leptos.
+  `check.sh` sees the commit, not the resolved 0.2.4: CI's two hashed
+  builds prove the names stay. **Released yet?** `tools/upstream.sh`.
   **Way back:** once it prints the cargo-leptos test and that passes,
   `cargo install --locked cargo-leptos@<version>` in the README,
   `prerequisites.md` and CI, delete `tools/cargo-leptos/` and the

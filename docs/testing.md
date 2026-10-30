@@ -210,8 +210,8 @@ requests. Same list as the pre-deploy checks in `staging.md` and `production.md`
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo test`
 - the wasm32 lint below
-- a full `cargo leptos build --split`, with the patched cargo-leptos
-  (`tools/cargo-leptos/`)
+- a full `cargo leptos build --split`, with cargo-leptos from #691's
+  commit (`tools/cargo-leptos/`)
 - two hashed `--split` builds that must give the same file names, the main
   script naming a split loader that exists (`development.md`, "Lazy
   islands")
