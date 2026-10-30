@@ -49,6 +49,10 @@ pub struct Settings {
     pub file_rate_limit: FileRateLimitSettings,
     pub security: SecuritySettings,
     pub mail: MailSettings,
+    /// Optional: a config without the block sends a magic link to any
+    /// address.
+    #[serde(default)]
+    pub magic_link: MagicLinkSettings,
     /// Optional: a config without the block has no nightly restart.
     #[serde(default)]
     pub nightly_restart: NightlyRestartSettings,
@@ -81,6 +85,7 @@ impl Settings {
         settings.file_rate_limit.validate()?;
         settings.security.validate()?;
         settings.mail.validate()?;
+        settings.magic_link.validate()?;
         settings.nightly_restart.validate()?;
         Ok(settings)
     }
@@ -232,6 +237,48 @@ impl MailSettings {
             )));
         }
         Ok(())
+    }
+}
+
+/// Who may ask for a magic link (`POST /api/auth/magic-link`,
+/// controllers/auth.rs): addresses on these domains alone, or any address
+/// when the list is empty. Loco's starter allowed `example.com` and
+/// `gmail.com` alone, in code; here an app narrows it in its config.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MagicLinkSettings {
+    /// Domains as written after the `@` (`example.com`), lowercase.
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+}
+
+impl MagicLinkSettings {
+    fn validate(&self) -> Result<()> {
+        for domain in &self.allowed_domains {
+            if domain.is_empty()
+                || domain.contains('@')
+                || domain
+                    .chars()
+                    .any(|c| c.is_whitespace() || c.is_uppercase())
+            {
+                return Err(Error::Message(format!(
+                    "config: settings.magic_link.allowed_domains holds `{domain}`; write a domain as after the `@`, lowercase (`example.com`)"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether `email` may ask for a magic link: its domain on the list, in
+    /// any case, or the list empty.
+    #[must_use]
+    pub fn allows(&self, email: &str) -> bool {
+        let email = email.to_lowercase();
+        self.allowed_domains.is_empty()
+            || self
+                .allowed_domains
+                .iter()
+                .any(|domain| email.ends_with(&format!("@{domain}")))
     }
 }
 
@@ -486,6 +533,30 @@ mod tests {
                 panic!("{from:?} must be refused");
             };
             assert!(err.to_string().contains("mail.from"), "{err}");
+        }
+    }
+
+    #[test]
+    fn magic_links_go_to_any_address_unless_the_config_names_domains() {
+        let any = parse(&base()).expect("the block is optional").magic_link;
+        assert!(any.allows("someone@anywhere.net"));
+
+        let mut block = base();
+        block["magic_link"] = json!({ "allowed_domains": ["example.com", "gmail.com"] });
+        let narrowed = parse(&block).expect("valid").magic_link;
+        assert!(narrowed.allows("user1@example.com"));
+        assert!(narrowed.allows("User1@Gmail.COM"), "any case");
+        assert!(!narrowed.allows("user1@temp-mail.com"));
+        assert!(!narrowed.allows("user1@notexample.com"), "the whole domain");
+    }
+
+    #[test]
+    fn a_magic_link_domain_is_written_as_after_the_at() {
+        for bad in ["", "@example.com", "Example.com", "example .com"] {
+            let mut block = base();
+            block["magic_link"] = json!({ "allowed_domains": [bad] });
+            let err = parse(&block).expect_err(bad);
+            assert!(err.to_string().contains("allowed_domains"), "{bad}: {err}");
         }
     }
 

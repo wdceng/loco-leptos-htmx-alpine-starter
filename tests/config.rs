@@ -357,6 +357,12 @@ fn deployed_environments_key_on_the_proxy_header(#[case] env: Environment) {
         !settings.security.content_security_policy.contains("ws://"),
         "{env}: the live-reload socket is local only"
     );
+    // A magic link to any address, as shipped; an app that narrows
+    // `settings.magic_link.allowed_domains` agrees its list here.
+    assert!(
+        settings.magic_link.allowed_domains.is_empty(),
+        "{env}: agreed magic-link domains"
+    );
 }
 
 #[rstest]

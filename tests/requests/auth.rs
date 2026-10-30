@@ -726,28 +726,36 @@ async fn markup_in_the_name_arrives_escaped_in_the_html_mail() {
     .await;
 }
 
-/// The name is capped at 100 characters (`users::Validator`): a longer one
-/// registers nobody and sends nothing.
+/// The name's 2 to 100 characters and the email's form (`users::Validator`)
+/// are refused with their reason, checked before anything else like the
+/// password's, so the answer says nothing about who exists. They register
+/// nobody and send nothing.
 #[tokio::test]
 #[serial]
-async fn a_name_longer_than_100_characters_is_refused() {
+async fn a_bad_name_or_email_is_refused_with_its_reason() {
     request::<App, _, _>(|request, ctx| async move {
-        let email = "long@example.com";
-        let payload = serde_json::json!({
-            "name": "a".repeat(101),
-            "email": email,
-            "password": "12341234"
-        });
-        let response = request.post("/api/auth/register").json(&payload).await;
-        assert_eq!(
-            response.status_code(),
-            200,
-            "register answers the same either way, so it does not reveal who exists"
-        );
-        assert!(
-            users::Model::find_by_email(&ctx.db, email).await.is_err(),
-            "no user was created"
-        );
+        for (name, email, reason) in [
+            ("a".repeat(101), "long@example.com", "Name must be"),
+            ("a".to_owned(), "short@example.com", "Name must be"),
+            ("loco".to_owned(), "not-an-email", "invalid email"),
+        ] {
+            let payload = serde_json::json!({
+                "name": name,
+                "email": email,
+                "password": "12341234"
+            });
+            let response = request.post("/api/auth/register").json(&payload).await;
+            assert_eq!(response.status_code(), 400, "{email}");
+            assert!(
+                response.text().contains(reason),
+                "{email}: {}",
+                response.text()
+            );
+            assert!(
+                users::Model::find_by_email(&ctx.db, email).await.is_err(),
+                "{email}: no user was created"
+            );
+        }
         assert_eq!(
             ctx.mailer.expect("stub mailer").deliveries().count,
             0,

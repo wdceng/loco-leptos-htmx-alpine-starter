@@ -32,10 +32,7 @@
 use axum::{
     Router,
     extract::Request,
-    http::{
-        HeaderValue, StatusCode,
-        header::{ACCEPT, CACHE_CONTROL},
-    },
+    http::{HeaderValue, StatusCode, header::CACHE_CONTROL},
     response::IntoResponse,
 };
 // Named import on purpose: `leptos::prelude::*` also exports an `Error`
@@ -46,7 +43,7 @@ use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 
 use crate::{
     middleware::rate_limit,
-    render::render_page,
+    render::{accepts_html, render_page},
     views::{
         layout::PageMeta,
         not_found::{HEADING, NotFoundPage},
@@ -55,12 +52,7 @@ use crate::{
 
 /// A miss: the page for a browser, one line for anything else, never cached.
 async fn miss(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
-    let wants_html = req
-        .headers()
-        .get(ACCEPT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|accept| accept.contains("text/html"));
-    if !wants_html {
+    if !accepts_html(req.headers()) {
         return Ok((
             StatusCode::NOT_FOUND,
             [(CACHE_CONTROL, HeaderValue::from_static("no-store"))],

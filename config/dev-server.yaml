@@ -152,6 +152,11 @@ settings:
   # MAILER_*.
   mail:
     from: '<%= get_env(name="MAILER_FROM", default="SaaS Starter <noreply@dev.example.com>") %>'
+  # Who may ask for a magic link (src/controllers/auth.rs): addresses on
+  # these domains alone, written as after the `@`, lowercase
+  # (`[example.com]`). Empty: any address.
+  magic_link:
+    allowed_domains: []
   # Nightly restart (src/maintenance.rs): once a day at `hour` o'clock in
   # `zone` (an IANA name; UTC as shipped, set your own) the server stops
   # itself and the service manager starts it again. `Restart=always` in the

@@ -222,6 +222,18 @@ fn every_form_names_its_hx_sync() {
     assert!(forms > 0, "no <form> found: has ResetForm moved?");
 }
 
+/// Whether a request asks for a page is read in one place: the not-found
+/// page and the error pages each read `Accept` themselves until the review
+/// of 2026-10-30.
+#[test]
+fn every_page_or_plain_answer_reads_accept_one_way() {
+    assert_one_home(
+        ".contains(\"text/html\")",
+        &["render.rs"],
+        "`accepts_html` (src/render.rs)",
+    );
+}
+
 /// The check itself: a code line holding the pattern is found, a comment
 /// is not, and the home is left out.
 #[test]

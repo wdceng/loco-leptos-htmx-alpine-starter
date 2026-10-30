@@ -83,6 +83,8 @@ settings:
       frame-ancestors 'none'
   mail:
     from: SaaS Starter <noreply@example.com>
+  magic_link:
+    allowed_domains: []
   nightly_restart:
     enable: false
     hour: 3

@@ -21,6 +21,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Job | Use | Where |
 |---|---|---|
 | Render a page | `render_page` (CSP nonce, shell, status) | `src/render.rs` |
+| Whether a request asks for a page or a plain answer (`Accept` names HTML): the not-found page, the error pages. Guarded | `accepts_html` | `src/render.rs` |
 | The document around every page: head, header, footer, skip link | `shell` | `src/views/layout.rs` |
 | A page's language, title, description, robots tag | `PageMeta` | `src/views/layout.rs` |
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
@@ -34,6 +35,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The 429 page, with the wait filled in | `too_many_requests::document`, `WAIT` | `src/views/too_many_requests.rs` |
 | A password reset from the mail's link: the form, done, expired | `ResetForm`, `ResetDone`, `ResetExpired`; the address `reset::PATH` | `src/views/reset.rs`, `src/controllers/reset.rs` |
 | A password's rule (8 to 128 characters), anywhere one is set | `password_problem` | `src/models/users.rs` |
+| A new account's name (2 to 100 characters) and email, checked before anything else | `name_or_email_problem`, from `Validator` | `src/models/users.rs` |
 | Hash or check a password | `hashing::hash`, `verify`, `verify_dummy` | `src/hashing.rs` |
 | A page AI assistants should know about | a line in `/llms.txt` | `src/controllers/llms.rs` |
 

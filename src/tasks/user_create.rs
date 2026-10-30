@@ -4,7 +4,7 @@ use crate::{
     mailers::auth::AuthMailer,
     models::{
         _entities::users,
-        users::{RegisterParams, password_problem},
+        users::{RegisterParams, name_or_email_problem, password_problem},
     },
 };
 
@@ -27,8 +27,10 @@ impl Task for UserCreate {
         let password = vars
             .cli_arg("password")
             .map_err(|_| Error::string("password is mandatory"))?;
-        // The same rule as the register route.
-        if let Some(problem) = password_problem(password) {
+        // The same rules as the register route.
+        if let Some(problem) =
+            password_problem(password).or_else(|| name_or_email_problem(name, email))
+        {
             return Err(Error::string(&problem));
         }
 

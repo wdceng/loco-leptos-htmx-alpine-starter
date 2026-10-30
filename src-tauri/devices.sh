@@ -69,9 +69,11 @@ avds=$("$android_sdk/emulator/emulator" -list-avds)
 
 # The device this run booted and has not shut down yet, shut down whatever
 # happens: a Simulator's udid, an emulator's serial or the Mac's app's
-# process.
+# process. An emulator started but not yet listed by adb has its process
+# alone (`own_emulator_pid`), killed so a skipped start leaves none behind.
 own_sim=
 own_emulator=
+own_emulator_pid=
 own_mac=
 shut_down() {
   # The app quit first and a moment left before the Simulator goes: shut
@@ -84,9 +86,11 @@ shut_down() {
     xcrun simctl shutdown "$own_sim" 2>/dev/null || true
   fi
   [[ -n $own_emulator ]] && "$adb" -s "$own_emulator" emu kill >/dev/null 2>&1
+  [[ -n $own_emulator_pid ]] && { kill "$own_emulator_pid" 2>/dev/null || true; }
   [[ -n $own_mac ]] && kill "$own_mac" 2>/dev/null
   own_sim=
   own_emulator=
+  own_emulator_pid=
   own_mac=
   return 0
 }
@@ -239,6 +243,7 @@ emulator_up() {
   serial=$(emulator_serial "$avd")
   if [[ -z $serial ]]; then
     "$android_sdk/emulator/emulator" -avd "$avd" -gpu swiftshader_indirect -no-window -no-audio >/dev/null 2>&1 &
+    own_emulator_pid=$!
     for _ in $(seq 1 60); do
       serial=$(emulator_serial "$avd")
       [[ -n $serial && $("$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') == 1 ]] && break
@@ -246,6 +251,7 @@ emulator_up() {
     done
     if [[ -z $serial ]]; then
       echo "   $avd: did not start, skipped"
+      shut_down
       return 1
     fi
     own_emulator=$serial

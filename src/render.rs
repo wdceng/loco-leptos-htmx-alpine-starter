@@ -19,7 +19,10 @@
 
 use axum::{
     extract::Request,
-    http::{HeaderName, HeaderValue, Method, header::CONTENT_SECURITY_POLICY},
+    http::{
+        HeaderMap, HeaderName, HeaderValue, Method,
+        header::{ACCEPT, CONTENT_SECURITY_POLICY},
+    },
 };
 use leptos::{
     config::LeptosOptions,
@@ -43,6 +46,17 @@ pub const BUILD_HEADER: HeaderName = HeaderName::from_static(islands::BUILD_HEAD
 /// htmx's answer header for the address a swap leaves: `false` on a page
 /// answered to a post keeps the address the page is at.
 pub const PUSH_URL_HEADER: HeaderName = HeaderName::from_static("hx-push-url");
+
+/// Whether a request asks for a page: its `Accept` names HTML, as a
+/// browser's does. Anything else (an API caller, a scanner) gets a plain
+/// answer that costs no render: the not-found page and the error pages.
+#[must_use]
+pub fn accepts_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|accept| accept.contains("text/html"))
+}
 
 /// Renders `page` inside the document shell and returns the HTTP response,
 /// streaming, with the nonce CSP attached.

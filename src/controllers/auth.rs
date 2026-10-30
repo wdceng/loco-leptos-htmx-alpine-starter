@@ -5,16 +5,13 @@ use crate::{
     middleware::rate_limit::Bucket,
     models::{
         _entities::users,
-        users::{LoginParams, RegisterParams, password_problem},
+        users::{LoginParams, RegisterParams, name_or_email_problem, password_problem},
     },
+    settings::Settings,
     views::auth::{CurrentResponse, LoginResponse},
 };
 use loco_rs::prelude::*;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
-
-pub static EMAIL_DOMAIN_RE: OnceLock<Regex> = OnceLock::new();
 
 /// The bucket on the `/api/auth` routes, built and validated in
 /// `after_context` (app.rs) from `settings.rate_limit.auth` and parked in
@@ -22,12 +19,6 @@ pub static EMAIL_DOMAIN_RE: OnceLock<Regex> = OnceLock::new();
 /// limiter is off in the config.
 #[derive(Clone)]
 pub struct AuthLimit(pub Option<Bucket>);
-
-fn get_allow_email_domain_re() -> &'static Regex {
-    EMAIL_DOMAIN_RE.get_or_init(|| {
-        Regex::new(r"@example\.com$|@gmail\.com$").expect("Failed to compile regex")
-    })
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ForgotParams {
@@ -57,8 +48,11 @@ async fn register(
     State(ctx): State<AppContext>,
     Json(params): Json<RegisterParams>,
 ) -> Result<Response> {
-    // First, so the answer is the same whether the email is taken or not.
-    if let Some(problem) = password_problem(&params.password) {
+    // The rules first, so the answer is the same whether the email is taken
+    // or not.
+    if let Some(problem) = password_problem(&params.password)
+        .or_else(|| name_or_email_problem(&params.name, &params.email))
+    {
         return bad_request(problem);
     }
     let res = users::Model::create_with_password(&ctx.db, &params).await;
@@ -198,6 +192,7 @@ async fn current(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Respo
 ///    A registered user sends a POST request to `/magic-link` with their email.
 ///    If the email exists, a short-lived, one-time-use token is generated and sent to the user's email.
 ///    For security and to avoid exposing whether an email exists, the response always returns 200, even if the email is invalid.
+///    An address on a domain the config doesn't allow (`settings.magic_link`) is refused first, with a 400.
 ///
 /// 2. **Click the Magic Link**:
 ///    The user clicks the link (/magic-link/{token}), which validates the token and its expiration.
@@ -209,9 +204,9 @@ async fn magic_link(
     State(ctx): State<AppContext>,
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
-    let email_regex = get_allow_email_domain_re();
-    if !email_regex.is_match(&params.email) {
-        tracing::debug!("The provided email is invalid or does not match the allowed domains");
+    let settings: Settings = stored(&ctx)?;
+    if !settings.magic_link.allows(&params.email) {
+        tracing::debug!("magic link: the address is not on settings.magic_link.allowed_domains");
         return bad_request("invalid request");
     }
 

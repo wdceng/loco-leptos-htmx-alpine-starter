@@ -25,8 +25,8 @@ use axum::{
     body::Body,
     extract::{Request, State},
     http::{
-        HeaderMap, HeaderName, HeaderValue, StatusCode, Uri,
-        header::{ACCEPT, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE},
+        HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri,
+        header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE},
     },
     middleware::{self, Next},
     response::Response,
@@ -37,7 +37,7 @@ use leptos::view;
 use loco_rs::{Result, app::AppContext, controller::middleware::MiddlewareLayer};
 
 use crate::{
-    render::render_page,
+    render::{accepts_html, render_page},
     views::{
         error::wording,
         layout::{Notice, PageMeta},
@@ -73,11 +73,7 @@ impl MiddlewareLayer for ErrorPages {
 
 /// A browser asking for a page: HTML accepted, and not the JSON API.
 fn wants_page(path: &str, headers: &HeaderMap) -> bool {
-    !path.starts_with("/api/")
-        && headers
-            .get(ACCEPT)
-            .and_then(|value| value.to_str().ok())
-            .is_some_and(|accept| accept.contains("text/html"))
+    !path.starts_with("/api/") && accepts_html(headers)
 }
 
 /// An error answer that isn't a page already.
@@ -95,13 +91,17 @@ async fn swap(State(ctx): State<AppContext>, req: Request, next: Next) -> Respon
     if !wants_page(req.uri().path(), req.headers()) {
         return next.run(req).await;
     }
-    let (uri, headers) = (req.uri().clone(), req.headers().clone());
+    let (method, uri, headers) = (
+        req.method().clone(),
+        req.uri().clone(),
+        req.headers().clone(),
+    );
     let res = next.run(req).await;
     if !needs_page(&res) {
         return res;
     }
     let status = res.status();
-    match page(&ctx, status, uri, headers).await {
+    match page(&ctx, status, method, uri, headers).await {
         Ok(page) => merge(res, page),
         Err(err) => {
             tracing::error!(error = %err, %status, "error page could not be rendered, sent the original answer");
@@ -110,14 +110,18 @@ async fn swap(State(ctx): State<AppContext>, req: Request, next: Next) -> Respon
     }
 }
 
-/// The page for `status`, rendered for a fresh GET of the same address.
+/// The page for `status`, rendered for the same method and address without
+/// the body: a post's error page keeps the address the browser is at, as
+/// every page answered to a post does (`render_page`).
 async fn page(
     ctx: &AppContext,
     status: StatusCode,
+    method: Method,
     uri: Uri,
     headers: HeaderMap,
 ) -> Result<Response> {
     let mut req = Request::new(Body::empty());
+    *req.method_mut() = method;
     *req.uri_mut() = uri;
     *req.headers_mut() = headers;
     let (heading, lead) = wording(status);
@@ -148,7 +152,7 @@ fn merge(original: Response, mut page: Response) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use axum::http::header::{ALLOW, CONTENT_SECURITY_POLICY};
+    use axum::http::header::{ACCEPT, ALLOW, CONTENT_SECURITY_POLICY};
 
     use super::*;
 

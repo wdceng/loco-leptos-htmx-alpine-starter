@@ -95,6 +95,10 @@ settings:
   # Outgoing mail: the stub mailer records the sender with the message.
   mail:
     from: SaaS Starter <noreply@example.com>
+  # Loco's starter's two domains, so the tests see a narrowed list refuse
+  # an address (tests/requests/auth.rs, `can_reject_invalid_email`).
+  magic_link:
+    allowed_domains: [example.com, gmail.com]
   # Nightly restart (src/maintenance.rs): off, the harness boots the app
   # inside the test process, and the app ignores the flag in test anyway.
   nightly_restart:

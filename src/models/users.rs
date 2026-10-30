@@ -28,6 +28,27 @@ pub fn password_problem(password: &str) -> Option<String> {
         .then(|| format!("The password must be {PASSWORD_MIN} to {PASSWORD_MAX} characters long."))
 }
 
+/// Why a new account's name or email is refused, or `None`: the rules
+/// [`Validator`] holds, which `before_save` applies too. Checked first, like
+/// [`password_problem`], so the answer says nothing about whether the email
+/// is taken.
+#[must_use]
+pub fn name_or_email_problem(name: &str, email: &str) -> Option<String> {
+    let details = Validator {
+        name: name.to_owned(),
+        email: email.to_owned(),
+    };
+    let errors = Validate::validate(&details).err()?;
+    let fields = errors.field_errors();
+    let first = ["name", "email"].iter().find_map(|field| {
+        fields
+            .get(*field)
+            .and_then(|errors| errors.first())
+            .and_then(|error| error.message.as_deref().map(str::to_owned))
+    });
+    Some(first.unwrap_or_else(|| errors.to_string()))
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginParams {
     pub email: String,

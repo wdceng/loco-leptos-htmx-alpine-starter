@@ -52,6 +52,39 @@ async fn a_browser_gets_a_page_for_a_wrong_method() {
     .await;
 }
 
+/// A post's error page keeps the address the browser is at, as every page
+/// answered to a post does (src/render.rs): htmx would push the form's own,
+/// an address that may answer only a post. A GET's pushes as usual.
+#[tokio::test]
+#[serial]
+async fn a_posts_error_page_keeps_the_address() {
+    let boot = boot_test::<App>()
+        .await
+        .expect("Failed to boot test application");
+    let ctx = boot.app_context;
+    let router = Router::new().route(
+        "/boom",
+        get(|| async { Err::<(), loco_rs::Error>(loco_rs::Error::InternalServerError) })
+            .post(|| async { Err::<(), loco_rs::Error>(loco_rs::Error::InternalServerError) }),
+    );
+    let router = ErrorPages::from_context(&ctx)
+        .apply(router)
+        .expect("layer applies")
+        .with_state(ctx.clone());
+    let server = TestServer::new(router).expect("test server");
+
+    let posted = server.post("/boom").add_header("accept", BROWSER).await;
+    assert_eq!(posted.status_code(), 500);
+    assert_eq!(posted.header("hx-push-url"), "false");
+
+    let got = server.get("/boom").add_header("accept", BROWSER).await;
+    assert_eq!(got.status_code(), 500);
+    assert!(
+        got.maybe_header("hx-push-url").is_none(),
+        "a GET's error page pushes its address"
+    );
+}
+
 /// Anything that doesn't ask for HTML keeps the original answer.
 #[tokio::test]
 #[serial]
