@@ -88,6 +88,10 @@ V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundl
 
 - **A driver that no longer matches its browser** fails the session with
   "only supports … version": fetch it again.
+- **An Edge `brew upgrade` put in is opened once by hand:**
+  `open -a "Microsoft Edge"`, approve the prompt, quit it. Until then
+  macOS refuses to start it, and the Edge lane fails with
+  `DevToolsActivePort` (2026-10-31).
 - **Firefox needs Full Disk Access for the app the run starts from**
   (Terminal, or VS Code): System Settings, Privacy & Security, then a
   restart of that app. Without it: "Could not find profile folder".
