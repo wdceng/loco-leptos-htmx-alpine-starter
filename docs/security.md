@@ -19,7 +19,7 @@ updates it in the same commit.
 | Cross-origin leaks | COOP, COEP, CORP, `Referrer-Policy` | `config/*.yaml` | `tests/config.rs` |
 | Brute force, mail flooding | Rate limits per visitor, per /64 for IPv6; a stricter bucket on `/api/auth` | `src/middleware/rate_limit.rs` | `tests/requests/rate_limit.rs` |
 | Which emails have accounts | Every refused login is the same 401 after one password check, a dummy one for an unknown email; a taken email registers like a new one | `src/controllers/auth.rs`, `src/hashing.rs` | `tests/requests/auth.rs` |
-| Someone else's address | An unverified account can't log in; the verification link works for a day; a magic link verifies, as it reached the inbox | `src/controllers/auth.rs`, `src/models/users.rs` | `tests/requests/auth.rs` |
+| Someone else's address | An unverified account can't log in; the welcome mail's link opens a page whose button verifies, so a mail scanner that opens it verifies nothing; the link works for a day; a magic link verifies, as it reached the inbox | `src/controllers/verify.rs`, `src/controllers/auth.rs`, `src/models/users.rs` | `tests/requests/verify.rs`, `tests/requests/auth.rs` |
 | One mailbox, two accounts | An address is stored and looked up lowercase | `src/models/users.rs` | `tests/requests/auth.rs` |
 | Weak passwords | 8 to 128 characters, everywhere one is set | `src/models/users.rs` | `tests/requests/auth.rs` |
 | Hashing as a denial of service | Argon2id off the async threads, four at once | `src/hashing.rs` | `src/hashing.rs` |
@@ -58,7 +58,7 @@ configs, the app, the dependencies.
 
 | # | Finding | Status |
 |---|---|---|
-| 1 | Account pre-hijack: anyone registers someone's address with a password of their own, and a mail scanner's GET on the verification link verifies it | **Partly fixed:** the welcome mail says to ignore it without a sign-up. A verification page whose button posts the token waits for the maintainer's word |
+| 1 | Account pre-hijack: anyone registers someone's address with a password of their own, and a mail scanner's GET on the verification link verifies it | **Fixed:** the mail links to `/verify`, whose button posts the token; the mail says to ignore it without a sign-up. A press on a mail nobody expected is accepted (below) |
 | 2 | The magic link is spent by a GET, which answers with the JWT: a mail scanner that follows it first gets the token, the person a refusal | **Open:** its page needs cookie sessions (below) |
 | 3 | Live tokens in the journal: Loco's logger wrote the whole address, the reset link's query included | **Fixed:** `src/middleware/request_log.rs` logs the route's pattern or the path, never a query |
 | 4 | Addresses were case-sensitive: one mailbox, two accounts | **Fixed:** lowercase, stored and looked up |
@@ -91,6 +91,12 @@ configs, the app, the dependencies.
 - **An API key per account, unused.** Loco's starter mints one at
   registration (`lo-<uuid>`); no route takes it. An app that offers API
   keys stores them hashed and lets a user replace one.
+- **A press on a welcome mail nobody expected.** Someone who presses
+  "Verify my email" on it verifies an account another registered with
+  their address and a password of their own. The mail and the page say to
+  ignore it; "forgot password" takes the account back. A new password at
+  verification would close it, at the cost of every new user typing one
+  twice.
 - **A proxy's own logs.** The app logs no token; a proxy that logs
   addresses (a `log` line in Caddy's block, a log push at Cloudflare) holds
   them. The reset token works once, for 30 minutes.
@@ -103,11 +109,11 @@ Each of these brings its own risks. The template has none of them yet.
   session store, `HttpOnly`, `Secure`, `SameSite=Lax` cookies, and **CSRF
   protection** on every form, an origin check at least. An islands app on
   this stack has both.
-- **Links in a mail that sign in or verify,** once cookie sessions are in:
-  the magic link opens a page whose button posts the token, and the
-  session starts there. Today's `GET /api/auth/magic-link/{token}` is
-  spent by a mail scanner that follows it first, and answers it the JWT.
-  The verification link the same (the review of 2026-10-31, #1 and #2).
+- **A magic link that signs in,** once cookie sessions are in: it opens a
+  page whose button posts the token, as `/verify` does, and the session
+  starts there. Today's `GET /api/auth/magic-link/{token}` is spent by a
+  mail scanner that follows it first, and answers it the JWT (the review of
+  2026-10-31, #2).
 - **A second factor:** passkeys or an authenticator app, recovery codes.
 - **Web push:** cookie sessions first (above), then `push.md`, the steps
   and the mistakes an islands app on this stack made adding it.

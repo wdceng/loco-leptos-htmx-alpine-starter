@@ -26,14 +26,16 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A page's language, title, description, robots tag | `PageMeta` | `src/views/layout.rs` |
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
-| A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset link's answers). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
+| A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
 | The app's name, anywhere | `APP_NAME` | `src/views/layout.rs` |
 | The site in one sentence (meta description, manifest, llms.txt) | `DESCRIPTION` | `src/controllers/home.rs` |
 | The centred content column | `COLUMN` | `src/views/layout.rs` |
 | The `<body>` classes | `BODY` | `src/views/layout.rs` |
 | The not-found page | `NotFoundPage`, a `Notice` | `src/views/not_found.rs` |
 | The 429 page, with the wait filled in | `too_many_requests::document`, `WAIT` | `src/views/too_many_requests.rs` |
+| A page a mail's link opens with a token in its address: `no-referrer`, `no-store` | `render_token_page` | `src/render.rs` |
 | A password reset from the mail's link: the form, done, expired | `ResetForm`, `ResetDone`, `ResetExpired`; the address `reset::PATH` | `src/views/reset.rs`, `src/controllers/reset.rs` |
+| Email verification from the welcome mail's link: the button, done, no longer works | `VerifyForm`, `VerifyDone`, `VerifyExpired`; the address `verify::PATH` | `src/views/verify.rs`, `src/controllers/verify.rs` |
 | A password's rule (8 to 128 characters), anywhere one is set | `password_problem` | `src/models/users.rs` |
 | A new account's name (2 to 100 characters) and email, checked before anything else | `name_or_email_problem`, from `Validator` | `src/models/users.rs` |
 | An email address as it is stored and looked up: lowercase | `normalized_email` | `src/models/users.rs` |
@@ -50,7 +52,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A refused form: its title, its line, the field marked as it's left. Guarded | `PageMeta::refused`, `PROBLEM`, `aria-describedby`, Alpine's `x-on:change`, as `ResetForm` | `src/views/layout.rs`, `src/views/reset.rs` |
 | A grid's columns. Guarded | `grid-cols-N` or `minmax(0,1fr)`, never a plain `1fr` | `tests/one_job.rs` |
 | A colour where CSS can't reach (`theme-color`, the manifest). The Android app reads the `theme-color` tag for its status bar, never a copy of its own | `SURFACE_HEX`, `BRAND_HEX` | `src/views/layout.rs` |
-| A form's submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`) | the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled`; the form `hx-sync="this:drop"` and `aria-busy` through Alpine, as `ResetForm` | `style/tailwind.css`, `src/views/reset.rs` |
+| A form's submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`) | `BUTTON`: the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled`; the form `hx-sync="this:drop"` and `aria-busy` through Alpine, as `ResetForm` | `src/views/layout.rs`, `style/tailwind.css`, `src/views/reset.rs` |
 | A click on what loads a page sets Alpine's state, never flips it. Guarded | `open = true`, never `open = !open` | `tests/requests/races.rs` |
 | A tap outside closes at its end. Guarded | `pointerup`, never `pointerdown` | `tests/one_job.rs` |
 | Less motion when the visitor asks | the one Reduce Motion rule, never `motion-reduce:` per class | `style/tailwind.css` |

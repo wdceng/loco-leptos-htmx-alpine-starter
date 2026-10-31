@@ -2,8 +2,8 @@
 //! user agent, environment and request id, naming the request by its
 //! route's pattern instead of its address.
 //!
-//! A token travels in the address: the reset link's query
-//! (`/reset?token=…`), the verification and magic links' path. Loco's own
+//! A token travels in the address: the reset and verification links' query
+//! (`/reset?token=…`, `/verify?token=…`), the magic link's path. Loco's own
 //! logger writes the whole URI into the journal, where a reset token still
 //! works for half an hour. Here a matched route is logged as its pattern
 //! (`/api/auth/verify/{token}`), anything else (a file, a miss) by its path

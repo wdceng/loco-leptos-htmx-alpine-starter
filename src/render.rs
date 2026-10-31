@@ -20,8 +20,8 @@
 use axum::{
     extract::Request,
     http::{
-        HeaderMap, HeaderName, HeaderValue, Method,
-        header::{ACCEPT, CONTENT_SECURITY_POLICY},
+        HeaderMap, HeaderName, HeaderValue, Method, StatusCode,
+        header::{ACCEPT, CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY},
     },
 };
 use leptos::{
@@ -101,6 +101,32 @@ where
     if posted {
         headers.insert(PUSH_URL_HEADER, HeaderValue::from_static("false"));
     }
+    Ok(res)
+}
+
+/// A page a mail's link opens with a token in its address (`/reset`,
+/// `/verify`): [`render_page`] with `status`, the address kept out of
+/// every referrer (`no-referrer`: no request from the page carries it on)
+/// and no copy kept by the browser (`no-store`).
+///
+/// # Errors
+/// As [`render_page`].
+pub async fn render_token_page<V, F>(
+    ctx: &AppContext,
+    req: Request,
+    meta: PageMeta,
+    status: StatusCode,
+    page: F,
+) -> Result<Response>
+where
+    F: Fn() -> V + Clone + Send + Sync + 'static,
+    V: IntoView + 'static,
+{
+    let mut res = render_page(ctx, req, meta, page).await?;
+    *res.status_mut() = status;
+    let headers = res.headers_mut();
+    headers.insert(REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(res)
 }
 

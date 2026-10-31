@@ -267,6 +267,11 @@ change of mind gets a new line, and the old one moves to
   `logger` place, as `Site` takes `static`'s.
 - 2026-10-31: **An email address is lowercase,** stored and looked up:
   one mailbox, one account.
+- 2026-10-31: **The welcome mail links to a page whose button verifies**
+  (`/verify`), as the reset mail's does: a mail scanner opening Loco's
+  `GET /api/auth/verify/{token}` verified the account. That route stays,
+  for an API client. No new password at verification, which would close a
+  press on an unexpected mail too: every new user would type one twice.
 
 ## Working
 

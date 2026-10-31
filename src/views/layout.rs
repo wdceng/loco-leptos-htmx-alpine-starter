@@ -152,6 +152,12 @@ pub const FIELD: &str = "mt-2 block min-h-11 w-full rounded-md border border-ink
 /// the field's `aria-describedby` points at its `id`.
 pub const PROBLEM: &str = "mt-6 font-semibold text-danger";
 
+/// A form's submit button: a finger's height (`min-h-11`), and while htmx
+/// sends the form (`aria-busy` on the form, through Alpine) the `busy:`
+/// look after 200 ms, so a fast answer never shows it. Never `disabled`,
+/// which drops the button's name and value from the post.
+pub const BUTTON: &str = "mt-6 min-h-11 rounded-md bg-primary px-4 py-2 font-semibold text-white transition-opacity busy:pointer-events-none busy:opacity-60 busy:delay-200";
+
 /// The browser tab's title: the page's own name, then the app's. An empty
 /// name is the app's alone (the home page). The one place the app's name
 /// joins a title, the 429 page's too.

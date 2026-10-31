@@ -2,30 +2,26 @@
 //! (`/reset?token=…`, src/mailers/auth.rs), and its form's post. A plain
 //! HTML form, so it works without the islands bundle.
 //!
-//! The token arrives in the address, so both answers go out with
-//! `Referrer-Policy: no-referrer` (no request from the page carries the
-//! address on) and `Cache-Control: no-store` (the browser keeps no copy).
-//! The token works once, for `RESET_TOKEN_EXPIRATION_MIN` minutes.
+//! The token arrives in the address, so both answers go out as every page
+//! a mail's token opens (`render_token_page`): `no-referrer` and
+//! `no-store`. The token works once, for `RESET_TOKEN_EXPIRATION_MIN`
+//! minutes.
 
 use axum::{
     Form,
     body::Body,
     extract::{Query, Request},
-    http::{
-        HeaderValue, StatusCode,
-        header::{CACHE_CONTROL, REFERRER_POLICY},
-        request::Parts,
-    },
+    http::{StatusCode, request::Parts},
 };
-// Named imports on purpose: `leptos::prelude::*` also exports an `Error`
+// Named import on purpose: `leptos::prelude::*` also exports an `Error`
 // type that would shadow Loco's.
-use leptos::{IntoView, view};
+use leptos::view;
 use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
     models::users::{self, password_problem},
-    render::render_page,
+    render::render_token_page,
     views::{
         layout::PageMeta,
         reset::{ResetDone, ResetExpired, ResetForm},
@@ -61,27 +57,6 @@ fn meta() -> PageMeta {
     }
 }
 
-/// Renders `page` with `meta` and `status`, the address kept out of every
-/// referrer and no copy kept by the browser.
-async fn answer<V, F>(
-    ctx: &AppContext,
-    req: Request,
-    meta: PageMeta,
-    status: StatusCode,
-    page: F,
-) -> Result<Response>
-where
-    F: Fn() -> V + Clone + Send + Sync + 'static,
-    V: IntoView + 'static,
-{
-    let mut res = render_page(ctx, req, meta, page).await?;
-    *res.status_mut() = status;
-    let headers = res.headers_mut();
-    headers.insert(REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
-    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    Ok(res)
-}
-
 /// `GET /reset?token=…`: the form. The token isn't checked here: an
 /// expired one is said after the post, together with everything else.
 #[debug_handler]
@@ -91,7 +66,7 @@ async fn page(
     req: Request,
 ) -> Result<Response> {
     let token = link.token;
-    answer(&ctx, req, meta(), StatusCode::OK, move || {
+    render_token_page(&ctx, req, meta(), StatusCode::OK, move || {
         view! { <ResetForm token=token.clone() problem=None /> }
     })
     .await
@@ -108,7 +83,7 @@ async fn submit(
     let req = Request::from_parts(parts, Body::empty());
     if let Some(problem) = password_problem(&form.password) {
         let token = form.token;
-        return answer(
+        return render_token_page(
             &ctx,
             req,
             meta().refused(),
@@ -118,7 +93,7 @@ async fn submit(
         .await;
     }
     let Ok(user) = users::Model::find_by_reset_token(&ctx.db, &form.token).await else {
-        return answer(
+        return render_token_page(
             &ctx,
             req,
             meta(),
@@ -135,7 +110,7 @@ async fn submit(
         pid = user.pid.to_string(),
         "password reset through the page"
     );
-    answer(
+    render_token_page(
         &ctx,
         req,
         meta(),

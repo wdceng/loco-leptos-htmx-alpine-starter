@@ -101,6 +101,10 @@ so the suite runs in about a second.
   link shows the form (`no-store`, `no-referrer`, `noindex`); a short
   password shows it again with the reason; a good one changes the password,
   the old one stops working, and the link is spent.
+- `tests/requests/verify.rs`: the verify page as a person uses it. The
+  welcome mail's link shows the button (`no-store`, `no-referrer`,
+  `noindex`) and verifies nothing; the press verifies, the account signs
+  in, and the link is spent.
 - `tests/requests/home.rs`: a 200 with an HTML content type, a real document
   (doctype, `lang="en"`), the app name (`APP_NAME`), exactly one `<h1>`, the
   skip link and its target, the islands loader script, the wasm file it

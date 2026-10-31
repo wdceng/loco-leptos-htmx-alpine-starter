@@ -69,7 +69,13 @@ impl AuthMailer {
             .email_verification_token
             .as_deref()
             .ok_or_else(|| Error::string("the user has no email verification token"))?;
-        let link = format!("{}/api/auth/verify/{token}", Self::origin(ctx));
+        // A page whose button verifies, not Loco's API route: a scanner
+        // that opens the link verifies nothing there (controllers/verify.rs).
+        let link = format!(
+            "{}{}?token={token}",
+            Self::origin(ctx),
+            crate::controllers::verify::PATH
+        );
         Self::send(
             ctx,
             user,

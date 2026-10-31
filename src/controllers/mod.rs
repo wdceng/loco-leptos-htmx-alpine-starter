@@ -7,3 +7,4 @@ pub mod reset;
 pub mod robots;
 pub mod security_txt;
 pub mod up;
+pub mod verify;

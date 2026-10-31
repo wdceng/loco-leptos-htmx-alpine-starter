@@ -12,3 +12,4 @@ mod robots;
 mod security_headers;
 mod security_txt;
 mod up;
+mod verify;

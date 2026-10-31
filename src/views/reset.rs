@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use crate::{
     controllers::reset::PATH,
     models::users::{PASSWORD_MAX, PASSWORD_MIN, RESET_TOKEN_EXPIRATION_MIN},
-    views::layout::{FIELD, LEAD, Notice, PROBLEM, TITLE},
+    views::layout::{BUTTON, FIELD, LEAD, Notice, PROBLEM, TITLE},
 };
 
 /// The `id` of the line saying why the password was refused.
@@ -74,10 +74,7 @@ pub fn ResetForm(token: String, problem: Option<String>) -> impl IntoView {
                 x-bind:aria-invalid="invalid"
                 class=FIELD
             />
-            <button
-                type="submit"
-                class="mt-6 min-h-11 rounded-md bg-primary px-4 py-2 font-semibold text-white transition-opacity busy:pointer-events-none busy:opacity-60 busy:delay-200"
-            >
+            <button type="submit" class=BUTTON>
                 "Save the new password"
             </button>
         </form>

@@ -71,11 +71,12 @@ async fn can_register() {
         let deliveries = ctx.mailer.unwrap().deliveries();
         assert_eq!(deliveries.count, 1, "Exactly one email should be sent");
         // The link starts with `server.host` as configured, port included,
-        // never `host:port` (src/mailers/auth.rs).
+        // never `host:port` (src/mailers/auth.rs), and leads to the page
+        // whose button verifies (controllers/verify.rs).
         let mail = &deliveries.messages[0];
         assert_from_the_configured_sender(mail);
         assert!(
-            mail.contains("http://localhost:5150/api/auth/verify/"),
+            mail.contains("http://localhost:5150/verify?token"),
             "verification link does not start with server.host:\n{mail}"
         );
 

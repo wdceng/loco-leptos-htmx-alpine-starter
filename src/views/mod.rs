@@ -10,3 +10,4 @@ pub mod mail;
 pub mod not_found;
 pub mod reset;
 pub mod too_many_requests;
+pub mod verify;

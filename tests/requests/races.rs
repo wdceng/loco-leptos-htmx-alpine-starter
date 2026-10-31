@@ -50,7 +50,7 @@ fn flips_on_a_request(body: &str) -> Vec<String> {
 async fn no_click_that_asks_for_a_page_flips_alpines_state() {
     request::<App, _, _>(|request, _ctx| async move {
         let mut found = Vec::new();
-        for path in ["/", "/reset?token=x", "/no-such-page"] {
+        for path in ["/", "/reset?token=x", "/verify?token=x", "/no-such-page"] {
             let res = request.get(path).add_header("accept", "text/html").await;
             let body = res.text();
             assert!(body.contains("<main"), "{path}: not a page");
