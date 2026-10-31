@@ -390,14 +390,40 @@ async fn listen(driver: &WebDriver, heard: Shared) -> WebDriverResult<AbortHandl
             note(
                 &heard,
                 format!(
-                    "{}.{level}: {}",
+                    "{}.{level}: {}{}",
                     entry.entry_type,
-                    entry.text.as_deref().unwrap_or("")
+                    entry.text.as_deref().unwrap_or(""),
+                    frames(&entry.stack_trace)
                 ),
             );
         }
     })
     .abort_handle())
+}
+
+/// Where a BiDi log entry came from: each of its stack's frames on a line
+/// of its own, `at function (url:line:column)`, counted from 1 (BiDi counts
+/// from 0). Nothing when Firefox captured no stack. Without it an error
+/// under load on the M1 said only its message, no script (2026-10-31).
+fn frames(stack: &serde_json::Value) -> String {
+    stack["callFrames"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|frame| {
+            let number = |key: &str| frame[key].as_u64().map_or(0, |n| n + 1);
+            format!(
+                "\n    at {} ({}:{}:{})",
+                frame["functionName"]
+                    .as_str()
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or("?"),
+                frame["url"].as_str().unwrap_or("?"),
+                number("lineNumber"),
+                number("columnNumber")
+            )
+        })
+        .collect()
 }
 
 /// Listen to the session's events until stopped: problems noted in
