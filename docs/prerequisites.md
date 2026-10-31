@@ -252,6 +252,25 @@ cargo install-update -a          # the cargo tools (2.4)
 tools/cargo-leptos/install.sh    # after tools/cargo-leptos/ changed
 ```
 
+When (`docs/decisions.md`, Working):
+
+- **Monthly**, the first Monday: the crates, the tools above, the Android
+  SDK (emulator, images, platform tools), Xcode and its Simulators.
+- **A release at least two weeks old.** A newer one waits for next month.
+- **Security fixes at once**, outside the month: a crate's advisory, macOS.
+- **The M5 first**, then one Android lane (`e2e/run.sh android`), then the
+  M1.
+- **One major upgrade at a time**, each its own commit; the versions within
+  a major together.
+- **Never while the browser lanes run.**
+- **Keep the way back**: the previous emulator build's address before
+  `sdkmanager` replaces it (37.2.12's: Browsers, the devices).
+- **What comes from a commit moves when its fix is released**, not by the
+  month: cargo-leptos (`tools/cargo-leptos/`) and the Leptos fork
+  (`[patch.crates-io]` in `Cargo.toml`). `tools/upstream.sh` says when.
+- The desktop browsers update themselves: the beta bar tests the next ones
+  first.
+
 Once both split fixes are released, cargo-leptos goes back to
 `cargo install --locked cargo-leptos@<version>`, with the same version in
 `.github/workflows/ci.yaml`.

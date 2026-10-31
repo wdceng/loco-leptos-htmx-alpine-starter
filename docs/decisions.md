@@ -256,6 +256,10 @@ change of mind gets a new line, and the old one moves to
 
 ## Working
 
+- 2026-10-31: **Updates once a month, of releases two weeks old**
+  (`docs/prerequisites.md`, Updates). Emulator 37.2.13, two days old, cost
+  a day: it crashed every Android lane on both Macs. Security fixes don't
+  wait. As an islands app on this stack.
 - 2026-10-03: **Generators run in a scratch `git worktree`**, their files
   brought over with editing tools, so every change shows as a diff.
 - 2026-10-05: **The maintainer commits:**
