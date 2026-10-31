@@ -3,10 +3,10 @@
 # Staging's twin: the same settings, the same deploy layout (binary,
 # config/, site/), selected with LOCO_ENV=dev-server. It differs from staging
 # only in its host and its port (the unit's PORT, docs/dev-server.md). Every
-# value has a default so the unit boots with nothing but LOCO_ENV; the unit
-# overrides BINDING and PORT so the app listens on loopback behind Caddy,
-# and JWT_SECRET and MAILER_* replace the placeholder defaults below once
-# they exist.
+# value but JWT_SECRET has a default, so the unit boots with LOCO_ENV and a
+# JWT secret; the unit overrides BINDING and PORT so the app listens on
+# loopback behind Caddy, and MAILER_* replace the placeholder defaults below
+# once they exist.
 
 # Application logging configuration
 logger:
@@ -224,13 +224,14 @@ database:
 auth:
   # JWT authentication
   jwt:
-    # Secret key for token generation and verification. Required, and a
-    # different value from staging and production: a dev-server token must
-    # not open an account elsewhere. The default is for the dev server only
-    # and is public (it is in git): "dev-server only, not a secret" in
-    # base64, which Loco decodes before signing; set JWT_SECRET in the unit
-    # to replace it.
-    secret: <%= get_env(name="JWT_SECRET", default="ZGV2LXNlcnZlciBvbmx5LCBub3QgYSBzZWNyZXQ=") %>
+    # Secret key for token generation and verification. Required, with no
+    # default, as in production: a key in git is one anyone can sign a token
+    # with, and the boot refuses an empty one or `replace-me`
+    # (src/deploy_checks.rs). A different value from staging and production:
+    # a dev-server token must not open an account elsewhere. Base64, which
+    # Loco decodes before signing; it comes from secrets.dev-server.env
+    # (docs/dev-server.md).
+    secret: <%= get_env(name="JWT_SECRET") %>
     # Token expiration time in seconds. One day: a JWT can't be revoked, so
     # a stolen one works until it expires. Longer sessions and a logout need
     # cookie sessions (docs/security.md).

@@ -720,7 +720,7 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
    side at the column's gap.
 5. **A link that leaves the site:** a tap on a phone number opens the
    dialer, on a mail address the mail app, on another site the browser,
-   and the page is still there when you come back (`for_the_system`,
+   and the page is still there when you come back (`destination`,
    `src-tauri/src/lib.rs`). **On the iPhone and iPad, a real tap only.**
    WebKit drops a script's click on a link that opens a new tab as a
    popup, before the app is asked, so it proves nothing either way.

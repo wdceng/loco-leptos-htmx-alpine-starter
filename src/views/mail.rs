@@ -34,6 +34,7 @@ pub fn WelcomeMail(name: String, verify_link: String) -> impl IntoView {
         <p>
             <a href=verify_link>"Verify Your Account"</a>
         </p>
+        <p>"If you didn't sign up, please ignore this email."</p>
         <p>"Best regards," <br /> "The Loco Team"</p>
     }
 }

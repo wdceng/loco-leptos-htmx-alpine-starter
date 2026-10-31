@@ -465,15 +465,12 @@ fn local_environments_key_on_the_peer_and_allow_live_reload(#[case] env: Environ
 /// Loco decodes the JWT secret as base64 before it signs
 /// (`loco_rs::auth::jwt`): a secret with a `-` in it signs nothing, and
 /// every sign-in answers 401 (2026-10-29, a `test-only-not-a-secret`
-/// placeholder). So every config's own secret must sign a token, the
-/// default behind `JWT_SECRET` included. Production has no default: its
-/// secret is the unit's, generated as base64 (`docs/production.md`).
+/// placeholder). So every local config's own secret must sign a token. The
+/// deployed ones have none (below).
 #[rstest]
 #[case::development(Environment::Development)]
 #[case::test_env(Environment::Test)]
 #[case::e2e(e2e())]
-#[case::staging(staging())]
-#[case::dev_server(dev_server())]
 fn every_configs_own_jwt_secret_signs_a_token(#[case] env: Environment) {
     let config: Config = serde_yaml::from_str(&render_defaults(&env))
         .unwrap_or_else(|e| panic!("{}: not a Loco config: {e}", config_path(&env).display()));
@@ -481,6 +478,23 @@ fn every_configs_own_jwt_secret_signs_a_token(#[case] env: Environment) {
     JWT::new(&jwt.secret)
         .generate_token(60, "pid".to_owned(), serde_json::Map::new())
         .unwrap_or_else(|e| panic!("{env}: the JWT secret cannot sign a token: {e}"));
+}
+
+/// No deployed copy signs with a key in git: its `JWT_SECRET` takes no
+/// default, so a missing one refuses the boot, and `deploy_checks` refuses
+/// an empty one or `replace-me`. Staging and the dev server booted on a
+/// committed key until 2026-10-31 (docs/security.md, the review of that
+/// day), so a secrets file without the line let anyone sign a token.
+#[rstest]
+#[case::dev_server(dev_server())]
+#[case::staging(staging())]
+#[case::production(Environment::Production)]
+fn no_deployed_jwt_secret_comes_from_git(#[case] env: Environment) {
+    let config = std::fs::read_to_string(config_path(&env)).expect("the config");
+    assert!(
+        required_variables(&config).contains(&"JWT_SECRET".to_owned()),
+        "{env}: config/{env}.yaml gives JWT_SECRET a default"
+    );
 }
 
 /// The browser tests key on the peer like development, refuse to start

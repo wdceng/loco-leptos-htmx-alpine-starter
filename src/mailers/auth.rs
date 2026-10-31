@@ -13,7 +13,10 @@ use crate::{
     app::stored,
     models::users,
     settings::Settings,
-    views::mail::{self, ForgotPasswordMail, MagicLinkMail, WelcomeMail},
+    views::{
+        layout::APP_NAME,
+        mail::{self, ForgotPasswordMail, MagicLinkMail, WelcomeMail},
+    },
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -70,9 +73,11 @@ impl AuthMailer {
         Self::send(
             ctx,
             user,
-            format!("Welcome {}", user.name),
+            // Never the name: whoever registers types it, the mail goes to
+            // any address they give, and a subject is what an inbox shows.
+            format!("Welcome to {APP_NAME}"),
             format!(
-                "Welcome {}, you can now log in.\nVerify your account with the link below:\n\n{link}\n",
+                "Welcome {}, you can now log in.\nVerify your account with the link below:\n\n{link}\n\nIf you didn't sign up, please ignore this email.\n",
                 user.name
             ),
             view! { <WelcomeMail name=user.name.clone() verify_link=link.clone() /> },

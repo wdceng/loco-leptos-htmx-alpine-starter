@@ -3,3 +3,4 @@
 
 pub mod error_page;
 pub mod rate_limit;
+pub mod request_log;

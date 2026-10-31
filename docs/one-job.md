@@ -36,6 +36,8 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A password reset from the mail's link: the form, done, expired | `ResetForm`, `ResetDone`, `ResetExpired`; the address `reset::PATH` | `src/views/reset.rs`, `src/controllers/reset.rs` |
 | A password's rule (8 to 128 characters), anywhere one is set | `password_problem` | `src/models/users.rs` |
 | A new account's name (2 to 100 characters) and email, checked before anything else | `name_or_email_problem`, from `Validator` | `src/models/users.rs` |
+| An email address as it is stored and looked up: lowercase | `normalized_email` | `src/models/users.rs` |
+| A request's line in the log: its route's pattern or its path, never a query | `RequestLog`, `logged_path` | `src/middleware/request_log.rs` |
 | Hash or check a password | `hashing::hash`, `verify`, `verify_dummy` | `src/hashing.rs` |
 | A page AI assistants should know about | a line in `/llms.txt` | `src/controllers/llms.rs` |
 
@@ -81,7 +83,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Wake islands htmx swaps in, and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
 | Make Leptos's island loader start when Chrome gives no idle time | the Leptos fork's loader (`[patch.crates-io]`) | `Cargo.toml` |
 | The app: a window on the live site, on desktops and phones | `src-tauri/`, `run` in `src/lib.rs`, its start page `offline/index.html`, the app's one script; the phones' projects in `gen/` | `src-tauri/` |
-| A link that leaves the site in the app (a call, a mail, a text, another app, another site), handed to the system | `for_the_system` in `src/lib.rs`, the site from `site_of` | `src-tauri/` |
+| A link that leaves the site in the app (a call, a mail, a text, another app, another site), handed to the system; any other scheme nowhere | `destination` in `src/lib.rs`, the system's schemes `SYSTEM_SCHEMES`, the site from `site_of` | `src-tauri/` |
 | Pictures of the app on each device `testing.md` lists, one at a time, booted where it is off | `screens.sh` | `src-tauri/` |
 | The app's links that leave it, tapped on the Android emulator | `links.sh` | `src-tauri/` |
 | What the device scripts share: the site, the builds with it, an emulator up with the app open, the devices shut down | `devices.sh` (sourced) | `src-tauri/` |

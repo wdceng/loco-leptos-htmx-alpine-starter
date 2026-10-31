@@ -167,8 +167,10 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-dev"
 - Secrets live in `secrets.dev-server.env` in the repo root on your
   machine. It's git-ignored and every deploy uploads it as `secrets.env`.
   Never use staging's or production's file here.
-- An empty file boots on the placeholders in `config/dev-server.yaml`; mail
-  then fails to send. A missing file stops the unit.
+- `JWT_SECRET` is required: without it the app refuses to boot. Without
+  the `MAILER_*` lines it boots on the placeholders in
+  `config/dev-server.yaml`, and mail fails to send. A missing file stops
+  the unit.
 
 Create it once from its example, which explains every key, with its own
 `JWT_SECRET`. Uncomment the `MAILER_*` lines when the dev server should
@@ -273,6 +275,8 @@ ssh <server> "systemctl daemon-reload && systemctl enable --now app-dev && syste
 | `the site folder ... is missing` | `site/` not uploaded next to the binary |
 | `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
+| a `get_env` error naming `JWT_SECRET` | `secrets.env` without its `JWT_SECRET` line |
+| `dev-server won't start: JWT_SECRET empty or still replace-me` | the line is there, the key isn't (`src/deploy_checks.rs`) |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

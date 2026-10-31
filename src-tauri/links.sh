@@ -2,7 +2,7 @@
 # The app's links that leave it, tapped on the Android phone's emulator
 # (android-phone-full), against the dev loop by default (`--https://…` for
 # another site, as screens.sh): each must open its own app on the phone and
-# leave the app on its page (src/lib.rs, `for_the_system`), as an islands
+# leave the app on its page (src/lib.rs, `destination`), as an islands
 # app on this stack checks it after the opener plugin's own script left
 # every link to a new tab dead (2026-10-29). The starter's pages have no
 # link that leaves the site, so five are put into the home page's `<main>`

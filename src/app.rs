@@ -24,6 +24,7 @@ use crate::{
     middleware::{
         error_page::ErrorPages,
         rate_limit::{self, RateLimit},
+        request_log::RequestLog,
     },
     models::_entities::users,
     settings::Settings,
@@ -117,9 +118,12 @@ impl Hooks for App {
         Ok(router)
     }
 
-    /// Loco's default, config-driven stack with two changes. The router's
-    /// fallback (the static files and the not-found page) is the project's
-    /// own `site` in place of Loco's `static`, and first in the list: the
+    /// Loco's default, config-driven stack with these changes. The request
+    /// log is the project's own (`middleware/request_log.rs`) in Loco's
+    /// `logger` place, naming a request by its route, never by its address,
+    /// where a token travels. The router's fallback (the static files and
+    /// the not-found page) is the project's own `site` in place of Loco's
+    /// `static`, and first in the list: the
     /// stack is applied in order and each middleware wraps what the router
     /// holds by then, fallback included, so files and misses get the
     /// security headers, request id, request log, timeout and panic
@@ -140,6 +144,7 @@ impl Hooks for App {
         // its own over ours. The configs switch that one off too.
         stack.delete("static");
         stack.delete("fallback");
+        stack.replace("logger", Box::new(RequestLog::from_context(ctx)));
         stack.insert(0, Box::new(controllers::not_found::Site::from_context(ctx)));
         stack.insert_after("remote_ip", Box::new(RateLimit::from_context(ctx)));
         // After the timeout, so a 408 gets the page too; before

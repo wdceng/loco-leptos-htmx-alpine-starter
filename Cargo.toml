@@ -150,11 +150,13 @@ tower_governor = { version = "0.8.0", default-features = false, features = [
 governor = { version = "0.10.4", optional = true }
 # The router's fallback (src/controllers/not_found.rs): file serving and the
 # cache header, the same pieces Loco's static middleware uses, plus a real
-# 404. Already in the graph through Loco; named here to use its types.
-# Server only.
+# 404. And the request log (src/middleware/request_log.rs), Loco's own
+# `trace` layer. Already in the graph through Loco; named here to use its
+# types. Server only.
 tower-http = { version = "0.6.11", features = [
   "fs",
   "set-header",
+  "trace",
 ], optional = true }
 # Two boot checks on mail. `settings.mail.from` is parsed at boot
 # (src/settings.rs) the way Loco's mailer parses it when it sends, so a

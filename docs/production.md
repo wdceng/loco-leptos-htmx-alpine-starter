@@ -310,7 +310,7 @@ ssh <server> "systemctl daemon-reload && systemctl enable --now app-prod && syst
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
 | a `get_env` error naming `JWT_SECRET` or `MAILER_*` | `secrets.env` missing or incomplete |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
-| `production won't start: MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
+| `production won't start: JWT_SECRET, MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

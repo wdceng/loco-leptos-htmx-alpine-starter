@@ -1,7 +1,9 @@
-use app::{app::App, models::users};
+use app::{app::App, models::users, views::layout::APP_NAME};
+use chrono::{Duration, offset::Local};
 use insta::{assert_debug_snapshot, with_settings};
 use loco_rs::testing::prelude::*;
 use rstest::rstest;
+use sea_orm::{ActiveModelTrait, ActiveValue, IntoActiveModel};
 use serial_test::serial;
 
 use super::prepare_data;
@@ -777,6 +779,158 @@ async fn a_body_past_the_limit_is_refused() {
         });
         let response = request.post("/api/auth/login").json(&payload).await;
         assert_eq!(response.status_code(), 413, "a body past 64 KB");
+    })
+    .await;
+}
+
+/// One mailbox is one account, in whatever case its address is typed:
+/// stored lowercase, found in any case, and taken in any case
+/// (`users::normalized_email`). A second registration in another case is
+/// answered like a new one and changes nothing.
+#[tokio::test]
+#[serial]
+async fn an_address_in_any_case_is_one_account() {
+    request::<App, _, _>(|request, ctx| async move {
+        let register = |name: &str, email: &str, password: &str| {
+            serde_json::json!({ "name": name, "email": email, "password": password })
+        };
+        request
+            .post("/api/auth/register")
+            .json(&register("loco", "Mixed.Case@Example.com", "12341234"))
+            .await;
+        let user = users::Model::find_by_email(&ctx.db, "MIXED.case@example.COM")
+            .await
+            .expect("found in any case");
+        assert_eq!(user.email, "mixed.case@example.com", "stored lowercase");
+
+        let again = request
+            .post("/api/auth/register")
+            .json(&register("other", "MIXED.CASE@example.com", "abcdefgh"))
+            .await;
+        assert_eq!(again.status_code(), 200, "answered like a new one");
+        assert_eq!(
+            ctx.mailer.expect("stub mailer").deliveries().count,
+            1,
+            "the second registration sends nothing"
+        );
+
+        let token = user.email_verification_token.expect("a verification token");
+        request.get(&format!("/api/auth/verify/{token}")).await;
+        let login = |email: &str, password: &str| {
+            serde_json::json!({ "email": email, "password": password })
+        };
+        let first = request
+            .post("/api/auth/login")
+            .json(&login("mixed.CASE@Example.com", "12341234"))
+            .await;
+        assert_eq!(first.status_code(), 200, "the account signs in in any case");
+        let second = request
+            .post("/api/auth/login")
+            .json(&login("mixed.case@example.com", "abcdefgh"))
+            .await;
+        assert_eq!(second.status_code(), 401, "the second password opens nothing");
+    })
+    .await;
+}
+
+/// The welcome mail's subject is the app's, never the name: whoever
+/// registers types the name, and the mail goes to any address they give.
+#[tokio::test]
+#[serial]
+async fn the_welcome_mails_subject_carries_no_name() {
+    request::<App, _, _>(|request, ctx| async move {
+        let payload = serde_json::json!({
+            "name": "Your card was charged, call 555 0100",
+            "email": "ana@example.com",
+            "password": "12341234"
+        });
+        request.post("/api/auth/register").json(&payload).await;
+
+        let mails = ctx.mailer.expect("stub mailer").deliveries().messages;
+        let subject = mails[0]
+            .lines()
+            .find(|line| line.starts_with("Subject: "))
+            .unwrap_or_else(|| panic!("no Subject header:\n{}", mails[0]));
+        assert_eq!(subject, format!("Subject: Welcome to {APP_NAME}"));
+    })
+    .await;
+}
+
+/// The welcome mail's link works for a day while the account is unverified
+/// (`users::EMAIL_VERIFICATION_EXPIRATION_HOURS`); resending the mail gives
+/// a new one that works.
+#[tokio::test]
+#[serial]
+async fn a_verification_link_works_for_a_day() {
+    request::<App, _, _>(|request, ctx| async move {
+        let email = "late@example.com";
+        let payload = serde_json::json!({
+            "name": "late",
+            "email": email,
+            "password": "12341234"
+        });
+        request.post("/api/auth/register").json(&payload).await;
+        let user = users::Model::find_by_email(&ctx.db, email)
+            .await
+            .expect("registered");
+        let old_token = user.email_verification_token.clone().expect("a token");
+        let mut sent_a_day_ago = user.into_active_model();
+        sent_a_day_ago.email_verification_sent_at = ActiveValue::Set(Some(
+            (Local::now()
+                - Duration::hours(users::EMAIL_VERIFICATION_EXPIRATION_HOURS)
+                - Duration::minutes(1))
+            .into(),
+        ));
+        sent_a_day_ago.update(&ctx.db).await.expect("updated");
+
+        let late = request.get(&format!("/api/auth/verify/{old_token}")).await;
+        assert_eq!(late.status_code(), 401, "a day and a minute late");
+
+        request
+            .post("/api/auth/resend-verification-mail")
+            .json(&serde_json::json!({ "email": email }))
+            .await;
+        let user = users::Model::find_by_email(&ctx.db, email)
+            .await
+            .expect("registered");
+        let new_token = user.email_verification_token.expect("a new token");
+        assert_ne!(new_token, old_token);
+        let fresh = request.get(&format!("/api/auth/verify/{new_token}")).await;
+        assert_eq!(fresh.status_code(), 200, "the resent link");
+        let user = users::Model::find_by_email(&ctx.db, email)
+            .await
+            .expect("registered");
+        assert!(user.email_verified_at.is_some(), "verified");
+    })
+    .await;
+}
+
+/// A password reset ends a magic link still pending: a reset closes every
+/// way in that was opened before it.
+#[tokio::test]
+#[serial]
+async fn a_password_reset_ends_a_pending_magic_link() {
+    request::<App, _, _>(|request, ctx| async move {
+        seed::<App>(&ctx).await.expect("seeded");
+        let email = "user1@example.com";
+        let address = serde_json::json!({ "email": email });
+        request.post("/api/auth/magic-link").json(&address).await;
+        request.post("/api/auth/forgot").json(&address).await;
+        let user = users::Model::find_by_email(&ctx.db, email)
+            .await
+            .expect("seeded");
+        let magic_token = user.magic_link_token.expect("a magic link");
+        let reset = serde_json::json!({
+            "token": user.reset_token.expect("a reset token"),
+            "password": "a-new-password",
+        });
+        let reset = request.post("/api/auth/reset").json(&reset).await;
+        assert_eq!(reset.status_code(), 200, "the reset");
+
+        let magic = request
+            .get(&format!("/api/auth/magic-link/{magic_token}"))
+            .await;
+        assert_eq!(magic.status_code(), 401, "the magic link from before it");
     })
     .await;
 }

@@ -253,6 +253,20 @@ change of mind gets a new line, and the old one moves to
   Loco's regex of `example.com` and `gmail.com` in the controller: an app
   narrows it in its config, a wrong entry refuses the boot. `regex` left
   the app with it, now a test dependency.
+- 2026-10-31: **A second security review,** as an attacker would: every
+  route, the token flows, the logs, the configs, the app. Its 12 findings
+  and their status in `docs/security.md`.
+- 2026-10-31: **No deployed copy signs with a JWT secret from git.**
+  Staging and the dev server lost their committed defaults: a secrets file
+  without the line booted on a key anyone could read, and sign a token
+  with. Their mail placeholders stay, so they still boot without a mail
+  account.
+- 2026-10-31: **The request log names a route, never an address.** Loco's
+  logger wrote the whole URI, and a reset token in the query stayed valid
+  in the journal for half an hour. The project's own logger takes Loco's
+  `logger` place, as `Site` takes `static`'s.
+- 2026-10-31: **An email address is lowercase,** stored and looked up:
+  one mailbox, one account.
 
 ## Working
 

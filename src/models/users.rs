@@ -11,6 +11,17 @@ use crate::hashing;
 pub const MAGIC_LINK_LENGTH: i8 = 32;
 pub const MAGIC_LINK_EXPIRATION_MIN: i8 = 5;
 pub const RESET_TOKEN_EXPIRATION_MIN: i64 = 30;
+/// How long the welcome mail's verification link works; resending the mail
+/// is the way to a new one.
+pub const EMAIL_VERIFICATION_EXPIRATION_HOURS: i64 = 24;
+
+/// An email address as it is stored and looked up: lowercase, so one
+/// mailbox is one account in whatever case it's typed. Every save
+/// (`before_save`) and every lookup by address goes through it.
+#[must_use]
+pub fn normalized_email(email: &str) -> String {
+    email.to_lowercase()
+}
 
 /// A password's length in characters: at least 8, as NIST SP 800-63B asks,
 /// with no rules about which characters; at most 128, so nobody can make
@@ -88,14 +99,17 @@ impl ActiveModelBehavior for super::_entities::users::ActiveModel {
         C: ConnectionTrait,
     {
         self.validate()?;
-        if insert {
-            let mut this = self;
-            this.pid = ActiveValue::Set(Uuid::new_v4());
-            this.api_key = ActiveValue::Set(format!("lo-{}", Uuid::new_v4()));
-            Ok(this)
-        } else {
-            Ok(self)
+        let mut this = self;
+        if let ActiveValue::Set(email) = &this.email {
+            this.email = ActiveValue::Set(normalized_email(email));
         }
+        if insert {
+            this.pid = ActiveValue::Set(Uuid::new_v4());
+            // Loco's starter mints an API key for every account; no route
+            // takes one yet (docs/security.md, "Accepted risks").
+            this.api_key = ActiveValue::Set(format!("lo-{}", Uuid::new_v4()));
+        }
+        Ok(this)
     }
 }
 
@@ -120,7 +134,7 @@ impl Model {
         let user = users::Entity::find()
             .filter(
                 model::query::condition()
-                    .eq(users::Column::Email, email)
+                    .eq(users::Column::Email, normalized_email(email))
                     .build(),
             )
             .one(db)
@@ -130,9 +144,15 @@ impl Model {
 
     /// finds a user by the provided verification token
     ///
+    /// The link works for [`EMAIL_VERIFICATION_EXPIRATION_HOURS`] while the
+    /// account is unverified. A verified account's token still answers, so
+    /// its old link says "already verified" (a magic link verifies and keeps
+    /// it, [`ActiveModel::verified_by_magic_link`]).
+    ///
     /// # Errors
     ///
-    /// When could not find user by the given token or DB query error
+    /// When could not find user by the given token or DB query error, or the
+    /// token expired
     pub async fn find_by_verification_token(
         db: &DatabaseConnection,
         token: &str,
@@ -145,7 +165,19 @@ impl Model {
             )
             .one(db)
             .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+        let user = user.ok_or_else(|| ModelError::EntityNotFound)?;
+        let fresh = user.email_verification_sent_at.is_some_and(|sent_at| {
+            sent_at + Duration::hours(EMAIL_VERIFICATION_EXPIRATION_HOURS) >= Local::now()
+        });
+        if user.email_verified_at.is_some() || fresh {
+            Ok(user)
+        } else {
+            tracing::debug!(
+                user_pid = user.pid.to_string(),
+                "verification token expired for the user."
+            );
+            Err(ModelError::msg("verification token expired"))
+        }
     }
 
     /// finds a user by the magic token and verify and token expiration
@@ -275,13 +307,14 @@ impl Model {
         let password_hash = hashing::hash(&params.password)
             .await
             .map_err(|e| ModelError::Any(e.into()))?;
+        let email = normalized_email(&params.email);
 
         let txn = db.begin().await?;
 
         if users::Entity::find()
             .filter(
                 model::query::condition()
-                    .eq(users::Column::Email, &params.email)
+                    .eq(users::Column::Email, &email)
                     .build(),
             )
             .one(&txn)
@@ -292,7 +325,7 @@ impl Model {
         }
 
         let user = users::ActiveModel {
-            email: ActiveValue::set(params.email.clone()),
+            email: ActiveValue::set(email),
             password: ActiveValue::set(password_hash),
             name: ActiveValue::set(params.name.clone()),
             ..Default::default()
@@ -387,7 +420,8 @@ impl ActiveModel {
     /// updates it in the database.
     ///
     /// This method hashes the provided password and sets it as the new password
-    /// for the user.
+    /// for the user. A magic link still pending ends with it: a reset closes
+    /// every way in that was opened before it.
     ///
     /// # Errors
     ///
@@ -404,6 +438,8 @@ impl ActiveModel {
         );
         self.reset_token = ActiveValue::Set(None);
         self.reset_sent_at = ActiveValue::Set(None);
+        self.magic_link_token = ActiveValue::Set(None);
+        self.magic_link_expiration = ActiveValue::Set(None);
         self.update(db).await.map_err(ModelError::from)
     }
 

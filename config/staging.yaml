@@ -3,10 +3,10 @@
 # Same deploy layout as production (binary, config/, site/), selected with
 # LOCO_ENV=staging. It differs from production only where testing benefits:
 # readable debug logs, a short asset cache so testers always see the latest
-# build, and its own host. Unlike production, every value has a default so
-# the unit boots with nothing but LOCO_ENV; the unit overrides BINDING and
-# PORT so the app listens on loopback behind Caddy, and JWT_SECRET and
-# MAILER_* replace the placeholder defaults below once they exist.
+# build, and its own host. Unlike production, every value but JWT_SECRET has
+# a default, so the unit boots with LOCO_ENV and a JWT secret; the unit
+# overrides BINDING and PORT so the app listens on loopback behind Caddy,
+# and MAILER_* replace the placeholder defaults below once they exist.
 
 # Application logging configuration
 logger:
@@ -222,12 +222,13 @@ database:
 auth:
   # JWT authentication
   jwt:
-    # Secret key for token generation and verification. Required, and a
-    # different value from production: a staging token must not open a
-    # production account. The default is for staging only and is public
-    # (it is in git): "staging only, not a secret" in base64, which Loco
-    # decodes before signing; set JWT_SECRET in the unit to replace it.
-    secret: <%= get_env(name="JWT_SECRET", default="c3RhZ2luZyBvbmx5LCBub3QgYSBzZWNyZXQ=") %>
+    # Secret key for token generation and verification. Required, with no
+    # default, as in production: a key in git is one anyone can sign a token
+    # with, and the boot refuses an empty one or `replace-me`
+    # (src/deploy_checks.rs). A different value from production: a staging
+    # token must not open a production account. Base64, which Loco decodes
+    # before signing; it comes from secrets.staging.env (docs/staging.md).
+    secret: <%= get_env(name="JWT_SECRET") %>
     # Token expiration time in seconds. One day: a JWT can't be revoked, so
     # a stolen one works until it expires. Longer sessions and a logout need
     # cookie sessions (docs/security.md).

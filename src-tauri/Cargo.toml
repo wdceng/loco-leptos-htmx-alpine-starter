@@ -26,7 +26,7 @@ tauri-build = { version = "2.7.4", features = [] }
 [dependencies]
 tauri = { version = "2.12.5", features = [] }
 # A call, a mail or a text the page links to, handed to the phone's own app
-# (src/lib.rs, `for_the_system`).
+# (src/lib.rs, `destination`).
 tauri-plugin-opener = "2.7.2"
 
 [profile.release]
