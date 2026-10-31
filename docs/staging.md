@@ -244,6 +244,21 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 StateDirectory=app-stg
+StateDirectoryMode=0700
+UMask=0077
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ProtectProc=invisible
 Environment=DATABASE_URL=sqlite:///var/lib/app-stg/app_staging.sqlite?mode=rwc
 Environment=LOCO_ENV=staging
 Environment=BINDING=127.0.0.1
@@ -263,6 +278,16 @@ WantedBy=multi-user.target
 - **Keep `Restart=always`.** The app stops itself every night at
   `nightly_restart.hour` (03:00 UTC as shipped) and the unit brings it
   back.
+- **The lines from `StateDirectoryMode` on keep the service to what it
+  needs.** Its database readable by its own user alone (three units share
+  the box), no capabilities, an ordinary service's system calls and
+  sockets. A call refused answers `Operation not permitted` (the security
+  review of 2026-10-31).
+- A server set up before them: the lines in, then the files closed once:
+
+```bash
+ssh <server> "chmod 700 /var/lib/app-stg && find /var/lib/app-stg -maxdepth 1 -name 'app_staging.sqlite*' -exec chmod 600 {} + && systemctl daemon-reload && systemctl try-restart app-stg && systemctl is-active app-stg && stat -c '%a %U %n' /var/lib/app-stg /var/lib/app-stg/*"   # active; 700 the folder, 600 the database; a stopped unit stays stopped
+```
 
 ### Step 3: Start
 
@@ -280,6 +305,7 @@ ssh <server> "systemctl daemon-reload && systemctl enable --now app-stg && syste
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |
+| `Operation not permitted` | a hardening line refuses a call: `journalctl -u app-stg` names it, then that line out |
 | `version GLIBC_2.31 not found` | server too old, see Step 0 |
 
 ### Step 4: Caddy

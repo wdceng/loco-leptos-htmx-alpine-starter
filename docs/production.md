@@ -278,6 +278,21 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 StateDirectory=app-prod
+StateDirectoryMode=0700
+UMask=0077
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ProtectProc=invisible
 Environment=DATABASE_URL=sqlite:///var/lib/app-prod/app_production.sqlite?mode=rwc
 Environment=LOCO_ENV=production
 Environment=BINDING=127.0.0.1
@@ -299,6 +314,16 @@ WantedBy=multi-user.target
   back. The journal shows `nightly restart scheduled for 03:00 UTC` at
   boot.
 - **Secrets never go in the unit.** Anyone on the box can read unit files.
+- **The lines from `StateDirectoryMode` on keep the service to what it
+  needs.** Its database readable by its own user alone (three units share
+  the box), no capabilities, an ordinary service's system calls and
+  sockets. A call refused answers `Operation not permitted` (the security
+  review of 2026-10-31).
+- A server set up before them: the lines in, then the files closed once:
+
+```bash
+ssh <server> "chmod 700 /var/lib/app-prod && find /var/lib/app-prod -maxdepth 1 -name 'app_production.sqlite*' -exec chmod 600 {} + && systemctl daemon-reload && systemctl try-restart app-prod && systemctl is-active app-prod && stat -c '%a %U %n' /var/lib/app-prod /var/lib/app-prod/*"   # active; 700 the folder, 600 the database; a stopped unit stays stopped
+```
 
 ### Step 3: Start
 
@@ -317,6 +342,7 @@ ssh <server> "systemctl daemon-reload && systemctl enable --now app-prod && syst
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |
+| `Operation not permitted` | a hardening line refuses a call: `journalctl -u app-prod` names it, then that line out |
 | `version GLIBC_2.31 not found` | server too old, see Step 0 |
 
 ### Step 4: Caddy
@@ -434,7 +460,10 @@ ssh <server> -t "systemctl stop app-prod && cd /srv/app/prod && { pkill -f '^/sr
 4. Once https works: Cloudflare, SSL/TLS, Edge Certificates, HSTS 12
    months, subdomains and preload on. That matches the header in
    `config/production.yaml`.
-5. Submit `<domain>` at https://hstspreload.org. **Last on purpose:** from
+5. A backup, which the template doesn't set up: the database every night
+   with `sqlite3 … ".backup"` (never a copy of the live file), off the
+   box, `0600`, seven kept, and a restore tried once.
+6. Submit `<domain>` at https://hstspreload.org. **Last on purpose:** from
    then on every subdomain must be https, and removal takes months.
 
 ## Without Cloudflare

@@ -276,6 +276,10 @@ change of mind gets a new line, and the old one moves to
   joined into one line): RFC 7518 §3.2 says an HMAC key MUST be at least
   the hash's size, 512 bits for HS512, Loco's. The docs made 48. Secrets
   made before keep working; a new one is made at 64.
+- 2026-10-31: **The three units keep the service to what it needs:**
+  their database their own user's alone, no capabilities, an ordinary
+  service's system calls and sockets. Three units share one box. A server
+  set up before takes a one-time line. As an islands app on this stack.
 
 ## Working
 

@@ -27,6 +27,7 @@ updates it in the same commit.
 | A stolen token | JWTs live one day | `config/*.yaml` | `tests/config.rs` |
 | Big or slow requests | 64 KB body limit, 15 s timeout | `config/*.yaml` | `tests/config.rs` |
 | Bypassing the CDN | Firewall to Cloudflare only, the origin key | `production.md` | by hand |
+| Another service on the box | Each unit's database its own user's alone (`0700`, `0600`); no capabilities, an ordinary service's system calls and sockets | the units in `production.md`, `staging.md`, `dev-server.md` | by hand (`stat`, `systemctl is-active`) |
 | Secrets when deployed | No JWT secret from git: required, and refused at boot while empty or a placeholder, everywhere deployed; production's mail account and security contact too | `src/deploy_checks.rs`, `config/*.yaml` | `src/deploy_checks.rs`, `tests/config.rs` |
 | Personal data in logs | No email address in any log line, and no token: a request is logged by its route; the journal keeps 30 days | `src/controllers/auth.rs`, `src/middleware/request_log.rs`, `production.md` | `src/middleware/request_log.rs`, by hand |
 | The welcome mail as someone's message | Its subject is the app's, never the name the visitor typed | `src/mailers/auth.rs` | `tests/requests/auth.rs` |
