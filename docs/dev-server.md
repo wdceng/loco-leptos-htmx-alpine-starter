@@ -177,8 +177,11 @@ Create it once from its example, which explains every key, with its own
 send real mail (details in `docs/production.md`):
 
 ```bash
-umask 077 && cp secrets.dev-server.env.example secrets.dev-server.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 48)" >> secrets.dev-server.env
+umask 077 && cp secrets.dev-server.env.example secrets.dev-server.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 64 | tr -d '\n')" >> secrets.dev-server.env
 ```
+
+- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
+  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
 
 ## One-time setup
 

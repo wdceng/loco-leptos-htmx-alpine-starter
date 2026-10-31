@@ -272,6 +272,10 @@ change of mind gets a new line, and the old one moves to
   `GET /api/auth/verify/{token}` verified the account. That route stays,
   for an API client. No new password at verification, which would close a
   press on an unexpected mail too: every new user would type one twice.
+- 2026-10-31: **A JWT secret is 64 bytes** (`openssl rand -base64 64`,
+  joined into one line): RFC 7518 §3.2 says an HMAC key MUST be at least
+  the hash's size, 512 bits for HS512, Loco's. The docs made 48. Secrets
+  made before keep working; a new one is made at 64.
 
 ## Working
 

@@ -183,8 +183,11 @@ Create the file once from its example, which explains every key, then put
 your real mail account in place of each `replace-me`:
 
 ```bash
-umask 077 && cp secrets.production.env.example secrets.production.env && sed -i '' "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 48)|" secrets.production.env
+umask 077 && cp secrets.production.env.example secrets.production.env && sed -i '' "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')|" secrets.production.env
 ```
+
+- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
+  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
 
 - `MAILER_FROM` is the sender, `Name <address>`, in double quotes: the
   manual run reads the file with the shell. A sender the mailer would

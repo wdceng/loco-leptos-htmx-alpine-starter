@@ -174,8 +174,11 @@ Create it once from its example, which explains every key, with its own
 mail (details in `docs/production.md`):
 
 ```bash
-umask 077 && cp secrets.staging.env.example secrets.staging.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 48)" >> secrets.staging.env
+umask 077 && cp secrets.staging.env.example secrets.staging.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 64 | tr -d '\n')" >> secrets.staging.env
 ```
+
+- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
+  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
 
 ## One-time setup
 
