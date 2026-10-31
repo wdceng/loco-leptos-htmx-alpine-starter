@@ -552,7 +552,22 @@ ios_boot_why() {
 stop_device() {
   case $kind in
     iphone | ipad | ipad-air) [[ -n $device ]] && xcrun simctl shutdown "$device" 2>/dev/null || true ;;
-    android | android-tablet) [[ -n $device ]] && "$adb" -s "$device" emu kill >/dev/null 2>&1 || true ;;
+    # The emulator asked to stop within 20 s, then left to `stop`, which
+    # ends it by its own process: an `emu kill` that hung held the Mac's
+    # one adb server for an hour, and the lanes beside it lost their
+    # devices, adb's connection reset under chromedriver (an islands app on
+    # this stack, 2026-10-30).
+    android | android-tablet)
+      [[ -n $device ]] || return 0
+      "$adb" -s "$device" emu kill >/dev/null 2>&1 &
+      local asking=$!
+      for _ in {1..20}; do
+        kill -0 "$asking" 2>/dev/null || break
+        sleep 1
+      done
+      kill "$asking" 2>/dev/null || true
+      wait "$asking" 2>/dev/null || true
+      ;;
   esac
 }
 
