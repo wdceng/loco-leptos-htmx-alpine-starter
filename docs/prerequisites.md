@@ -1,0 +1,463 @@
+# Prerequisites
+
+It's all Rust to build and run, no Node.js. Tailwind, wasm-bindgen and
+wasm-opt are standalone binaries that cargo-leptos downloads on first use.
+Node 24+ runs two checks only: the stylesheet's lint (`npm install` once,
+then `npm run lint`) and `src-tauri/links.sh`, which reads the app's page
+with Node's WebSocket.
+
+Install commands are each tool's own. Your package manager works too.
+
+## 1. Required
+
+| # | Tool | Purpose | Install |
+|-----|------|---------|---------|
+| 1.1 | **C toolchain** | Linker and system libraries for the native build | Xcode Command Line Tools on macOS (`xcode-select --install`), `build-essential` on Debian/Ubuntu, Visual Studio Build Tools on Windows |
+| 1.2 | **Rust**, stable 1.94+ | Compiles both halves. Loco 1.2 and Sea-ORM 2.0.4 need 1.94+ | https://rustup.rs |
+| 1.3 | **wasm32 target** | Compiles the islands bundle | `rustup target add wasm32-unknown-unknown` |
+| 1.4 | **cargo-leptos**, from #691's commit | Builds both halves, runs Tailwind and the live-reload dev loop. 0.3.11 plus the two split fixes lazy islands need, the same build as CI (`development.md`, "Lazy islands"). Once per machine, and again when `tools/cargo-leptos/` changes | `tools/cargo-leptos/install.sh` |
+
+`clippy` and `rustfmt` come with Rust.
+
+## 2. Optional Cargo Tools
+
+| # | Tool | Purpose | Install |
+|-----|------|---------|---------|
+| 2.1 | **cargo-watch** | Only for `cargo loco watch`, which reloads just the server. The usual loop is `cargo leptos watch --split -- start` | `cargo install --locked cargo-watch` |
+| 2.2 | **cargo-audit** | Scans `Cargo.lock` for known vulnerabilities. CI runs 0.22.2. `.cargo/audit.toml` lists ignored advisories | `cargo install --locked cargo-audit@0.22.2` |
+| 2.3 | **cargo-zigbuild**, with Zig and the Linux target | Builds the Linux x86_64 server binary natively, Zig as its linker (`dev-server.md`, `staging.md`, `production.md`) | `brew install zig` (or https://ziglang.org/download/), then `cargo install --locked cargo-zigbuild && rustup target add x86_64-unknown-linux-gnu` |
+| 2.4 | **cargo-update** | `cargo install-update -a` updates every cargo tool. Set once to keep sqlx-cli on 0.9.0 and to install nextest `--locked`. It leaves cargo-leptos (1.4, a git install) alone; `--git` would move it off #691's commit | `cargo install --locked cargo-update --features vendored-openssl && cargo install-update-config --version "=0.9.0" sqlx-cli && cargo install-update-config --enforce-lock cargo-nextest` |
+| 2.5 | **loco** | The Loco CLI, only for `loco new` and generators. Not needed here: `cargo loco` is a cargo alias in `.cargo/config.toml` that runs the app binary | `cargo install --locked loco` |
+| 2.6 | **cargo-nextest** | One process per test (`cargo nextest run`). `.config/nextest.toml` keeps app-booting tests on one thread | `cargo install --locked cargo-nextest` |
+| 2.7 | **cargo-sweep** | Clears old native, wasm32 and Linux builds out of `target/` | `cargo install --locked cargo-sweep` |
+| 2.8 | **sea-orm-cli** | Only for `cargo loco db entities`, which regenerates `src/models/_entities/`. `cargo loco doctor` flags it if missing | `cargo install --locked sea-orm-cli` |
+| 2.9 | **sqlx-cli** | `cargo sqlx prepare` refreshes the `.sqlx/` query cache after a migration or a new query (`development.md`). Same version as the `sqlx` crate, 0.9.0 | `cargo install --locked sqlx-cli@0.9.0 --no-default-features --features sqlite` |
+| 2.10 | **cargo-llvm-cov** | Each file's test coverage (`cargo llvm-cov nextest --summary-only`) | `rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov` |
+| 2.11 | **cargo-cache** | Shows and trims `~/.cargo`'s downloads (`cargo cache --autoclean`) | `cargo install --locked cargo-cache` |
+
+- **cargo-update without `vendored-openssl` breaks when brew's OpenSSL
+  moves on.** It linked `openssl@3`, gone once brew had only `openssl@4`.
+
+## 3. Local Services
+
+| # | Tool | Purpose | Install |
+|-----|------|---------|---------|
+| 3.1 | **SMTP catcher** | `config/development.yaml` sends mail to `localhost:1025`. Registration and password reset need something listening. Mailpit, MailHog and maildev all default to 1025, with a web inbox on 8025 | `brew install mailpit && brew services start mailpit` on a Mac. Elsewhere `docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit`, or a native build from https://github.com/axllent/mailpit. Or set `stub: true` under `mailer:` to keep mail in memory |
+| 3.2 | **sqlite3** | Inspect the database files (`app_<env>.sqlite`). `.backup` makes a consistent copy while the app runs | Package manager, or https://sqlite.org/download.html |
+
+## 4. Downloaded by cargo-leptos
+
+Nothing to install. They land in `~/.cache/cargo-leptos` on the first build.
+
+| # | Tool | Purpose | Pin a version |
+|-----|------|---------|---------------|
+| 4.1 | **tailwindcss** | Compiles `style/tailwind.css` | `LEPTOS_TAILWIND_VERSION=v4.x.y` |
+| 4.2 | **wasm-bindgen** | JS glue for the wasm bundle | matched to the crate in `Cargo.lock` |
+| 4.3 | **wasm-opt** | Shrinks the release wasm | `LEPTOS_WASM_OPT_VERSION=version_NNN` |
+
+## 5. On a Server Only
+
+| # | Tool | Purpose |
+|-----|------|---------|
+| 5.1 | **Caddy** | Reverse proxy with automatic HTTPS in front of Loco (`staging.md`, `production.md`). Not needed locally |
+
+## 6. Editor (VS Code)
+
+| # | Extension | Purpose |
+|-----|-----------|---------|
+| 6.1 | **rust-analyzer** | Rust language support |
+| 6.2 | **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) | Class completion, hover previews and its lint inside `view!`, and the stylesheet in its v4 mode. `.vscode/settings.json` sets both up |
+
+`.vscode/extensions.json` recommends both, so VS Code offers them when you
+open the folder.
+
+## Browsers
+
+The browser tests (`e2e/run.sh`, `docs/testing.md`) drive Chrome, Edge,
+Firefox and Safari through their drivers, Safari on the iOS Simulators and
+Chrome on Android emulators, with cargo-nextest (2.6) and bash 4.3 or
+newer (`brew install bash`; macOS's own is 3.2).
+
+The desktop lanes' browsers, kept current by `brew upgrade`:
+
+```bash
+brew install --cask google-chrome microsoft-edge firefox
+```
+
+Chrome's driver, matching it (again after a Chrome update):
+
+```bash
+V=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version | awk '{print $3}') && mkdir -p ~/Library/Caches/chromedriver && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver.zip && unzip -o -q /tmp/chromedriver.zip -d ~/Library/Caches/chromedriver
+```
+
+Firefox's driver:
+
+```bash
+brew install geckodriver
+```
+
+Safari's driver, once; then Safari, Settings, Developer: "Allow remote
+automation":
+
+```bash
+sudo safaridriver --enable
+```
+
+Edge's driver, matching it (again after an Edge update); it prints its
+version:
+
+```bash
+V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundleShortVersionString) && D=$(mktemp -d) && curl -sfL -o "$D/e.zip" "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && unzip -oq "$D/e.zip" -d "$D" && mv "$D/msedgedriver" /opt/homebrew/bin/ && xattr -d com.apple.quarantine /opt/homebrew/bin/msedgedriver 2>/dev/null; msedgedriver --version
+```
+
+- **A driver that no longer matches its browser** fails the session with
+  "only supports … version": fetch it again.
+- **An Edge `brew upgrade` put in is opened once by hand:**
+  `open -a "Microsoft Edge"`, approve the prompt, quit it. Until then
+  macOS refuses to start it, and the Edge lane fails with
+  `DevToolsActivePort` (2026-10-31).
+- **Firefox needs Full Disk Access for the app the run starts from**
+  (Terminal, or VS Code): System Settings, Privacy & Security, then a
+  restart of that app. Without it: "Could not find profile folder".
+- The low bar's Chrome 114 and Firefox 128: `docs/testing.md`, "The Low
+  Bar".
+
+### The devices
+
+iPhone and iPad (Xcode from the App Store first).
+
+Xcode's system parts:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app && sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch
+```
+
+The iOS whose Simulator safaridriver drives (about 8 GB):
+
+```bash
+xcodebuild -downloadPlatform iOS -buildVersion 27.2
+```
+
+Once after the download, iOS 27.2 as a disk image:
+
+```bash
+A=$(grep -l 24B114 /System/Library/AssetsV2/com_apple_MobileAsset_iOSSimulatorRuntime/*.asset/Info.plist | head -1) && xcrun simctl runtime add "$(dirname "$A")"/AssetData/Restore/*.dmg
+```
+
+The devices; it lists an "iPhone 18 Pro", an "iPad Pro 13-inch (M5)" and
+an "iPad Air 11-inch (M4)":
+
+```bash
+xcrun simctl list devices 'iOS 27.2'
+```
+
+- **After every Xcode update, `sudo xcodebuild -runFirstLaunch` again.**
+  Without Xcode's new parts safaridriver opens no session on any
+  Simulator.
+- **The runtime must be added as its disk image.** `-downloadPlatform`
+  installs a cryptex, on which safaridriver finds "no session hosts".
+  `24B114` is iOS 27.2's build: change it with the runtime.
+
+Android (the command-line tools, no Android Studio).
+
+Java 21, the one Gradle needs too, and sdkmanager:
+
+```bash
+brew install --cask temurin@21 android-commandlinetools
+```
+
+An Android 17 image with Chrome:
+
+```bash
+yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"
+```
+
+A Pixel 10, once:
+
+```bash
+echo no | avdmanager create avd -n android-phone -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10
+```
+
+A Pixel Tablet, once:
+
+```bash
+echo no | avdmanager create avd -n android-tablet -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet
+```
+
+Chromedriver for the emulator's Chrome, `M` its major version:
+
+```bash
+M=145 && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["milestones"][sys.argv[1]]["version"])' $M) && mkdir -p ~/Library/Caches/chromedriver-android/$M && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver-android.zip && unzip -oq /tmp/chromedriver-android.zip -d ~/Library/Caches/chromedriver-android/$M
+```
+
+- `e2e/run.sh` reads the emulator's Chrome version as it boots and names
+  the chromedriver it misses: fetch that `M`.
+- **Emulator 37.2.13 crashes, 37.2.12 holds.** 37.2.13 crashed every lane
+  in its own OpenGL layer, on the GPU and in software alike (2026-10-30);
+  `e2e/run.sh` refuses it. `sdkmanager --update` brings it back: update the
+  rest by name. The way back, Google's own 37.2.12 (build 16428233, about
+  400 MB), in place of `emulator/`; it prints `37.2.12.0`:
+
+  ```bash
+  S=/opt/homebrew/share/android-commandlinetools && curl -fL -o /tmp/emulator-37.2.12.zip https://dl.google.com/android/repository/emulator-darwin_aarch64-16428233.zip && rm -rf "$S/emulator" && ditto -x -k /tmp/emulator-37.2.12.zip "$S" && rm /tmp/emulator-37.2.12.zip && "$S/emulator/emulator" -version | head -1
+  ```
+
+  The zip holds no `package.xml`, so `sdkmanager` may not list it as
+  installed afterwards.
+- The low bar's iOS 17.5 and Android 15 emulators: `docs/testing.md`,
+  "The Low Bar".
+
+### The beta bar
+
+The browsers' next releases, beside the installed ones and never over
+them, Chrome for Testing and the drivers in `~/Library/Caches/e2e-beta`
+(`E2E_BETA`).
+
+Chrome for Testing's Beta and its driver (again for a new Beta; the lane
+takes the highest):
+
+```bash
+B=~/Library/Caches/e2e-beta && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["channels"]["Beta"]["version"])') && M=${V%%.*} && U=https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64 && mkdir -p "$B" && curl -fL -o "$B/c.zip" $U/chrome-mac-arm64.zip && mkdir -p "$B/chrome-$M" && ditto -x -k "$B/c.zip" "$B/chrome-$M" && curl -fL -o "$B/d.zip" $U/chromedriver-mac-arm64.zip && mkdir -p "$B/chromedriver-$M" && ditto -x -k "$B/d.zip" "$B/chromedriver-$M" && rm "$B/c.zip" "$B/d.zip"
+```
+
+Edge Beta and its driver (again after an Edge Beta update):
+
+```bash
+brew install --cask microsoft-edge@beta && V=$(defaults read "/Applications/Microsoft Edge Beta.app/Contents/Info.plist" CFBundleShortVersionString) && D=~/Library/Caches/e2e-beta/msedgedriver-${V%%.*} && mkdir -p "$D" && curl -fL -o "$D/e.zip" "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && ditto -x -k "$D/e.zip" "$D" && rm "$D/e.zip"
+```
+
+Firefox's Beta in an app of its own:
+
+```bash
+brew install --cask firefox@developer-edition
+```
+
+Safari's next WebKit, with its own safaridriver:
+
+```bash
+brew install --cask safari-technology-preview
+```
+
+Its driver, once; then its Settings, Developer: "Allow remote automation":
+
+```bash
+sudo "/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver" --enable
+```
+
+- **A new Chrome for Testing asks macOS first** for Bluetooth and the
+  local network, and waits frozen until someone clicks Allow on that
+  Mac's screen. Run each new version once where someone can click.
+- Quit Safari Technology Preview before `safari-beta`, as Safari before
+  `safari`.
+
+## 7. The App
+
+Only for `src-tauri/`. macOS and Windows.
+
+`cargo tauri …`:
+
+```bash
+cargo install --locked tauri-cli --version 2.12.4
+```
+
+The Windows compiler and linker; `/opt/homebrew/opt/llvm/bin` goes first on
+`PATH` for the build:
+
+```bash
+brew install llvm lld
+```
+
+The Windows target:
+
+```bash
+rustup target add x86_64-pc-windows-msvc
+```
+
+The Windows SDK, fetched on the first Windows build (about 1 GB):
+
+```bash
+cargo install --locked cargo-xwin
+```
+
+Linux, built inside Docker (`src-tauri/linux.sh`), from any Mac. Docker
+Desktop; start it before the build:
+
+```bash
+brew install --cask docker
+```
+
+iOS and iPadOS, with Xcode from the App Store.
+
+Xcode's system parts, once and after every Xcode update:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app && sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch
+```
+
+The iOS Simulator (about 8 GB):
+
+```bash
+xcodebuild -downloadPlatform iOS
+```
+
+The Xcode project, pods, a real device over USB:
+
+```bash
+brew install xcodegen cocoapods ios-deploy libimobiledevice
+```
+
+Devices, the Simulator on Apple Silicon and on Intel:
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+```
+
+- **After every Xcode update, `-runFirstLaunch` again.** Without Xcode's
+  new system parts, `-downloadPlatform` fails on a missing `CoreSimulator`.
+- **Xcode 27 has no Simulator app:** its window is DeviceHub
+  (`/Applications/Xcode.app/Contents/Applications/DeviceHub.app`).
+
+The iPhone Duo, Apple's foldable, is only on iOS 27.1.
+
+iOS 27.1 beside 27.2 (about 8 GB):
+
+```bash
+xcodebuild -downloadPlatform iOS -buildVersion 27.1
+```
+
+The Duo, once:
+
+```bash
+xcrun simctl create "iPhone Duo" com.apple.CoreSimulator.SimDeviceType.iPhone-Duo com.apple.CoreSimulator.SimRuntime.iOS-27-1
+```
+
+Android, with the SDK from `brew install --cask android-commandlinetools`.
+
+The Java Gradle runs on:
+
+```bash
+brew install --cask temurin@21
+```
+
+The platform, the build tools and the NDK, about 1 GB:
+
+```bash
+sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;30.0.16248370"
+```
+
+The Android targets:
+
+```bash
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+```
+
+The emulators `testing.md` names ("The app on the phones").
+
+adb, the emulator (37.2.12, not 37.2.13: Browsers, the devices), an
+Android 17 image:
+
+```bash
+yes | sdkmanager --licenses && sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"
+```
+
+A Pixel 10, once (its profile from cmdline-tools 23.0):
+
+```bash
+echo no | avdmanager create avd -n android-phone -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10
+```
+
+A Pixel Tablet, once:
+
+```bash
+echo no | avdmanager create avd -n android-tablet -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet
+```
+
+The phone at half resolution, the same 412×923 CSS layout:
+
+```bash
+sed -i '' -e 's/^hw.lcd.width=.*/hw.lcd.width=540/' -e 's/^hw.lcd.height=.*/hw.lcd.height=1212/' -e 's/^hw.lcd.density=.*/hw.lcd.density=210/' ~/.android/avd/android-phone.avd/config.ini
+```
+
+The tablet at 1.5× with 4 GB, the same 1280×800 CSS layout:
+
+```bash
+sed -i '' -e 's/^hw.ramSize=.*/hw.ramSize=4G/' -e 's/^hw.lcd.width=.*/hw.lcd.width=1920/' -e 's/^hw.lcd.height=.*/hw.lcd.height=1200/' -e 's/^hw.lcd.density=.*/hw.lcd.density=240/' ~/.android/avd/android-tablet.avd/config.ini
+```
+
+The app's pictures' own pair (`src-tauri/screens.sh`), at full density so
+a camera cutout is its real size:
+
+```bash
+echo no | avdmanager create avd -n android-phone-full -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_10 && echo no | avdmanager create avd -n android-tablet-full -k "system-images;android-37.0;google_apis_playstore;arm64-v8a" -d pixel_tablet && sed -i '' 's/^hw.ramSize=.*/hw.ramSize=4G/' ~/.android/avd/android-tablet-full.avd/config.ini
+```
+
+Then in the shell's profile (`~/.bash_profile` for bash, `~/.zshrc` for
+zsh), and a new terminal:
+
+```bash
+export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # where Tauri finds the SDK
+export NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370                    # and the NDK
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)                   # Gradle's Java
+export LANG=en_US.UTF-8                                            # CocoaPods' encoding
+```
+
+- **Java 21, not the newest:** Gradle runs on `JAVA_HOME`. Temurin 27 is
+  untested with Tauri's Gradle 9.6.1.
+- **`LANG`:** without a UTF-8 terminal, CocoaPods warns "CocoaPods
+  requires your terminal to be using UTF-8 encoding".
+- **The first Android build fetches build-tools and platform 36 itself.**
+  Nothing to install for them.
+- **The emulators are shared with the other apps on this stack,** so
+  they're set up one way: `android-phone` and `android-tablet` at half
+  density for the browser tests, the `-full` pair for the pictures.
+
+## Verify
+
+You're set if this prints the target and "both fixes in":
+
+```bash
+rustup target list --installed | grep wasm32 && tools/cargo-leptos/check.sh
+```
+
+## Updates
+
+Rust, clippy, rustfmt:
+
+```bash
+rustup update
+```
+
+The cargo tools (2.4):
+
+```bash
+cargo install-update -a
+```
+
+cargo-leptos, after `tools/cargo-leptos/` changed:
+
+```bash
+tools/cargo-leptos/install.sh
+```
+
+When (`docs/decisions.md`, Working):
+
+- **Monthly**, the first Monday: the crates, the tools above, the Android
+  SDK (emulator, images, platform tools), Xcode and its Simulators.
+- **A release at least two weeks old.** A newer one waits for next month.
+- **Security fixes at once**, outside the month: a crate's advisory, macOS.
+- **The M5 first**, then one Android lane (`e2e/run.sh android`), then the
+  M1.
+- **One major upgrade at a time**, each its own commit; the versions within
+  a major together.
+- **Never while the browser lanes run.**
+- **Keep the way back**: the previous emulator build's address before
+  `sdkmanager` replaces it (37.2.12's: Browsers, the devices).
+- **What comes from a commit moves when its fix is released**, not by the
+  month: cargo-leptos (`tools/cargo-leptos/`) and the Leptos fork
+  (`[patch.crates-io]` in `Cargo.toml`). `tools/upstream.sh` says when.
+- The desktop browsers update themselves: the beta bar tests the next ones
+  first.
+
+Once both split fixes are released, cargo-leptos goes back to
+`cargo install --locked cargo-leptos@<version>`, with the same version in
+`.github/workflows/ci.yaml`.

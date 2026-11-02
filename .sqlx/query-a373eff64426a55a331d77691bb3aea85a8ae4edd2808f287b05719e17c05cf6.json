@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT token_hash FROM sessions WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "token_hash",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "token_hash"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a373eff64426a55a331d77691bb3aea85a8ae4edd2808f287b05719e17c05cf6"
+}

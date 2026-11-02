@@ -1,0 +1,40 @@
+{
+  // VS Code's built-in CSS parser predates Tailwind v4: it flags its
+  // at-rules (@source, @theme) as unknown and `source("../src")` on the
+  // import as a syntax error. Open CSS in the Tailwind CSS IntelliSense
+  // extension's own language mode instead, which knows v4's syntax and
+  // still shows a real mistake. Its lint on: a class set twice on one
+  // element (`p-2 p-4`), a bad `@apply` or variant, in the stylesheet and
+  // the views alike. ESLint checks the stylesheet in the checks
+  // (`npm run lint`, eslint.config.mjs).
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "tailwindCSS.validate": true,
+
+  // No build runs on its own in the editor: clippy runs in the checks
+  // (`cargo clippy`, into its own target folder), never a `cargo check` on
+  // every save, which fights the watch loop for `target/`. rust-analyzer's
+  // own errors stay. The ESLint extension stays off too; its list is for
+  // whoever turns it on.
+  "rust-analyzer.checkOnSave": false,
+  "eslint.enable": false,
+  "eslint.validate": ["css", "tailwindcss"],
+
+  // For the Tailwind CSS IntelliSense extension (bradlc.vscode-tailwindcss),
+  // if installed: treat Rust files as markup so class names get completion
+  // and hover previews, and its lint (above). A misspelt class gets
+  // no warning: the extension has no such check. A class without a hover
+  // preview is the hint. Three places hold classes: `class="…"` in `view!`;
+  // a string constant, `const COLUMN: &str = "…"`, the line break after `=`
+  // included; and a `format!`'s string around its `{…}`, as
+  // `class=format!("{COLUMN} py-6")`.
+  "tailwindCSS.includeLanguages": {
+    "rust": "html"
+  },
+  "tailwindCSS.experimental.classRegex": [
+    ["class\\s*=\\s*\"([^\"]*)\"", "([^\\s\"]+)"],
+    ["const\\s+[A-Z][A-Z0-9_]*\\s*:\\s*&str\\s*=\\s*\"([^\"]*)\"", "([^\\s\"]+)"],
+    ["format!\\(\\s*\"([^\"]*)\"", "([^\\s\"{}]+)"]
+  ]
+}

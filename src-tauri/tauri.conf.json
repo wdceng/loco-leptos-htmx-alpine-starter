@@ -1,0 +1,36 @@
+{
+  "productName": "SaaS Starter",
+  "mainBinaryName": "SaaS Starter",
+  "version": "0.1.0",
+  "identifier": "com.example.app",
+  "build": {
+    "frontendDist": "offline"
+  },
+  "app": {
+    "windows": [
+      {
+        "create": false,
+        "title": "SaaS Starter",
+        "url": "index.html",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 360,
+        "minHeight": 480
+      }
+    ],
+    "security": {
+      "csp": "default-src 'none'; connect-src https://example.com; script-src 'self'; style-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

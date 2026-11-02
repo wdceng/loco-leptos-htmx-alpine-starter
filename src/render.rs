@@ -1,0 +1,193 @@
+//! Where a Loco controller hands a request to Leptos for a page.
+//!
+//! Every page controller calls [`render_page`]: it fetches the Leptos
+//! options and the app settings from the shared store, renders the shell
+//! around the page component, and sets the page's Content-Security-Policy.
+//!
+//! The CSP carries a per-request nonce, the same one Leptos stamps on the
+//! inline scripts it emits (`HydrationScripts`, `AutoReload`). leptos_axum
+//! generates its own nonce inside the render call, too late to end up in a
+//! response header, so the nonce is created here and handed in through the
+//! additional-context hook, which leptos_axum runs after its own
+//! `provide_nonce()`: ours replaces it. Loco's `secure_headers` middleware
+//! adds a header only when the response does not already carry it, so this
+//! CSP wins on pages and the config's fallback CSP (a `secure_headers`
+//! override) applies elsewhere.
+//!
+//! Every page also names the build it comes from (`X-Build`), which an open
+//! tab compares before swapping a page in (`Navigation`, src/islands.rs).
+
+use axum::{
+    extract::Request,
+    http::{
+        HeaderMap, HeaderName, HeaderValue, Method, StatusCode,
+        header::{ACCEPT, CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY},
+    },
+};
+use leptos::{
+    config::LeptosOptions,
+    nonce::Nonce,
+    prelude::{IntoView, provide_context},
+};
+use loco_rs::prelude::*;
+
+use crate::{
+    app::stored,
+    assets::Assets,
+    islands,
+    settings::{NONCE_PLACEHOLDER, Settings},
+    views::layout::{PageMeta, shell},
+};
+
+/// The header every page names its build in ([`Assets::build`]), by the
+/// name both halves share (`islands::BUILD_HEADER`).
+pub const BUILD_HEADER: HeaderName = HeaderName::from_static(islands::BUILD_HEADER);
+
+/// htmx's answer header for the address a swap leaves: `false` on a page
+/// answered to a post keeps the address the page is at.
+pub const PUSH_URL_HEADER: HeaderName = HeaderName::from_static("hx-push-url");
+
+/// Whether a request asks for a page: its `Accept` names HTML, as a
+/// browser's does. Anything else (an API caller, a scanner) gets a plain
+/// answer that costs no render: the not-found page and the error pages.
+#[must_use]
+pub fn accepts_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|accept| accept.contains("text/html"))
+}
+
+/// Renders `page` inside the document shell and returns the HTTP response,
+/// streaming, with the nonce CSP attached.
+///
+/// # Errors
+/// The Leptos options or the settings are missing from the shared store
+/// (the app did not boot through `after_context`), or the CSP template does
+/// not form a valid header value.
+pub async fn render_page<V, F>(
+    ctx: &AppContext,
+    req: Request,
+    meta: PageMeta,
+    page: F,
+) -> Result<Response>
+where
+    F: Fn() -> V + Clone + Send + Sync + 'static,
+    V: IntoView + 'static,
+{
+    let options: LeptosOptions = stored(ctx)?;
+    let settings: Settings = stored(ctx)?;
+    let assets: Assets = stored(ctx)?;
+
+    let nonce = Nonce::new();
+    let csp = csp_header(&settings.security.content_security_policy, &nonce)?;
+    let build = HeaderValue::from_str(&assets.build)
+        .map_err(|e| Error::Message(format!("x-build header: {e}")))?;
+
+    let render = leptos_axum::render_app_to_stream_with_context(
+        move || provide_context(nonce.clone()),
+        move || shell(options.clone(), assets.clone(), meta.clone(), page()),
+    );
+    // A page answered to a post is the page the form was on, sent back with
+    // what it refused, or the page it led to: its address stays the one the
+    // browser is at. htmx would push the form's own, an address that may
+    // answer only a post, so a reload there or Back would fail. A form that
+    // redirects leads to a GET's page, which pushes as usual.
+    let posted = !matches!(*req.method(), Method::GET | Method::HEAD);
+    let mut res = render(req).await;
+    let headers = res.headers_mut();
+    headers.insert(CONTENT_SECURITY_POLICY, csp);
+    headers.insert(BUILD_HEADER, build);
+    if posted {
+        headers.insert(PUSH_URL_HEADER, HeaderValue::from_static("false"));
+    }
+    Ok(res)
+}
+
+/// A page no copy of may be kept, by the browser or a cache on the way
+/// (`no-store`): one that shows who is signed in (`/login`), so Back after
+/// signing out shows no name, and every token page ([`render_token_page`]).
+/// [`render_page`] with `status`.
+///
+/// # Errors
+/// As [`render_page`].
+pub async fn render_private_page<V, F>(
+    ctx: &AppContext,
+    req: Request,
+    meta: PageMeta,
+    status: StatusCode,
+    page: F,
+) -> Result<Response>
+where
+    F: Fn() -> V + Clone + Send + Sync + 'static,
+    V: IntoView + 'static,
+{
+    let mut res = render_page(ctx, req, meta, page).await?;
+    *res.status_mut() = status;
+    res.headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(res)
+}
+
+/// A page a mail's link opens with a token in its address (`/reset`,
+/// `/verify`): [`render_private_page`], the address kept out of every
+/// referrer too (`no-referrer`: no request from the page carries it on).
+///
+/// # Errors
+/// As [`render_page`].
+pub async fn render_token_page<V, F>(
+    ctx: &AppContext,
+    req: Request,
+    meta: PageMeta,
+    status: StatusCode,
+    page: F,
+) -> Result<Response>
+where
+    F: Fn() -> V + Clone + Send + Sync + 'static,
+    V: IntoView + 'static,
+{
+    let mut res = render_private_page(ctx, req, meta, status, page).await?;
+    res.headers_mut()
+        .insert(REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    Ok(res)
+}
+
+/// Fills the nonce into the CSP template from the config.
+///
+/// # Errors
+/// The result is not a valid header value (the template is validated at
+/// boot, so this only fires if the nonce itself were malformed).
+fn csp_header(template: &str, nonce: &Nonce) -> Result<HeaderValue> {
+    let value = template.replace(NONCE_PLACEHOLDER, nonce.as_inner());
+    HeaderValue::from_str(&value)
+        .map_err(|e| Error::Message(format!("content-security-policy header: {e}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nonce_is_substituted() {
+        let nonce = Nonce::from_value("abc123");
+        let header = csp_header(
+            "default-src 'self'; script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval'",
+            &nonce,
+        )
+        .expect("valid header");
+        let value = header.to_str().expect("ascii");
+        assert_eq!(
+            value,
+            "default-src 'self'; script-src 'self' 'nonce-abc123' 'wasm-unsafe-eval'"
+        );
+        assert!(!value.contains(NONCE_PLACEHOLDER));
+    }
+
+    #[test]
+    fn invalid_header_value_is_an_error() {
+        let nonce = Nonce::from_value("abc123");
+        let err = csp_header("default-src 'self'\nscript-src {nonce}", &nonce)
+            .expect_err("newline is not allowed in a header value");
+        assert!(err.to_string().contains("content-security-policy"), "{err}");
+    }
+}

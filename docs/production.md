@@ -1,0 +1,665 @@
+# Production
+
+|            |                                          |
+| ---------- | ---------------------------------------- |
+| Server     | `<server>`, the SSH login, e.g. `root@203.0.113.10` |
+| Directory  | `/srv/app/prod`                          |
+| Unit, user | `app-prod.service`, `app-prod`           |
+| Port       | 5150                                     |
+| URL        | `https://<domain>`, e.g. `https://example.com` |
+
+Replace `<server>` and `<domain>` in the commands below. The directory, unit,
+user and port are suggestions; if you change one, change it everywhere in
+this file.
+
+Deployed: the `app` binary, `hash.txt` next to it, `config/production.yaml`,
+`site/`, `secrets.env`.
+
+The reference setup is Cloudflare in front of Caddy in front of Loco. Caddy
+alone works too, see "Without Cloudflare" at the end.
+
+## Deploy
+
+### Checks
+
+```bash
+cargo clippy --all-targets && cargo test &&
+cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings &&
+cargo audit
+```
+
+The template's placeholders must be gone ("Start a new project" in `development.md`),
+and `secrets.production.env` must exist and hold real values. Both checks
+must print nothing.
+
+The template's placeholders:
+
+```bash
+grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs
+```
+
+The secrets file's placeholders:
+
+```bash
+test -s secrets.production.env && grep -n "replace-me" secrets.production.env
+```
+
+The second prints nothing when the file is ready. If the file is missing it
+says nothing either, so check that `ls secrets.production.env` finds it.
+The deploy chain below checks both.
+
+Try the release build locally first (http://localhost:5153). It builds into
+`target/site-release`, so the watch loop on 5150 keeps running untouched:
+
+```bash
+LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split &&
+LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
+```
+
+### Build and deploy
+
+```bash
+cargo audit && ! grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs &&
+test -s secrets.production.env && ! grep -q "replace-me" secrets.production.env && tools/cargo-leptos/check.sh &&
+cargo clippy --all-targets && cargo test &&
+LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&
+CARGO_TARGET_DIR=target/zig cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.31 &&
+rm -rf dist && mkdir dist &&
+cp target/zig/x86_64-unknown-linux-gnu/release/app dist/app &&
+cp target/release/hash.txt dist/hash.txt &&
+cp -r target/site-release dist/site &&
+ssh <server> "mkdir -p /srv/app/prod/config" &&
+ssh <server> "systemctl stop app-prod" &&
+ssh <server> "cd /srv/app/prod && { [ -f app ] && cp app app.prev; [ -f hash.txt ] && cp hash.txt hash.txt.prev; [ -d site ] && rm -rf site.prev && mv site site.prev; true; }" &&
+scp dist/app <server>:/srv/app/prod/app &&
+scp dist/hash.txt <server>:/srv/app/prod/hash.txt &&
+scp -r dist/site <server>:/srv/app/prod/ &&
+ssh <server> "find /srv/app/prod/site -name '.DS_Store' -delete" &&
+scp config/production.yaml <server>:/srv/app/prod/config/ &&
+scp secrets.production.env <server>:/srv/app/prod/secrets.env &&
+ssh <server> "chmod 600 /srv/app/prod/secrets.env && systemctl start app-prod" &&
+ssh <server> "journalctl -u app-prod -f"
+```
+
+- The first two lines are the production gates: `cargo audit`, no
+  template placeholders, and a `secrets.production.env` that exists and
+  has no `replace-me` left. A placeholder mail account would boot fine and
+  only fail when the first mail is sent. A missing file would fail at the
+  upload, after the service was already stopped.
+- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
+  the chain when this machine's cargo-leptos lacks the split fixes
+  (`development.md`, "Lazy islands").
+- A failing step stops the chain. A failed build never touches the server.
+- `--release` is a full, slow build every time. `.2.31` is the oldest glibc
+  the binary needs (Step 0); `target/zig` keeps this build apart from the
+  Mac's own.
+- The previous deploy is kept as `*.prev` for the rollback below.
+- `hash.txt` must travel with the binary and match `site/`, or the app
+  won't start.
+
+### Rollback
+
+```bash
+ssh <server> "systemctl stop app-prod && cd /srv/app/prod && mv app app.bad && mv app.prev app && mv hash.txt hash.txt.bad && mv hash.txt.prev hash.txt && rm -rf site.bad && mv site site.bad && mv site.prev site && systemctl start app-prod && systemctl status app-prod --no-pager"
+```
+
+The binary, `hash.txt` and `site/` always move together.
+
+### Smoke test
+
+On the server, straight at the app, so a Cloudflare challenge can't get in
+the way:
+
+```bash
+ssh <server> 'cd /srv/app/prod && for p in / /robots.txt $(ls site/pkg | grep -v "\.ts$" | sed "s|^|/pkg/|"); do printf "%-40s " "$p"; curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:5150$p"; done && curl -s http://127.0.0.1:5150/ | grep -o "href=\"/pkg/[^\"]*\"" && curl -s http://127.0.0.1:5150/robots.txt && echo "X-Robots-Tag (must be empty):" && curl -sI http://127.0.0.1:5150/ | grep -i x-robots-tag; true'
+```
+
+- All 200, the linked `href` values among the listed files, `robots.txt`
+  says `Allow: /`, no `X-Robots-Tag`.
+- `https://<domain>` in the browser with the console open: no errors.
+  `https://www.<domain>` lands on `https://<domain>`.
+- The mail account logs in: right after every start the app logs in to
+  SMTP once, sending nothing, and the journal says how it went.
+  `ssh <server> "journalctl -u app-prod -b | grep 'smtp login check'"`
+  should show `the mail server accepted the login`. A failure is a warning
+  with the reason (wrong host, port or password) and the site keeps
+  running, so look for it.
+- Register a test account: the welcome mail arrives. If not,
+  `journalctl -u app-prod` says why.
+
+### Config-only change
+
+```bash
+scp config/production.yaml <server>:/srv/app/prod/config/ &&
+ssh <server> "systemctl restart app-prod"
+```
+
+## Unit commands
+
+Restart:
+
+```bash
+ssh <server> "systemctl restart app-prod"
+```
+
+Its state:
+
+```bash
+ssh <server> "systemctl status app-prod"
+```
+
+Follow its log:
+
+```bash
+ssh <server> "journalctl -u app-prod -f"
+```
+
+Down until the next reboot:
+
+```bash
+ssh <server> "systemctl stop app-prod"
+```
+
+Down across reboots:
+
+```bash
+ssh <server> "systemctl disable --now app-prod"
+```
+
+Back:
+
+```bash
+ssh <server> "systemctl enable --now app-prod"
+```
+
+## Server
+
+- Debian 11 or Ubuntu 20.04 or newer (see the glibc check in Step 0).
+- Caddy installed on the box, shared by every site on it.
+- Cloudflare in front, proxied, SSL/TLS mode Full (strict).
+- The firewall lets in only Cloudflare's addresses, and the origin key
+  blocks other Cloudflare accounts. Both are below.
+- The app keys each visitor on `CF-Connecting-IP`
+  (`remote_ip.source: CfConnectingIp` in the config).
+- **`/up` answers the app's start page.** Production has no gate,
+  so nothing to let past. Check: `curl -s https://<domain>/up` prints `ok`.
+- Cloudflare adds HSTS and `X-Content-Type-Options` itself. To see what the
+  app sends: `curl -sI http://127.0.0.1:5150/` on the server.
+- Shared with other projects? Touch only this app's directory, unit, port
+  and Caddy block.
+
+| `LOCO_ENV` | Where           | Bind             | URL                        |
+| ---------- | --------------- | ---------------- | -------------------------- |
+| staging    | `/srv/app/stg`  | `127.0.0.1:5151` | `https://staging.<domain>` |
+| production | `/srv/app/prod` | `127.0.0.1:5150` | `https://<domain>`         |
+
+## Environment variables
+
+In the unit: `LOCO_ENV`, `BINDING`, `PORT`, `LEPTOS_*`, `DATABASE_URL`. The
+domain is `server.host` in `config/production.yaml`; `HOST=` in the unit
+overrides it. Change one:
+
+```bash
+ssh -t <server> "nano /etc/systemd/system/app-prod.service" &&
+ssh <server> "systemctl daemon-reload && systemctl restart app-prod"
+```
+
+- Keep `BINDING=127.0.0.1`. `0.0.0.0` would bypass Caddy.
+- Secrets live in `secrets.production.env` in the repo root on your
+  machine. It's git-ignored and every deploy uploads it as `secrets.env`.
+  Staging has its own, `secrets.staging.env`. Never share one between the
+  two.
+- Production has no defaults for `JWT_SECRET`, `MAILER_HOST`,
+  `MAILER_USER`, `MAILER_PASSWORD` and `MAILER_FROM`. A missing one stops
+  the boot.
+
+Create the file once from its example, which explains every key, then put
+your real mail account in place of each `replace-me`:
+
+```bash
+umask 077 && cp secrets.production.env.example secrets.production.env && sed -i '' "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')|" secrets.production.env
+```
+
+- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
+  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
+
+- `MAILER_FROM` is the sender, `Name <address>`, in double quotes: the
+  manual run reads the file with the shell. A sender the mailer would
+  reject, such as a name with a bare comma, stops the boot.
+- **Gmail:** `MAILER_USER` is the address, `MAILER_PASSWORD` an app
+  password (Google account, Security, 2-Step Verification, App passwords),
+  never the account password. `MAILER_FROM` must use the same address, or
+  Gmail rewrites it.
+- **Postmark, SES, Mailgun** and the like want a sender they've verified.
+- **Port:** 587 with STARTTLS. For implicit TLS on 465, add
+  `MAILER_PORT=465` to the file and set `tls: implicit` under
+  `mailer.smtp` in the config.
+- A changed secret goes up with the next deploy, or right away:
+  `scp secrets.production.env <server>:/srv/app/prod/secrets.env && ssh <server> "chmod 600 /srv/app/prod/secrets.env && systemctl restart app-prod"`.
+
+## One-time setup
+
+```text
+/srv/app/prod/
+├── app          Linux binary
+├── hash.txt     next to the binary
+├── config/      production.yaml only
+├── site/        target/site-release
+└── secrets.env  root-only, loaded by the unit
+```
+
+Everything is root's and read-only for the app. The only writable place is
+`/var/lib/app-prod`, where the SQLite file lives. Back it up with
+`sqlite3 /var/lib/app-prod/app_production.sqlite ".backup <copy>"`, never by
+copying the file.
+
+### Step 0: Port free, glibc new enough?
+
+Is the port free?
+
+```bash
+ssh <server> "ss -tlnp | grep ':5150\b' || echo '5150 free'"
+```
+
+The server's glibc:
+
+```bash
+ssh <server> "ldd --version | head -1"
+```
+
+A different port goes in two places only: `PORT=` in the unit and
+`reverse_proxy` in Caddy.
+
+The server's glibc must be at least the one the binary needs. The build
+names it: `.2.31` on the target in every deploy chain, so Debian 11 and
+Ubuntu 20.04 or newer work. An older server needs a lower number there.
+Once `dist/` is built, this prints what the binary needs:
+
+```bash
+strings dist/app | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1
+```
+
+### Step 1: Directory, user, files
+
+```bash
+ssh <server> "mkdir -p /srv/app/prod/config && useradd --system --user-group --no-create-home --shell /usr/sbin/nologin app-prod"
+```
+
+Build `dist/` with lines 4 to 9 of the deploy chain, then:
+
+```bash
+scp dist/app <server>:/srv/app/prod/app &&
+scp dist/hash.txt <server>:/srv/app/prod/hash.txt &&
+scp -r dist/site <server>:/srv/app/prod/ &&
+scp config/production.yaml <server>:/srv/app/prod/config/ &&
+scp secrets.production.env <server>:/srv/app/prod/secrets.env &&
+ssh <server> "chmod +x /srv/app/prod/app && chmod 600 /srv/app/prod/secrets.env"
+```
+
+### Step 2: The unit
+
+```bash
+ssh <server> -t "nano /etc/systemd/system/app-prod.service"
+```
+
+```ini
+[Unit]
+Description=app production
+After=network.target
+
+[Service]
+Type=simple
+User=app-prod
+WorkingDirectory=/srv/app/prod
+ExecStart=/srv/app/prod/app start
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+StateDirectory=app-prod
+StateDirectoryMode=0700
+UMask=0077
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ProtectProc=invisible
+PrivateDevices=yes
+ProtectClock=yes
+ProtectHostname=yes
+SystemCallArchitectures=native
+RemoveIPC=yes
+IPAddressDeny=link-local multicast
+MemoryDenyWriteExecute=yes
+SystemCallFilter=~@privileged @resources
+Environment=DATABASE_URL=sqlite:///var/lib/app-prod/app_production.sqlite?mode=rwc
+Environment=LOCO_ENV=production
+Environment=BINDING=127.0.0.1
+Environment=PORT=5150
+Environment=LEPTOS_OUTPUT_NAME=app
+Environment=LEPTOS_SITE_ROOT=site
+Environment=LEPTOS_SITE_PKG_DIR=pkg
+Environment=LEPTOS_ENV=PROD
+EnvironmentFile=/srv/app/prod/secrets.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- **Keep `start`.** Without it the binary prints its help and
+  `Restart=always` loops.
+- **Keep `Restart=always`.** The app stops itself every night at
+  `nightly_restart.hour` (03:00 UTC as shipped) and the unit brings it
+  back. The journal shows `nightly restart scheduled for 03:00 UTC` at
+  boot.
+- **Secrets never go in the unit.** Anyone on the box can read unit files.
+- **The lines from `StateDirectoryMode` on keep the service to what it
+  needs.** Its database readable by its own user alone (three units share
+  the box), no capabilities, an ordinary service's system calls and
+  sockets, no devices, clock or hostname to change, no 32-bit calls, no
+  memory both writable and executable, and no link-local address, so not a
+  cloud's metadata service at `169.254.169.254`. A call refused answers
+  `Operation not permitted` (the security review of 2026-10-31).
+- A server set up before them: the lines in, then the files closed once.
+  It prints `active`, then 700 for the folder and 600 for the database; a
+  stopped unit stays stopped:
+
+```bash
+ssh <server> "chmod 700 /var/lib/app-prod && find /var/lib/app-prod -maxdepth 1 -name 'app_production.sqlite*' -exec chmod 600 {} + && systemctl daemon-reload && systemctl try-restart app-prod && systemctl is-active app-prod && stat -c '%a %U %n' /var/lib/app-prod /var/lib/app-prod/*"
+```
+
+### Step 3: Start
+
+```bash
+ssh <server> "systemctl daemon-reload && systemctl enable --now app-prod && systemctl status app-prod"
+```
+
+Its hardening score, `1.3 OK`; higher means a hardening line is missing
+from the unit:
+
+```bash
+ssh <server> "systemd-analyze security app-prod --no-pager | tail -1"
+```
+
+| Boot error | Cause |
+|---|---|
+| `the site folder ... is missing` | `site/` not uploaded next to the binary |
+| `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
+| `the hash file is stale` | `hash.txt` and `site/` from different builds |
+| a `get_env` error naming `JWT_SECRET` or `MAILER_*` | `secrets.env` missing or incomplete |
+| `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
+| `production won't start: JWT_SECRET, MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
+| `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
+| `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
+| `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |
+| `Operation not permitted` | a hardening line refuses a call, which the kernel does not log: the app's own error in `journalctl -u app-prod` says what failed, then the hardening lines out one by one, the last added first |
+| `version GLIBC_2.31 not found` | server too old, see Step 0 |
+
+### Step 4: Caddy
+
+The origin key (below) must exist on the box and in the domain's Cloudflare
+zone first, or Caddy drops every request.
+
+The shared `/etc/caddy/Caddyfile` starts with this, once per server: the
+global block ("Caddy's admin socket" and "Caddy's log", below) and the
+origin key's snippet ("The origin key", below). A site's block goes below
+it, never above:
+
+```text
+{
+        admin unix//run/caddy/admin.sock
+        log default {
+                format filter {
+                        request>headers>X-Origin-Key delete
+                }
+        }
+}
+
+import /etc/caddy/origin-check.caddy
+```
+
+Add this block to `/etc/caddy/Caddyfile`. Never replace the file, other
+sites may share it. Without `www`, leave out the two `www.` addresses and
+the redirect:
+
+```bash
+ssh <server> -t "nano /etc/caddy/Caddyfile"
+```
+
+```text
+<domain>:80, <domain>:443, www.<domain>:80, www.<domain>:443 {
+        import origin_check
+        @www host www.<domain>
+        redir @www https://<domain>{uri} permanent
+        reverse_proxy 127.0.0.1:5150 {
+                header_up -X-Origin-Key
+        }
+        encode gzip zstd
+}
+```
+
+```bash
+ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy"
+```
+
+If validation fails, Caddy keeps running on the old config.
+
+### Caddy's admin socket
+
+Once per server, for every site on it: Caddy's admin API is a unix socket
+only the `caddy` user and root can reach. On its default, `127.0.0.1:2019`,
+any process on the box could read the live config, the origin key with it,
+and load another or stop Caddy.
+
+Check (`0`, then the socket, `s-w------- caddy caddy`):
+
+```bash
+ssh <server> "ss -ltn | grep -c ':2019 '; ls -l /run/caddy/admin.sock"
+```
+
+On a box without it, first the global block's admin line, as in Step 4, at
+the very top of the Caddyfile, above the `import`:
+
+```bash
+ssh <server> -t "nano /etc/caddy/Caddyfile"
+```
+
+Then the `caddy` user's `/run/caddy`, and one restart (a reload would still
+ask 2019). The reload after it proves the socket answers:
+
+```bash
+ssh <server> "mkdir -p /etc/systemd/system/caddy.service.d && printf '[Service]\nRuntimeDirectory=caddy\n' > /etc/systemd/system/caddy.service.d/admin-socket.conf && caddy validate --config /etc/caddy/Caddyfile && systemctl daemon-reload && systemctl restart caddy && systemctl reload caddy && systemctl is-active caddy"
+```
+
+- **A `caddy` command run by hand needs `--config /etc/caddy/Caddyfile`.**
+  It reads the socket from there; without it, it asks 2019 and fails.
+  `systemctl reload caddy` already passes it.
+- **Never `admin off`.** Reloads then stop working, and every change is a
+  restart that takes every site down if the Caddyfile is wrong.
+- **Never `caddy fmt --overwrite`.** It rewrites every site's block in the
+  shared file.
+- If the check fails: delete the global block and
+  `/etc/systemd/system/caddy.service.d/admin-socket.conf`, then
+  `systemctl daemon-reload && systemctl restart caddy`.
+
+### Caddy's hardening
+
+Once per server, for every site on it: Caddy, the one process facing the
+internet, runs behind the same walls as the app's unit. Its certificates in
+`/var/lib/caddy` are the only thing it may write. An override file beside
+`admin-socket.conf`, so a package upgrade keeps it.
+
+Check its score, about 2, where the package alone scores 8.8:
+
+```bash
+ssh <server> "systemd-analyze security caddy --no-pager | tail -1"
+```
+
+Then each site's code through Caddy, the key never printed:
+
+```bash
+ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); for h in $(grep -E "^[a-z].*\{$" /etc/caddy/Caddyfile | cut -d: -f1); do curl -sk -m 5 --resolve $h:443:127.0.0.1 -H "X-Origin-Key: $K" -o /dev/null -w "%{http_code} $h\n" https://$h/; done'
+```
+
+On a box without it, the file and one restart, every site cut for a second
+or two:
+
+```bash
+ssh <server> "printf '%s\n' '[Service]' 'NoNewPrivileges=yes' 'ProtectSystem=strict' 'ReadWritePaths=/var/lib/caddy' 'ProtectHome=yes' 'PrivateDevices=yes' 'UMask=0077' 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK' 'SystemCallArchitectures=native' 'SystemCallFilter=@system-service' 'SystemCallErrorNumber=EPERM' 'MemoryDenyWriteExecute=yes' 'ProtectKernelTunables=yes' 'ProtectKernelModules=yes' 'ProtectKernelLogs=yes' 'ProtectControlGroups=yes' 'ProtectClock=yes' 'ProtectHostname=yes' 'ProtectProc=invisible' 'RestrictNamespaces=yes' 'RestrictRealtime=yes' 'RestrictSUIDSGID=yes' 'LockPersonality=yes' 'RemoveIPC=yes' 'IPAddressDeny=link-local multicast' > /etc/systemd/system/caddy.service.d/hardening.conf && systemctl daemon-reload && systemctl restart caddy && sleep 2 && systemctl is-active caddy && systemctl reload caddy && systemd-analyze security caddy --no-pager | tail -1"
+```
+
+- **A new site that serves files from disk or logs to a file needs its
+  path.** Files outside `/home` and `/root`, a log file's folder added to
+  `ReadWritePaths`: everything else is read-only to Caddy.
+- Caddy keeps two capabilities: ports 80 and 443, and HTTP/3's buffers
+  (`CAP_NET_ADMIN`).
+- **Certificates renew in the background,** weeks before they expire. A day
+  after the change, and after the next renewal,
+  `journalctl -u caddy --since yesterday | grep -iE 'renew|obtain' | grep -i error`
+  prints nothing.
+- If the check fails: delete
+  `/etc/systemd/system/caddy.service.d/hardening.conf`, then
+  `systemctl daemon-reload && systemctl restart caddy`.
+
+### Caddy's log
+
+Once per server, for every site on it: Caddy writes a request's headers
+into the journal with every error, `X-Origin-Key` and its value among them.
+The global block's `log default` drops that header from every line.
+
+Check (`0`, a day after the change; never print these lines):
+
+```bash
+ssh <server> "journalctl -u caddy --since '-1 day' --no-pager | grep -c 'X-Origin-Key'"
+```
+
+On a box without it, the global block's `log default`, as in Step 4, at the
+top of the Caddyfile under the `admin` line:
+
+```bash
+ssh <server> -t "nano /etc/caddy/Caddyfile"
+```
+
+Then the reload; a config Caddy refuses leaves the old one serving:
+
+```bash
+ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && systemctl is-active caddy"
+```
+
+- **Never grep Caddy's journal for a header and print the lines.** Before
+  this change they hold the key. Count them (`grep -c`).
+
+## Firewall (once per server)
+
+Only Cloudflare may reach ports 80 and 443. Otherwise a request straight to
+the server's IP can fake `CF-Connecting-IP` and dodge the rate limiter.
+
+```bash
+ssh <server> 'apt install -y ufw && ufw allow OpenSSH && for ip in $(curl -s https://www.cloudflare.com/ips-v4) $(curl -s https://www.cloudflare.com/ips-v6); do ufw allow proto tcp from $ip to any port 80,443; done && ufw --force enable && ufw status'
+```
+
+- **`ufw allow OpenSSH` comes first.** Without it, enabling the firewall
+  locks you out.
+- Shared box? Every site on it now needs Cloudflare in front.
+- Cloudflare's list rarely changes. If it does, run the loop again.
+
+## Log retention (once per server)
+
+The app's logs go to the journal. They name accounts by `pid`, never by
+email, but a request log still holds IP addresses: keep 30 days, then let
+them go.
+
+```bash
+ssh <server> 'mkdir -p /etc/systemd/journald.conf.d && printf "[Journal]\nMaxRetentionSec=30day\n" > /etc/systemd/journald.conf.d/retention.conf && systemctl restart systemd-journald && journalctl --disk-usage'
+```
+
+- It covers every unit on the box, the app's three included.
+- A different period? Change `30day` and run it again. Privacy law usually
+  asks for "no longer than needed": write down why yours is the length it
+  is.
+
+## The origin key (once per server)
+
+Cloudflare adds a secret header, `X-Origin-Key`, to every request. Caddy's
+`origin_check` snippet drops requests without it. This stops another
+Cloudflare account from reaching your server through Cloudflare's own
+addresses.
+
+Create the key and the snippet on the box:
+
+```bash
+ssh <server> 'K=$(openssl rand -hex 32) && printf "(origin_check) {\n\t@no_key not header X-Origin-Key %s\n\tabort @no_key\n}\n" "$K" > /etc/caddy/origin-check.caddy && chown root:caddy /etc/caddy/origin-check.caddy && chmod 640 /etc/caddy/origin-check.caddy'
+```
+
+Then add `import /etc/caddy/origin-check.caddy` near the top of
+`/etc/caddy/Caddyfile`, once: after the global options block `{ ... }` if
+there is one, before any site block.
+
+**The key lives only on the server and in Cloudflare's rules.** Never in
+git, a chat or a screenshot. A new key means editing every zone's rule.
+
+In each Cloudflare zone that points at this server: Rules, Create rule,
+Request Header Transform Rule, name `Origin key`, all incoming requests,
+set static header `X-Origin-Key`, value from the clipboard:
+
+```bash
+ssh <server> 'grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy' | tr -d '\n' | pbcopy && echo "key copied to the clipboard"
+```
+
+Check it, with the key masked in the output: `000` without the key, `200`
+with it.
+
+```bash
+ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); h=<domain>; curl -sk -m 5 --resolve $h:443:127.0.0.1 -o /dev/null -w "without key: %{http_code}\n" https://$h/; curl -sk -m 5 --resolve $h:443:127.0.0.1 -H "X-Origin-Key: $K" -o /dev/null -w "with key: %{http_code}\n" https://$h/'
+```
+
+## Manual run (without systemd)
+
+```bash
+ssh <server> -t "systemctl stop app-prod && cd /srv/app/prod && { pkill -f '^/srv/app/prod/app ' || true; } && set -a && . ./secrets.env && set +a && LOCO_ENV=production BINDING=127.0.0.1 PORT=5150 LEPTOS_OUTPUT_NAME=app LEPTOS_SITE_ROOT=site LEPTOS_SITE_PKG_DIR=pkg LEPTOS_ENV=PROD DATABASE_URL=sqlite:///var/lib/app-prod/app_production.sqlite?mode=rwc nohup runuser -u app-prod -- /srv/app/prod/app start > /srv/app/prod/app.log 2>&1 & sleep 1; tail -f /srv/app/prod/app.log"
+```
+
+- **Always `pkill -f '^/full/path '`.** A bare `pkill app` also kills
+  staging.
+- At the nightly restart hour the app exits and stays down. Fine for a
+  short session; `systemctl start app-prod` when done.
+
+## Go-live (once)
+
+1. The origin-key rule in the domain's Cloudflare zone.
+2. DNS for `<domain>` (and `www`) to the server, proxied. Leave any MX,
+   SPF and verification records alone.
+3. The Caddy block (Step 4), validated and reloaded.
+4. Once https works: Cloudflare, SSL/TLS, Edge Certificates, HSTS 12
+   months, subdomains and preload on. That matches the header in
+   `config/production.yaml`.
+5. A backup, which the template doesn't set up: the database every night
+   with `sqlite3 … ".backup"` (never a copy of the live file), off the
+   box, `0600`, seven kept, and a restore tried once.
+6. Submit `<domain>` at https://hstspreload.org. **Last on purpose:** from
+   then on every subdomain must be https, and removal takes months.
+
+## Without Cloudflare
+
+With only Caddy in front, `CfConnectingIp` breaks the rate limiter: any
+client can send its own `CF-Connecting-IP` and pick its bucket, and every
+client that sends none shares Caddy's. The limiter also refuses to start a
+deployed environment keyed on the TCP peer, which behind a proxy is the
+proxy.
+
+- Leave out the firewall loop, `import origin_check` and the `header_up`
+  line.
+- Switch to `X-Forwarded-For`, which Loco calls `RightmostXForwardedFor`:
+  extend `KeySource` and its config-to-key mapping in
+  `src/middleware/rate_limit.rs`, and update the limiter's request tests and
+  `tests/config.rs`, which pin the current behaviour.

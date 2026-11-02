@@ -1,0 +1,192 @@
+/* Tailwind v4 entry point. cargo-leptos feeds this to the Tailwind
+   standalone binary and writes the result to target/site/pkg/app.css.
+   Tailwind's defaults throughout: its font stack, its palette, its reset.
+   Give the app its own look here. */
+/* `source("../src")`: Tailwind scans only src/ for class names. Its default
+   scans the whole project, so a class named in the docs, a config or
+   .vscode/settings.json ended up in the CSS (about a quarter of it). A
+   utility's bare name in a Rust comment still counts, so comments in src/
+   describe CSS in words. */
+@import "tailwindcss" source("../src");
+
+/* Our views are Rust, not HTML, so the .rs sources are listed explicitly.
+   Every page is Leptos; there is no static HTML to scan. */
+@source "../src/**/*.rs";
+
+/* Colours, named by role. Views use these names only, never a scale step
+   such as `gray-600`, so a new look means changing these five lines, not
+   the views. They point at Tailwind's default palette. `inline` makes the
+   utilities use the target directly (text-ink -> var(--color-gray-900)).
+   SURFACE_HEX and BRAND_HEX in src/views/layout.rs repeat `surface` and
+   `primary` as hex for the theme-color tag and the web manifest. */
+@theme inline {
+  --color-primary: var(--color-blue-600); /* links, filled buttons */
+  --color-surface: var(--color-white); /* page background */
+  --color-ink: var(--color-gray-900); /* body text */
+  --color-ink-muted: var(--color-gray-600); /* secondary text */
+  --color-danger: var(--color-red-600); /* a refused field and its line */
+}
+
+/* The safe-area insets as lengths (`html`, below), so a change of them
+   glides rather than snaps. A browser without `@property` keeps them plain
+   variables, which snap as before, so nothing depends on it: the lint's
+   Baseline rule is off for the three (eslint.config.mjs). */
+/* eslint-disable css/use-baseline */
+@property --safe-area-left {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --safe-area-right {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --safe-area-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+/* eslint-enable css/use-baseline */
+
+/* The desktop's lines, `md` (768) and `lg` (1024), ask for a height of
+   480px as well, so a phone on its side keeps the phone's layout however
+   wide its page: with `viewport-fit=cover` an 852px phone crosses 768.
+   Google's window size classes ("compact height", under 480dp, 99.78% of
+   phones on their side); an iPhone on its side is compact height too.
+   `max-md` and `max-lg` are their opposites, "narrow or low". Tailwind's
+   own four replaced in place, in the block form: the one-line form splits
+   at the comma and drops the `@media`. The `max-` two come out after `sm`,
+   `md` and `lg` in the built CSS rather than before, so never pair one
+   with those on one property of one element. Every other copy of the line
+   (a width test in an island, a `theme-color` media query) follows it. */
+@custom-variant max-lg {
+  @media (width < 64rem), (height < 30rem) {
+    @slot;
+  }
+}
+@custom-variant max-md {
+  @media (width < 48rem), (height < 30rem) {
+    @slot;
+  }
+}
+@custom-variant md {
+  @media (width >= 48rem) and (height >= 30rem) {
+    @slot;
+  }
+}
+@custom-variant lg {
+  @media (width >= 64rem) and (height >= 30rem) {
+    @slot;
+  }
+}
+
+/* `standalone:`, for the app opened from a phone's home screen (the web
+   manifest's `display: standalone`). Without Safari's bars the page reaches
+   the glass: a control at the top sits under the clock, one at the foot in
+   the screen's rounded corner. Give those room with this variant, on a
+   phone only, as `standalone:max-md:pt-6`. The sides read the safe-area
+   insets instead (below); the top and the foot keep these fixed gaps,
+   since only the sides were measured on a phone. The top's inset
+   (`--safe-area-top`, below) is another job, room for a bar lying over the
+   page, and 0 here, where iOS keeps the page below the clock: a top with
+   both adds them, `standalone:max-md:pt-[calc(1.5rem+var(--safe-area-top))]`.
+   Tailwind generates it only where a class uses it. */
+@custom-variant standalone {
+  @media (display-mode: standalone) {
+    @slot;
+  }
+}
+
+/* `busy:`, a form's submit button while htmx sends the form: htmx puts its
+   request class on the form until the answer, errors included. Every form
+   in the template goes through htmx. Written with `:is`, which carries the
+   selector's weight, so a busy class wins over a button's own hover and
+   transition classes. Not the disabled state: a disabled button drops its
+   name and value from the post. */
+@custom-variant busy {
+  &:is(form.htmx-request [type="submit"]) {
+    @slot;
+  }
+}
+
+/* What the template needs on top of Tailwind's reset (Preflight). */
+@layer base {
+  /* The scrollbar's room kept on every page, so nothing jumps sideways
+     when a page, a fold or a dialog changes whether the page scrolls. No
+     scroll anchoring: with something after the page's region, Chrome and
+     Firefox anchored on it and a move showed the new page's footer before
+     going to the top (an islands app on this stack, 2026-10-21). A browser
+     without either behaves as before, so the lint's Baseline rule is off
+     for the two. */
+  html {
+    /* eslint-disable css/use-baseline */
+    scrollbar-gutter: stable;
+    overflow-anchor: none;
+    /* eslint-enable css/use-baseline */
+    /* The screen's safe-area insets at its sides, the page reaching the
+       glass (`viewport-fit=cover`, src/views/layout.rs): the one pair
+       everything at a side reads (`COLUMN`, the skip link), never
+       `env(safe-area-inset-*)` itself, so they line up on a phone on its
+       side. 0 upright and on a desktop. */
+    --safe-area-left: env(safe-area-inset-left);
+    --safe-area-right: env(safe-area-inset-right);
+    /* The top: the status bar over the app's webview (src-tauri/), which
+       fills a phone's screen; read by everything at the page's top (the
+       header, the skip link, the 429 page's `<main>`). 0 in a browser tab,
+       the home-screen app and on a desktop. */
+    --safe-area-top: env(safe-area-inset-top);
+    /* A change glides over 500ms: the camera's side, which the helper
+       names only once the turn's angle has come, slides in rather than
+       jumps; at 200ms it still read as a jump on a phone (an islands app
+       on this stack, 2026-10-28). Off under Reduce Motion (below). */
+    transition:
+      --safe-area-left 500ms ease-out,
+      --safe-area-right 500ms ease-out,
+      --safe-area-top 500ms ease-out;
+  }
+  /* The camera's side alone, where the helper has said which
+     (public/js/safe-area.js, `data-safe-area` on <html>): iOS reports the
+     inset on both sides of a phone on its side, so the other side gets the
+     design's gap back. No mark (no script, no angle): both sides keep it. */
+  html[data-safe-area="left"] {
+    --safe-area-right: 0px;
+  }
+  html[data-safe-area="right"] {
+    --safe-area-left: 0px;
+  }
+  /* A browser that keeps its view clear of the camera itself (Chrome on an
+     iPhone, Chromium issue 465922618) and still reports the inset: none of
+     ours, or the page would be indented twice on the camera's side. */
+  html[data-safe-area="none"] {
+    --safe-area-left: 0px;
+    --safe-area-right: 0px;
+  }
+
+  /* Leptos wraps an island in <leptos-island> and its server-rendered
+     children in <leptos-children>. Browsers lay unknown elements out as
+     inline boxes, which would sit between a grid and its items. `contents`
+     removes the wrappers from layout: the elements inside behave as if the
+     wrappers were not there. */
+  leptos-island,
+  leptos-children {
+    display: contents;
+  }
+}
+
+/* Reduce Motion (macOS and iOS: Accessibility, Motion; Android: Remove
+   animations): every transition and animation off, scrolls jumping. One
+   rule outside Tailwind's layers, so it wins over every utility, in place
+   of a `motion-reduce:` variant on each. The pseudo-elements are named
+   because `*` doesn't reach them. The browser tests read it as the browser
+   got it, since the build's minifier rewrites selectors it doesn't know. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  *::backdrop {
+    transition: none;
+    animation: none;
+    scroll-behavior: auto;
+  }
+}
