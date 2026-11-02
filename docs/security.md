@@ -116,6 +116,20 @@ Each of these brings its own risks. The template has none of them yet.
   mail scanner that follows it first, and answers it the JWT (the review of
   2026-10-31, #2).
 - **A second factor:** passkeys or an authenticator app, recovery codes.
+  Passkeys inside the Android app, as an islands app on this stack found
+  on a real phone, need all of:
+  - the WebView's passkeys switched on in `MainActivity.kt`
+    (`WEB_AUTHENTICATION_SUPPORT_FOR_APP`);
+  - `/.well-known/assetlinks.json` naming the package and each key the
+    builds are signed with, with **both** relations,
+    `common.handle_all_urls` and `common.get_login_creds`: the second alone
+    is refused, "RP ID cannot be validated" (50152);
+  - the relying party accepting the app's own origin beside the site's,
+    `android:apk-key-hash:` and the signing key's SHA-256 in base64url, one
+    per key: the WebView signs with it, "origin does not match" otherwise;
+  - a Google account on the phone, an emulator's too.
+
+  The iPhone's need the Apple team and an associated domain.
 - **Web push:** on the sessions (`src/models/sessions.rs`), then `push.md`, the steps
   and the mistakes an islands app on this stack made adding it.
 - **Your own htmx and Alpine attributes:** the libraries are in the
