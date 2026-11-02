@@ -159,15 +159,23 @@ plus:
   don't.
 - **Paths without a browser skip the gate.** What fetches them has no
   person to pass a challenge: the app's start page reads `/up` with a
-  `fetch`. A custom rule placed first, `Paths without a browser: skip
-  challenge`: hostname is in the same list **and** URI Path is in a list,
-  action Skip, all remaining custom rules:
+  `fetch`, and a phone adding the site to its home screen fetches its icon
+  (`/favicon/…`) and `/manifest.webmanifest` (an iPhone's challenged fetch
+  drew a letter for the icon in an islands app on this stack). A custom
+  rule placed first, `Paths without a browser: skip challenge`: hostname
+  is in the same list **and** (URI Path is in a list **or** starts with
+  `/favicon/`), action Skip, all remaining custom rules:
 
   ```
-  (http.host in {"<domain>"} and http.request.uri.path in {"/up"})
+  (http.host in {"<domain>"} and (http.request.uri.path in {"/up" "/manifest.webmanifest"} or starts_with(http.request.uri.path, "/favicon/")))
   ```
 
-  Check: `curl -s https://<domain>/up` prints `ok`.
+  Check: `curl -s https://<domain>/up` prints `ok`. The home screen's icon
+  and manifest, `200 image/png` and `200 application/manifest+json`:
+
+  ```bash
+  for p in /favicon/apple-touch-icon.png /manifest.webmanifest; do curl -s -o /dev/null -w "%{http_code} %{content_type}  $p\n" "https://<domain>$p"; done
+  ```
 - **A new such path goes into that list,** never a rule of its own: an
   image a mail links (a mail program's image proxy fetches it), a service
   worker's fetch (`push.md`), a `/.well-known/` file another company reads

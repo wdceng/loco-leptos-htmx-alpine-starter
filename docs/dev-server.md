@@ -170,9 +170,15 @@ plus:
   Visitors pass a check, scanners don't.
 - **Paths without a browser skip the gate.** What fetches them has no
   person to pass a challenge: the app's start page reads `/up` with a
-  `fetch`. Add `<domain>` to the rule `Paths without a browser: skip
+  `fetch`, and a phone adding the site to its home screen fetches its icon
+  and manifest. Add `<domain>` to the rule `Paths without a browser: skip
   challenge` too (`docs/staging.md`). Check: `curl -s https://<domain>/up`
-  prints `ok`.
+  prints `ok`. The home screen's icon and manifest, `200 image/png` and
+  `200 application/manifest+json`:
+
+  ```bash
+  for p in /favicon/apple-touch-icon.png /manifest.webmanifest; do curl -s -o /dev/null -w "%{http_code} %{content_type}  $p\n" "https://<domain>$p"; done
+  ```
 - **A new such path goes into that rule's list,** never a rule of its own:
   an image a mail links, a service worker's fetch (`push.md`), a
   `/.well-known/` file another company reads (`docs/staging.md`).
