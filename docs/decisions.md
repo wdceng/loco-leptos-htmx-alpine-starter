@@ -358,6 +358,11 @@ change of mind gets a new line, and the old one moves to
   the home-screen app. The webview padded in native code is the fallback
   for old Capacitor apps, not this. `standalone:` stays its own job, room
   beside iOS's blur. From an islands app on this stack.
+- 2026-11-02: **The foot follows the bottom inset, not `standalone:`.**
+  What floats at the foot stands 12px over `--safe-area-bottom`, as iOS
+  and Android place a floating button. `standalone:` matched the
+  home-screen app alone; the app's webview reaches the glass too, and its
+  button sat in the rounded corner. From an islands app on this stack.
 - 2026-10-29: **The app's pictures by script, iOS's top only**
   (`src-tauri/screens.sh`). `adb` swipes and turns an emulator; `simctl`
   has no command for either, so a Simulator's foot and side stay checks by

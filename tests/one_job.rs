@@ -142,8 +142,8 @@ fn every_tap_outside_closes_at_its_end() {
     );
 }
 
-/// A gap at a side or the top reads the inset variables
-/// (`--safe-area-left/right/top`, style/tailwind.css), never the screen's
+/// A gap at a side, the top or the foot reads the inset variables
+/// (`--safe-area-left/right/top/bottom`, style/tailwind.css), never the screen's
 /// inset itself: the helper's mark changes the variables alone, so a part
 /// reading `env()` would keep the inset on both sides of a turned phone, or
 /// twice in Chrome on an iPhone, and snap where the variables glide.
@@ -152,7 +152,7 @@ fn every_side_gap_reads_the_inset_variables() {
     assert_one_home(
         "safe-area-inset",
         &[],
-        "`var(--safe-area-left)`, `var(--safe-area-right)` and `var(--safe-area-top)`, as `COLUMN` and the header (views/layout.rs)",
+        "`var(--safe-area-left)`, `var(--safe-area-right)`, `var(--safe-area-top)` and `var(--safe-area-bottom)`, as `COLUMN` and the header (views/layout.rs)",
     );
 }
 

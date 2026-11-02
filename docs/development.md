@@ -486,10 +486,11 @@ The Play Store bundle; needs your signing key:
 cd src-tauri && cargo tauri android build --aab
 ```
 
-The desktop icons again, after the site's icon changes:
+The desktop icons again, after the site's icon changes, into a folder of
+their own (Icons, below):
 
 ```bash
-cd src-tauri && cargo tauri icon ../public/favicon/android-chrome-512x512.png -o /tmp/app-icons
+cd src-tauri && cargo tauri icon ../public/favicon/android-chrome-512x512.png -o ../target/desktop-icons
 ```
 
 The desktops and the phones run the same app: `run` in `src-tauri/src/lib.rs`.
@@ -557,15 +558,30 @@ The phones:
   `gen/apple/app-native_iOS/Info.plist`, committed as it writes it,
   without a final newline; the build output is ignored by `gen/`'s own
   `.gitignore` files.
-- **The phones' icons live in `gen/`:** `cargo tauri icon` without `-o`,
-  in a scratch worktree, writes them there; bring `gen/` back, not the
-  extra desktop icons.
+- **The phones' icons live in `gen/`:** the iPhone's in
+  `gen/apple/Assets.xcassets/AppIcon.appiconset/`, Android's in
+  `gen/android/app/src/main/res/mipmap-*/`, each from its own drawing
+  (Icons, below).
 - **The Simulator and the emulator need no account.** A real iPhone or
   iPad needs Developer Mode on (Settings, Privacy & Security) and your
   Apple team: `APPLE_DEVELOPMENT_TEAM=<team id>` on the command or
   `bundle.iOS.developmentTeam` in `tauri.conf.json`, or the build warns "No
   code signing certificates found". The stores need Apple's developer
   program and a Google Play listing, each with its signing.
+- **Your own iPhone with a free Apple ID** (Xcode's Personal Team), as an
+  islands app on this stack did it:
+  - a test bundle id, never the store's;
+  - the device registered once:
+    `xcodebuild -destination id=<udid> -allowProvisioningUpdates`;
+  - where Tauri's export fails, install the built app with
+    `xcrun devicectl device install app`;
+  - Apple's **WWDR G3** intermediate certificate in the keychain, or the
+    signing certificate isn't trusted;
+  - the app stops opening after 7 days: install it again;
+  - no associated domains on a free team, so no passkeys, autofill or push
+    in the app.
+- **Android's `adb install` puts the app in the drawer only,** not on the
+  home screen.
 - **Android builds with Java 21, not a Mac's default 27:** Gradle 9.6.1
   fails on 27 ("Unsupported class file major version 71"). `screens.sh`
   and `links.sh` set it (`devices.sh`); without the profile line
@@ -584,6 +600,34 @@ The phones:
   bars"). Not yet seen in the app, which shows its start page until `SITE`
   is a real site; the foot and Android's navigation bar are untested.
 
+Icons, one look on every home screen: the mark at about 73% of a white
+tile. Each platform shows an icon its own way, so one logo takes four
+drawings, as an islands app on this stack found on a Galaxy S22 and an
+iPhone:
+
+| Drawing | The mark | For |
+|---|---|---|
+| The site's | 73%, on nothing | the site's `any` icons (`android-chrome-512x512.png`, `-192x192.png`), the desktop icons |
+| The iPhone's | 73%, on white | `gen/apple/Assets.xcassets/AppIcon.appiconset/` |
+| Android's | **48%**, on white | the adaptive foreground in `gen/android/.../mipmap-*/`, background white |
+| The Mac's | Apple's template | `icon.icns` |
+
+- **Never the site's icon for the phones:** generated from it, Android cut
+  the mark's edges and the iPhone showed it larger than the site's.
+  Android shows only the middle two thirds of an adaptive foreground: a
+  mark of 48 to 66 dp on its 108 dp canvas; 48% shows at 73%.
+- **No `maskable` icon in the manifest.** Chrome uses one two ways: Install
+  pads it smaller, "Create shortcut" lays it whole and larger. With `any`
+  icons alone, Chrome puts them on its own white tile both times.
+- **Never `cargo tauri icon` in place:** it writes into `icons/` and `gen/`
+  itself. Run each drawing into `target/<name>-icons` with `-o`, and copy
+  only that drawing's files over.
+- **An installed Chrome site keeps its icon,** baked in at install:
+  uninstall it, then Install again, to see a change.
+- **A gated host lets the icon and the manifest past its challenge**
+  (`dev-server.md`, `staging.md`): an iPhone whose fetch was challenged
+  drew a letter for the icon.
+
 ## Start a new project
 
 Replace the template's placeholders before your first deploy. Production's
@@ -596,7 +640,7 @@ check (`production.md`) stops on what's left.
 | The mail sender | `config/development.yaml`, `test.yaml`, `staging.yaml`; production reads `MAILER_FROM` |
 | The security contact | `contact:` under `security:` in `config/production.yaml`; production won't boot on `example.com` |
 | The tagline | `src/views/home.rs` |
-| Favicon | `public/favicon/` |
+| Favicon and the apps' icons | `public/favicon/`, `src-tauri/icons/`, the phones' in `gen/`: four drawings of one logo ("The app", Icons), never the site's icon run through `cargo tauri icon` |
 | Colours | `style/tailwind.css`: `primary`, `surface`, `ink`, `ink-muted`, `danger` |
 | The app's name, id and address | `src-tauri/tauri.conf.json` (`productName`, `mainBinaryName`, `title`, `identifier`, `connect-src`; the identifier letters, digits and dots only, not ending in `.app`); `<title>` and `SITE` in `src-tauri/offline/index.html`; then the phones' projects again ("The app") |
 
@@ -632,6 +676,8 @@ to every edge. What stands at a side keeps clear of the camera itself:
 | `max(1.5rem, var(--safe-area-left))` | a side gap: the design's, or the inset where that's wider (`COLUMN`) |
 | `--safe-area-top` | the status bar over the app's webview, 0 in a browser |
 | `calc(1.5rem + var(--safe-area-top))` | a top gap: the design's plus the bar (the header, the skip link, the 429 page) |
+| `--safe-area-bottom` | the home indicator or gesture bar under a page that reaches the glass, 0 under a browser's bar |
+| `calc(0.75rem + var(--safe-area-bottom))` | a foot gap: 12px over the inset, for anything floating at the foot |
 | `public/js/safe-area.js` | marks the camera's side on `<html>` before the first paint (`data-safe-area`), so the other side gets the design's gap back |
 | `md:`, `lg:` with a height of 480px too | a phone on its side keeps the phone's layout |
 
@@ -646,10 +692,12 @@ to every edge. What stands at a side keeps clear of the camera itself:
 - **After a reload on its side, Chrome on an iPhone** lays the page out
   narrower than `innerWidth` until the first scroll. Nothing to fix from
   the page.
-- **The top and the foot** keep the `standalone:` variant's fixed gaps:
-  only the sides were measured on a phone. A top with both adds them:
-  `standalone:` is room beside iOS's blur, the inset room for a bar over
-  the page.
+- **The top** keeps the `standalone:` variant's fixed gap. A top with both
+  adds them: `standalone:` is room beside iOS's blur, the inset room for a
+  bar over the page.
+- **The foot reads the inset, never `standalone:`.** The app's webview
+  reaches the glass too but isn't a `standalone` display, so a button
+  placed by `standalone:` sat in the rounded corner there.
 - **Whatever sets its own top adds the inset:** a padding on `body` doesn't
   reach a fixed, absolute or sticky element. A browser that reports a top
   inset it already keeps clear would add a gap: unchecked on a phone.
@@ -744,7 +792,8 @@ Inspector), then this line in its console:
   so a watch loop left on overnight is still running in the morning.
 - **The home-screen app reaches the glass.** Opened from a phone's home
   screen, the page has no Safari bars around it: give controls at the top
-  and the foot room with `standalone:max-md:…` (`style/tailwind.css`).
+  room with `standalone:max-md:…`, and those at the foot
+  `var(--safe-area-bottom)` (`style/tailwind.css`).
 - **A part with its own side padding ignores the insets.** Anything at a
   side reads `max(gap, var(--safe-area-left))`, as `COLUMN` does, or it
   sits under the camera of a phone on its side.

@@ -30,7 +30,7 @@
 /* The safe-area insets as lengths (`html`, below), so a change of them
    glides rather than snaps. A browser without `@property` keeps them plain
    variables, which snap as before, so nothing depends on it: the lint's
-   Baseline rule is off for the three (eslint.config.mjs). */
+   Baseline rule is off for the four (eslint.config.mjs). */
 /* eslint-disable css/use-baseline */
 @property --safe-area-left {
   syntax: "<length>";
@@ -43,6 +43,11 @@
   initial-value: 0px;
 }
 @property --safe-area-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --safe-area-bottom {
   syntax: "<length>";
   inherits: true;
   initial-value: 0px;
@@ -83,11 +88,11 @@
 
 /* `standalone:`, for the app opened from a phone's home screen (the web
    manifest's `display: standalone`). Without Safari's bars the page reaches
-   the glass: a control at the top sits under the clock, one at the foot in
-   the screen's rounded corner. Give those room with this variant, on a
-   phone only, as `standalone:max-md:pt-6`. The sides read the safe-area
-   insets instead (below); the top and the foot keep these fixed gaps,
-   since only the sides were measured on a phone. The top's inset
+   the glass: a control at the top sits under the clock. Give it room with
+   this variant, on a phone only, as `standalone:max-md:pt-6`. The top
+   alone: the sides and the foot read the safe-area insets (below), the
+   foot because the app's webview reaches the glass too and is no
+   `standalone` display, so this variant missed it there. The top's inset
    (`--safe-area-top`, below) is another job, room for a bar lying over the
    page, and 0 here, where iOS keeps the page below the clock: a top with
    both adds them, `standalone:max-md:pt-[calc(1.5rem+var(--safe-area-top))]`.
@@ -136,6 +141,14 @@
        header, the skip link, the 429 page's `<main>`). 0 in a browser tab,
        the home-screen app and on a desktop. */
     --safe-area-top: env(safe-area-inset-top);
+    /* The foot: what the system keeps clear under a page that reaches the
+       glass (an iPhone's home indicator, Android's gesture bar under an
+       edge-to-edge view), in the app and the home-screen app alike; 0
+       where a browser's bar takes its own room. What floats at the foot
+       stands 12px over it, `bottom-[calc(0.75rem+var(--safe-area-bottom))]`,
+       as iOS and Android place a floating button: out of the screen's
+       rounded corner (an islands app on this stack, 2026-11-02). */
+    --safe-area-bottom: env(safe-area-inset-bottom);
     /* A change glides over 500ms: the camera's side, which the helper
        names only once the turn's angle has come, slides in rather than
        jumps; at 200ms it still read as a jump on a phone (an islands app
@@ -143,7 +156,8 @@
     transition:
       --safe-area-left 500ms ease-out,
       --safe-area-right 500ms ease-out,
-      --safe-area-top 500ms ease-out;
+      --safe-area-top 500ms ease-out,
+      --safe-area-bottom 500ms ease-out;
   }
   /* The camera's side alone, where the helper has said which
      (public/js/safe-area.js, `data-safe-area` on <html>): iOS reports the

@@ -58,7 +58,8 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A tap outside closes at its end. Guarded | `pointerup`, never `pointerdown` | `tests/one_job.rs` |
 | Less motion when the visitor asks | the one Reduce Motion rule, never `motion-reduce:` per class | `style/tailwind.css` |
 | A control a finger taps | at least 44px tall (`min-h-11`), as `ResetForm`'s field and button | `e2e/tests/health.rs` checks |
-| Room at the top and the foot in the home-screen app (a control under the clock or by the home indicator) | the `standalone:` variant, on a phone: `standalone:max-md:pt-6` | `style/tailwind.css` |
+| Room at the top in the home-screen app (a control under the clock) | the `standalone:` variant, on a phone: `standalone:max-md:pt-6` | `style/tailwind.css` |
+| A gap at the page's foot, clear of the home indicator or gesture bar (anything floating there). Guarded | `calc(0.75rem + var(--safe-area-bottom))`; never `standalone:`, which misses the app's webview | `style/tailwind.css` |
 | A gap at a side, clear of a turned phone's camera. Guarded | `max(gap, var(--safe-area-left))` and `…-right`, as `COLUMN`; never `env(safe-area-inset-*)` | `style/tailwind.css`, `src/views/layout.rs` |
 | A gap at the page's top, clear of a status bar over it (the app's webview on a phone). Guarded | `calc(gap + var(--safe-area-top))`, as the header, the skip link and the 429 page; beside `standalone:`, never instead of it | `style/tailwind.css`, `src/views/layout.rs` |
 | Which side of a turned phone keeps its inset | `data-safe-area` on `<html>`, set by the helper; a change glides over 500ms (`@property`) | `public/js/safe-area.js` |
