@@ -9,7 +9,7 @@ use loco_rs::{app::AppContext, testing::prelude::*};
 use sea_orm::{ActiveModelTrait, ActiveValue, IntoActiveModel};
 use serial_test::serial;
 
-use super::prepare_data::{PASSWORD, signs_in, user, without_nonces};
+use super::prepare_data::{CSP, PASSWORD, signs_in, user, without_nonce};
 
 /// A user who signed up through the page and was mailed a link: its token.
 async fn signed_up(request: &loco_rs::TestServer, ctx: &AppContext, email: &str) -> String {
@@ -209,7 +209,7 @@ async fn a_verified_or_unknown_address_is_answered_alike() {
                 .form(&serde_json::json!({ "email": email }))
                 .await;
             assert_eq!(res.status_code(), 200, "{email}");
-            answers.push(without_nonces(&res.text()));
+            answers.push(without_nonce(&res.header(CSP), &res.text()));
         }
         assert!(answers.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(

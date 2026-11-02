@@ -96,7 +96,7 @@ so the suite runs in about a second.
     the user's token.
   - Passwords of 7 and 129 characters are refused; a taken email, in any
     case, signs up like a new one; `/forgot` and a new welcome mail answer
-    every address alike (`without_nonces` compares the pages).
+    every address alike (`without_nonce` compares the pages).
   - Markup in the name arrives escaped in the HTML part; the subject is
     the app's.
   - A name over 100 characters signs up nobody and sends nothing.

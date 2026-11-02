@@ -8,7 +8,7 @@ use serial_test::serial;
 
 use super::{
     mails::{assert_from_the_configured_sender, unfolded},
-    prepare_data::{user, without_nonces},
+    prepare_data::{CSP, user, without_nonce},
 };
 
 #[tokio::test]
@@ -77,8 +77,8 @@ async fn an_unknown_address_is_answered_alike() {
             .await;
         assert_eq!(known.status_code(), unknown.status_code());
         assert_eq!(
-            without_nonces(&known.text()),
-            without_nonces(&unknown.text())
+            without_nonce(&known.header(CSP), &known.text()),
+            without_nonce(&unknown.header(CSP), &unknown.text())
         );
         assert_eq!(
             ctx.mailer.expect("stub mailer").deliveries().count,

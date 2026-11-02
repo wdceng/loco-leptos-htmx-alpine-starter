@@ -3,6 +3,7 @@
 //! made them is unmounted (src/app.rs).
 
 use app::models::users::{self, RegisterParams};
+use axum::http::HeaderValue;
 use loco_rs::app::AppContext;
 use sea_orm::IntoActiveModel;
 
@@ -37,19 +38,21 @@ pub fn sign_in(email: &str, password: &str) -> serde_json::Value {
     serde_json::json!({ "email": email, "password": password })
 }
 
-/// A page with its CSP nonces blanked: the one thing that differs between
-/// two answers alike, being new on every request (src/render.rs).
-pub fn without_nonces(page: &str) -> String {
-    const NONCE: &str = "nonce=\"";
-    let mut kept = String::with_capacity(page.len());
-    let mut rest = page;
-    while let Some(start) = rest.find(NONCE) {
-        kept.push_str(&rest[..start + NONCE.len()]);
-        rest = &rest[start + NONCE.len()..];
-        rest = rest.find('"').map_or("", |end| &rest[end..]);
-    }
-    kept.push_str(rest);
-    kept
+/// The header a page's nonce is read from ([`without_nonce`]).
+pub const CSP: &str = "content-security-policy";
+
+/// A page with its CSP nonce blanked, read from the answer's own policy:
+/// the one thing two answers alike differ in, new on every request
+/// (src/render.rs), and stamped by Leptos in more than `nonce=`, its
+/// preload links' `crossorigin` too.
+pub fn without_nonce(csp: &HeaderValue, page: &str) -> String {
+    let nonce = csp
+        .to_str()
+        .ok()
+        .and_then(|csp| csp.split("'nonce-").nth(1))
+        .and_then(|rest| rest.split('\'').next())
+        .expect("the page's CSP names its nonce");
+    page.replace(nonce, "")
 }
 
 /// Whether `email` and `password` sign in through the page: a 303 with the

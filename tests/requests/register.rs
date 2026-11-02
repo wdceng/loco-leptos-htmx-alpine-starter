@@ -8,7 +8,7 @@ use serial_test::serial;
 
 use super::{
     mails::{assert_from_the_configured_sender, html_part, subject},
-    prepare_data::{signs_in, without_nonces},
+    prepare_data::{CSP, signs_in, without_nonce},
 };
 
 fn sign_up(name: &str, email: &str, password: &str) -> serde_json::Value {
@@ -159,8 +159,8 @@ async fn a_taken_address_signs_up_like_a_new_one() {
             .await;
         assert_eq!(first.status_code(), second.status_code());
         assert_eq!(
-            without_nonces(&first.text()),
-            without_nonces(&second.text())
+            without_nonce(&first.header(CSP), &first.text()),
+            without_nonce(&second.header(CSP), &second.text())
         );
         assert_eq!(
             ctx.mailer.expect("stub mailer").deliveries().count,
