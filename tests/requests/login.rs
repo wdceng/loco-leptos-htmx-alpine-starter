@@ -2,46 +2,18 @@
 //! form, a refused try, the session's cookie, who is signed in, and the
 //! sign-out.
 
-use app::{
-    app::App,
-    models::{
-        sessions::Session,
-        users::{self, RegisterParams},
-    },
-    sql,
-};
+use app::{app::App, models::sessions::Session, sql};
 use loco_rs::{app::AppContext, testing::prelude::*};
-use sea_orm::IntoActiveModel;
 use serial_test::serial;
 
+use super::prepare_data::{self, PASSWORD, sign_in};
+
 const EMAIL: &str = "signin@example.com";
-const PASSWORD: &str = "12341234";
 
 /// A user with `email` who signed up, verified when `verified`: their
 /// row's id.
 async fn user(ctx: &AppContext, email: &str, verified: bool) -> i64 {
-    let user = users::Model::create_with_password(
-        &ctx.db,
-        &RegisterParams {
-            email: email.into(),
-            password: PASSWORD.into(),
-            name: "Ana".into(),
-        },
-    )
-    .await
-    .expect("the user is created");
-    if !verified {
-        return user.id;
-    }
-    user.into_active_model()
-        .verified(&ctx.db)
-        .await
-        .expect("verified")
-        .id
-}
-
-fn sign_in(email: &str, password: &str) -> serde_json::Value {
-    serde_json::json!({ "email": email, "password": password })
+    prepare_data::user(ctx, email, verified).await.id
 }
 
 /// The session's secret from a sign-in's `Set-Cookie`.
@@ -68,6 +40,10 @@ async fn the_form_signs_in_and_the_page_then_says_who() {
             r#"autocomplete="username""#,
             r#"autocomplete="current-password""#,
             r#"hx-sync="this:drop""#,
+            // The ways on: a new password, an account, the mail again.
+            r#"href="/forgot""#,
+            r#"href="/register""#,
+            r#"href="/verify""#,
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }

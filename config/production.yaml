@@ -7,7 +7,7 @@
 # secret or a localhost database is worse than one that refuses to boot.
 #
 # The variables this file requires (loaded by the systemd unit from
-# secrets.env, see docs/production.md): JWT_SECRET, MAILER_HOST, MAILER_USER,
+# secrets.env, see docs/production.md): MAILER_HOST, MAILER_USER,
 # MAILER_PASSWORD, MAILER_FROM. Addresses have defaults; set your domain in
 # server.host below. The unit overrides BINDING and PORT so the app listens
 # on loopback behind the reverse proxy.
@@ -132,10 +132,10 @@ settings:
     # Routes only; the static files have their own bucket below.
     per_second: 1
     burst: 120
-    # The auth API's own bucket, inside the one above: ten calls at once per
+    # The auth forms' own bucket, inside the one above: ten posts at once per
     # visitor IP, then one every 30 seconds. Enough for a person to
-    # register, verify, log in and retry a password; too little to use
-    # `register` as a mail relay or to guess passwords at speed.
+    # sign up, verify, sign in and retry a password; too little to use
+    # the sign-up as a mail relay or to guess passwords at speed.
     auth:
       per_second: 30
       burst: 10
@@ -257,14 +257,7 @@ database:
   # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_recreate: false
 
-# Authentication Configuration
-auth:
-  # JWT authentication
-  jwt:
-    # Secret key for token generation and verification. Required: a secret
-    # committed to the repository is a secret your users can forge tokens with.
-    secret: <%= get_env(name="JWT_SECRET") %>
-    # Token expiration time in seconds. One day: a JWT can't be revoked, so
-    # a stolen one works until it expires. Longer sessions and a logout need
-    # cookie sessions (docs/security.md).
-    expiration: 86400 # 1 day
+# No `auth:` block (2026-11-02): the site signs in with sessions of its own
+# (src/models/sessions.rs), and the starter's JWT API, compiled, is not
+# mounted (src/app.rs), so nothing reads a JWT secret; the API mounted would
+# fail closed, "no JWT config found".

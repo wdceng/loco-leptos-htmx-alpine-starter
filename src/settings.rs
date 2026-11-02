@@ -144,9 +144,9 @@ pub struct RateLimitSettings {
     /// Bucket size: how many requests a visitor may make at once before the
     /// sustained rate applies.
     pub burst: u32,
-    /// A second, stricter bucket on the `/api/auth` routes alone, inside the
-    /// one above: a request there spends a token from both. `register` mails
-    /// any address and `login` takes a password, so those routes get a
+    /// A second, stricter bucket on the auth forms' posts alone, inside the
+    /// one above: a post there spends a token from both. The sign-up mails
+    /// any address and the sign-in takes a password, so those posts get a
     /// fraction of the site-wide rate. Off together with `enable`.
     pub auth: RouteRateLimit,
 }

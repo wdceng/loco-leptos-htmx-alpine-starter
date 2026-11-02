@@ -1,10 +1,12 @@
 pub mod auth;
 pub mod cross_site;
+pub mod forgot;
 pub mod home;
 pub mod llms;
 pub mod login;
 pub mod manifest;
 pub mod not_found;
+pub mod register;
 pub mod reset;
 pub mod robots;
 pub mod security_txt;

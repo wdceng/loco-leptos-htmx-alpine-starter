@@ -200,21 +200,19 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-dev"
 - Secrets live in `secrets.dev-server.env` in the repo root on your
   machine. It's git-ignored and every deploy uploads it as `secrets.env`.
   Never use staging's or production's file here.
-- `JWT_SECRET` is required: without it the app refuses to boot. Without
-  the `MAILER_*` lines it boots on the placeholders in
-  `config/dev-server.yaml`, and mail fails to send. A missing file stops
-  the unit.
+- Nothing in it is required: without a real mail account the app boots,
+  and mail fails to send. A missing file stops the unit.
 
-Create it once from its example, which explains every key, with its own
-`JWT_SECRET`. Uncomment the `MAILER_*` lines when the dev server should
-send real mail (details in `docs/production.md`):
+Create it once from its example, then put the mail account in place of
+each `replace-me` when the dev server should send real mail (details in
+`docs/production.md`):
 
 ```bash
-umask 077 && cp secrets.dev-server.env.example secrets.dev-server.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 64 | tr -d '\n')" >> secrets.dev-server.env
+umask 077 && cp secrets.dev-server.env.example secrets.dev-server.env
 ```
 
-- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
-  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
+- **An old `JWT_SECRET` line does nothing.** No config reads it since
+  sign-in moved to cookie sessions; delete it.
 
 ## One-time setup
 
@@ -362,8 +360,6 @@ ssh <server> "systemd-analyze security app-dev --no-pager | tail -1"
 | `the site folder ... is missing` | `site/` not uploaded next to the binary |
 | `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
-| a `get_env` error naming `JWT_SECRET` | `secrets.env` without its `JWT_SECRET` line |
-| `dev-server won't start: JWT_SECRET empty or still replace-me` | the line is there, the key isn't (`src/deploy_checks.rs`) |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

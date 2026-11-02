@@ -1,8 +1,16 @@
+//! Loco's starter auth API, `/api/auth`, kept as generated but for this
+//! project's fixes. **Not mounted** (app.rs): the site signs in with
+//! cookie sessions through its own pages (`/login`, `/register`, `/forgot`,
+//! `/reset`, `/verify`; docs/decisions.md, 2026-11-02), and the configs
+//! carry no JWT key, which `login`, `current` and the magic link need. An
+//! app with a client that wants tokens mounts it again, with an `auth:`
+//! block and its secret in each config.
+
 use crate::{
     app::stored,
     hashing,
     mailers::auth::AuthMailer,
-    middleware::rate_limit::Bucket,
+    middleware::rate_limit::AuthLimit,
     models::{
         _entities::users,
         users::{LoginParams, RegisterParams, name_or_email_problem, password_problem},
@@ -12,13 +20,6 @@ use crate::{
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
-
-/// The bucket on the `/api/auth` routes, built and validated in
-/// `after_context` (app.rs) from `settings.rate_limit.auth` and parked in
-/// the shared store, because `Hooks::routes` cannot fail. `None` when the
-/// limiter is off in the config.
-#[derive(Clone)]
-pub struct AuthLimit(pub Option<Bucket>);
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ForgotParams {

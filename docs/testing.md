@@ -82,25 +82,27 @@ so the suite runs in about a second.
   page's `SITE`, alone.
 - `tests/models/users.rs`: the users model against the test database.
   Create with password, find by e-mail and pid, validation, duplicate
-  e-mail, and the verification, reset and magic-link token flows. `insta`
-  snapshots in `tests/models/snapshots/`.
+  e-mail, and the verification, reset and magic-link token flows (the
+  model's, kept with it; no page sends a magic link). `insta` snapshots in
+  `tests/models/snapshots/`.
 - `tests/models/sql_pool.rs`: SQLx reads, through `sql::pool`, a user
   Sea-ORM just wrote. It uses a real `query_scalar!`, so it also proves the
   `.sqlx/` cache works.
-- `tests/requests/auth.rs`: `/api/auth` end to end. Register, verify, login
-  (valid and invalid password, unverified user), current user, forgot and
-  reset, magic link, resend verification. Login variants are `rstest`
-  cases. `insta` snapshots are in `tests/requests/snapshots/`, shared setup
-  in `tests/requests/prepare_data.rs`. Also:
-  - Register, forgot and magic link read their mail back. `From:` is
+- `tests/requests/register.rs`, `forgot.rs`, `verify.rs`: the auth pages
+  a person uses, end to end. Users come from `prepare_data.rs` (the model,
+  not a page); mails are read back through `mails.rs`. Also:
+  - The sign-up and `/forgot` read their mail back. `From:` is
     `settings.mail.from`, and the link starts with `server.host` and carries
     the user's token.
-  - Every refused login (no account, wrong password, unverified) gives the
-    same 401; passwords of 7 and 129 characters are refused, on register
-    and reset; a taken email registers like a new one.
-  - Markup in the name arrives escaped in the HTML part.
-  - A name over 100 characters registers nobody and sends nothing.
+  - Passwords of 7 and 129 characters are refused; a taken email, in any
+    case, signs up like a new one; `/forgot` and a new welcome mail answer
+    every address alike (`without_nonces` compares the pages).
+  - Markup in the name arrives escaped in the HTML part; the subject is
+    the app's.
+  - A name over 100 characters signs up nobody and sends nothing.
   - A body over 64 KB is a 413.
+  - `/verify` without a token sends the mail again, with a fresh link.
+- `tests/requests/not_found.rs` keeps Loco's `/api/auth` a miss.
 - `tests/requests/error_page.rs`: a browser's `POST /` is a 405 with the
   Leptos error page, `Allow` kept, the page CSP with its nonce and
   `no-store`. Without an HTML `Accept` it stays Loco's empty 405, and the
@@ -602,13 +604,13 @@ for i in $(seq 1 125); do curl -s -o /dev/null -w '%{http_code}\n' -H "CF-Connec
 Expected: `120 200` and `5 429`. With `2001:db8:1:$i::1` instead, every
 request is a different /64, so all 125 pass.
 
-The auth API has its own, smaller bucket: `settings.rate_limit.auth`, burst
-30 in development. `cargo loco middleware -c` shows it under `auth` in the
-`rate_limit` entry, not as a middleware of its own. To see it, 35 logins,
-`30 401` and `5 429`:
+The auth forms' posts share their own, smaller bucket:
+`settings.rate_limit.auth`, burst 30 in development. `cargo loco
+middleware -c` shows it under `auth` in the `rate_limit` entry, not as a
+middleware of its own. To see it, 35 sign-ins, `30 400` and `5 429`:
 
 ```bash
-seq 1 35 | xargs -I{} curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'content-type: application/json' -d '{"email":"nobody@example.com","password":"x"}' http://localhost:5150/api/auth/login | sort | uniq -c
+seq 1 35 | xargs -I{} curl -s -o /dev/null -w '%{http_code}\n' -d 'email=nobody@example.com&password=x' http://localhost:5150/login | sort | uniq -c
 ```
 
 Then a page, a `200`: the site-wide bucket of 300 still has tokens:
@@ -623,13 +625,13 @@ With a catcher on port 1025 (`prerequisites.md`) and the dev server
 running:
 
 ```bash
-curl -s -X POST -H 'content-type: application/json' -d '{"name":"Ana","email":"ana@example.com","password":"12341234"}' http://localhost:5150/api/auth/register
+curl -s -o /dev/null -w '%{http_code}\n' -d 'name=Ana&email=ana@example.com&password=12341234' http://localhost:5150/register
 ```
 
-Expected in the catcher's inbox (http://localhost:8025): one mail from
-`SaaS Starter <noreply@example.com>` (`settings.mail.from` in
+Expected: `200`, and in the catcher's inbox (http://localhost:8025) one
+mail from `SaaS Starter <noreply@example.com>` (`settings.mail.from` in
 `config/development.yaml`, never Loco's `System <system@example.com>`),
-with a verification link starting `http://localhost:5150/api/auth/verify/`
+with a verification link starting `http://localhost:5150/verify?token=`
 (`server.host` as written, not `host:port`).
 
 ### Secrets and the SMTP login at boot
@@ -638,7 +640,7 @@ Production refuses a secret that is set but not filled in. Run it with a
 throwaway database so nothing lands in the repo:
 
 ```bash
-LOCO_ENV=production JWT_SECRET=x MAILER_HOST=replace-me MAILER_USER=u MAILER_PASSWORD= MAILER_FROM="App <a@example.com>" DATABASE_URL="sqlite:///tmp/prod-check.sqlite?mode=rwc" ./target/debug/app start
+LOCO_ENV=production MAILER_HOST=replace-me MAILER_USER=u MAILER_PASSWORD= MAILER_FROM="App <a@example.com>" DATABASE_URL="sqlite:///tmp/prod-check.sqlite?mode=rwc" ./target/debug/app start
 ```
 
 Expected: exit status 1 and

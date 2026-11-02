@@ -2,16 +2,15 @@
 //! `get_env` without a default refuses the boot when a variable is missing,
 //! but a variable that is set and still wrong goes through.
 //!
-//! - [`refuse_placeholders`], everywhere deployed: a JWT secret that is
-//!   empty or still reads `replace-me` refuses the boot, so no deployed
-//!   copy signs with a key anyone knows (the deployed configs give
-//!   `JWT_SECRET` no default, so a missing one `get_env` refused already).
-//!   Production refuses an SMTP host, user or password the same way (the
-//!   placeholder `docs/production.md` writes into `secrets.production.env`),
-//!   and `settings.security.contact` still at the template's `example.com`:
-//!   `security.txt` would send reports nowhere. Dev-server and staging keep
-//!   their mail placeholders on purpose: they boot without a mail account,
-//!   and their mail fails to send.
+//! - [`refuse_placeholders`], in production: an SMTP host, user or
+//!   password that is empty or still reads `replace-me` (the placeholder
+//!   `docs/production.md` writes into `secrets.production.env`) refuses the
+//!   boot, and so does `settings.security.contact` still at the template's
+//!   `example.com`: `security.txt` would send reports nowhere. Dev-server
+//!   and staging keep their mail placeholders on purpose: they boot without
+//!   a mail account, and their mail fails to send. No JWT secret is
+//!   checked: the configs carry none (src/app.rs, Loco's auth API
+//!   unmounted).
 //! - [`spawn_smtp_login`], everywhere deployed: logs in to the SMTP
 //!   server once, in the background, and sends nothing. A failure is a
 //!   warning in the journal, not a refusal: an outage at the mail provider
@@ -39,16 +38,10 @@ use crate::{
 /// What `docs/production.md` writes for a value still to be filled in.
 pub const PLACEHOLDER: &str = "replace-me";
 
-/// The variable the JWT secret comes from: the one secret every deployed
-/// environment refuses to boot without.
-const JWT_SECRET: &str = "JWT_SECRET";
-
-/// The secrets a deployed boot reads, by the variable that sets them.
+/// The secrets a deployed boot reads, by the variable that sets them: the
+/// mail account's.
 fn secrets(ctx: &AppContext) -> Vec<(&'static str, String)> {
     let mut values = Vec::new();
-    if let Some(jwt) = ctx.config.auth.as_ref().and_then(|auth| auth.jwt.as_ref()) {
-        values.push((JWT_SECRET, jwt.secret.clone()));
-    }
     let smtp = ctx
         .config
         .mailer
@@ -74,41 +67,24 @@ fn not_filled_in(values: &[(&'static str, String)]) -> Vec<&'static str> {
         .collect()
 }
 
-/// The secrets `env` refuses to boot without: the JWT secret everywhere
-/// deployed, production the mail account's too.
-fn required_in(
-    env: &Environment,
-    values: Vec<(&'static str, String)>,
-) -> Vec<(&'static str, String)> {
-    let production = matches!(env, Environment::Production);
-    values
-        .into_iter()
-        .filter(|(name, _)| production || *name == JWT_SECRET)
-        .collect()
-}
-
-/// Refuses a deployed boot with a secret that is empty or still
-/// `replace-me`, and production's with the template's security contact.
-/// Development, the tests and the browser tests pass.
+/// Refuses production's boot with a mail secret that is empty or still
+/// `replace-me`, or with the template's security contact. Every other
+/// environment passes.
 ///
 /// # Errors
-/// A deployed environment with `JWT_SECRET` not filled in; production with
-/// `MAILER_HOST`, `MAILER_USER` or `MAILER_PASSWORD` not filled in, or the
-/// template's security contact.
+/// Production with `MAILER_HOST`, `MAILER_USER` or `MAILER_PASSWORD` not
+/// filled in, or the template's security contact.
 pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
     let env = &ctx.environment;
-    if is_local(env) {
+    if !matches!(env, Environment::Production) {
         return Ok(());
     }
-    let missing = not_filled_in(&required_in(env, secrets(ctx)));
+    let missing = not_filled_in(&secrets(ctx));
     if !missing.is_empty() {
         return Err(Error::Message(format!(
             "{env} won't start: {} empty or still `{PLACEHOLDER}`. Fill them in secrets.{env}.env and deploy it (docs/{env}.md)",
             missing.join(", ")
         )));
-    }
-    if !matches!(env, Environment::Production) {
-        return Ok(());
     }
     let settings: Settings = stored(ctx)?;
     if contact_is_a_placeholder(&settings.security.contact) {
@@ -199,7 +175,6 @@ mod tests {
     #[test]
     fn real_values_pass() {
         let filled = values(&[
-            ("JWT_SECRET", "k3l9…a long random string"),
             ("MAILER_HOST", "smtp.example.net"),
             ("MAILER_USER", "noreply@example.net"),
             ("MAILER_PASSWORD", "an app password"),
@@ -210,7 +185,6 @@ mod tests {
     #[test]
     fn empty_and_placeholder_values_are_named() {
         let mixed = values(&[
-            ("JWT_SECRET", "k3l9…a long random string"),
             ("MAILER_HOST", "replace-me"),
             ("MAILER_USER", "   "),
             ("MAILER_PASSWORD", ""),
@@ -218,37 +192,6 @@ mod tests {
         assert_eq!(
             not_filled_in(&mixed),
             vec!["MAILER_HOST", "MAILER_USER", "MAILER_PASSWORD"]
-        );
-    }
-
-    /// Staging and the dev server boot on mail placeholders, never on an
-    /// empty or placeholder JWT secret; production on neither.
-    #[test]
-    fn every_deployed_environment_needs_its_jwt_secret_and_production_its_mail_too() {
-        let placeholders = || {
-            values(&[
-                ("JWT_SECRET", "replace-me"),
-                ("MAILER_HOST", "replace-me"),
-                ("MAILER_USER", ""),
-                ("MAILER_PASSWORD", "replace-me"),
-            ])
-        };
-        for env in ["staging", "dev-server"] {
-            let env = Environment::Any(env.into());
-            assert_eq!(
-                not_filled_in(&required_in(&env, placeholders())),
-                vec!["JWT_SECRET"],
-                "{env}"
-            );
-        }
-        assert_eq!(
-            not_filled_in(&required_in(&Environment::Production, placeholders())),
-            vec![
-                "JWT_SECRET",
-                "MAILER_HOST",
-                "MAILER_USER",
-                "MAILER_PASSWORD"
-            ]
         );
     }
 

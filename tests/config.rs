@@ -21,7 +21,6 @@ use std::path::Path;
 use app::settings::Settings;
 use axum::http::HeaderValue;
 use loco_rs::{
-    auth::jwt::JWT,
     config::Config,
     controller::middleware::{limit_payload::DefaultBodyLimitKind, remote_ip::ClientIpSource},
     environment::Environment,
@@ -34,7 +33,6 @@ use tera::{Context, Kwargs, State, Tera, TeraResult, Value};
 const PLACEHOLDERS: &[(&str, &str)] = &[
     ("HOST", "https://example.test"),
     ("DATABASE_URL", "sqlite://canary.sqlite?mode=rwc"),
-    ("JWT_SECRET", "canary"),
     ("MAILER_HOST", "smtp.example.test"),
     ("MAILER_USER", "canary"),
     ("MAILER_PASSWORD", "canary"),
@@ -137,7 +135,7 @@ fn load(env: &Environment) -> Config {
 
 /// The dev server is staging's twin. Rendered with the same placeholders,
 /// which stand in for everything the unit sets (`HOST`, `DATABASE_URL`,
-/// `JWT_SECRET`, `MAILER_*`), the two files are the same config; only the
+/// `MAILER_*`), the two files are the same config; only the
 /// defaults behind those variables differ.
 #[test]
 fn dev_server_is_staging_on_its_own_host() {
@@ -415,7 +413,7 @@ fn deployed_environments_key_on_the_proxy_header(#[case] env: Environment) {
     let settings = Settings::from_config(&config).expect("settings");
     assert_eq!(settings.rate_limit.burst, 120, "{env}: agreed burst");
     assert_eq!(settings.rate_limit.per_second, 1, "{env}: agreed refill");
-    // The auth API's own bucket: ten calls at once, then one every 30 s.
+    // The auth forms' own bucket: ten posts at once, then one every 30 s.
     assert_eq!(
         settings.rate_limit.auth.burst, 10,
         "{env}: agreed auth burst"
@@ -462,38 +460,25 @@ fn local_environments_key_on_the_peer_and_allow_live_reload(#[case] env: Environ
     );
 }
 
-/// Loco decodes the JWT secret as base64 before it signs
-/// (`loco_rs::auth::jwt`): a secret with a `-` in it signs nothing, and
-/// every sign-in answers 401 (2026-10-29, a `test-only-not-a-secret`
-/// placeholder). So every local config's own secret must sign a token. The
-/// deployed ones have none (below).
+/// No config carries a JWT key, nor asks for `JWT_SECRET`: the site signs
+/// in with cookie sessions, and Loco's auth API, the one reader of the key,
+/// is unmounted (src/app.rs). A key in a config would be a secret to keep
+/// and rotate that opens nothing, and a committed one would sign tokens
+/// for anyone once the API came back (docs/security.md, the review of
+/// 2026-10-31).
 #[rstest]
 #[case::development(Environment::Development)]
 #[case::test_env(Environment::Test)]
 #[case::e2e(e2e())]
-fn every_configs_own_jwt_secret_signs_a_token(#[case] env: Environment) {
-    let config: Config = serde_yaml::from_str(&render_defaults(&env))
-        .unwrap_or_else(|e| panic!("{}: not a Loco config: {e}", config_path(&env).display()));
-    let jwt = config.get_jwt_config().expect("a jwt block");
-    JWT::new(&jwt.secret)
-        .generate_token(60, "pid".to_owned(), serde_json::Map::new())
-        .unwrap_or_else(|e| panic!("{env}: the JWT secret cannot sign a token: {e}"));
-}
-
-/// No deployed copy signs with a key in git: its `JWT_SECRET` takes no
-/// default, so a missing one refuses the boot, and `deploy_checks` refuses
-/// an empty one or `replace-me`. Staging and the dev server booted on a
-/// committed key until 2026-10-31 (docs/security.md, the review of that
-/// day), so a secrets file without the line let anyone sign a token.
-#[rstest]
 #[case::dev_server(dev_server())]
 #[case::staging(staging())]
 #[case::production(Environment::Production)]
-fn no_deployed_jwt_secret_comes_from_git(#[case] env: Environment) {
+fn no_config_carries_a_jwt_key(#[case] env: Environment) {
+    assert!(load(&env).auth.is_none(), "{env}: an `auth:` block");
     let config = std::fs::read_to_string(config_path(&env)).expect("the config");
     assert!(
-        required_variables(&config).contains(&"JWT_SECRET".to_owned()),
-        "{env}: config/{env}.yaml gives JWT_SECRET a default"
+        !required_variables(&config).contains(&"JWT_SECRET".to_owned()),
+        "{env}: config/{env}.yaml asks for JWT_SECRET"
     );
 }
 
@@ -632,34 +617,11 @@ fn every_environment_names_the_mail_sender(#[case] env: Environment, #[case] fro
     assert_eq!(settings.mail.from, from, "{env}: settings.mail.from");
 }
 
-/// A JWT lives one day everywhere: it can't be revoked, so a stolen one
-/// works until it expires (docs/security.md).
-#[rstest]
-#[case::development(Environment::Development)]
-// `case::test` would make rstest drop the function without a warning.
-#[case::test_env(Environment::Test)]
-#[case::e2e(e2e())]
-#[case::dev_server(dev_server())]
-#[case::staging(staging())]
-#[case::production(Environment::Production)]
-fn tokens_live_one_day(#[case] env: Environment) {
-    let config = load(&env);
-    let jwt = config
-        .auth
-        .as_ref()
-        .and_then(|auth| auth.jwt.as_ref())
-        .unwrap_or_else(|| panic!("{env}: auth.jwt block missing"));
-    assert_eq!(
-        jwt.expiration, 86_400,
-        "{env}: auth.jwt.expiration in seconds"
-    );
-}
-
 /// The request tests count on this: twenty requests pass, the next is a 429.
-/// Large enough that the auth tests (register, verify, login, then the call
-/// under test) never trip it. The auth API's own bucket takes production's
-/// numbers: ten calls pass, the eleventh is a 429 while the site-wide bucket
-/// still has tokens.
+/// Large enough that the auth tests (sign up, verify, sign in, then the
+/// post under test) never trip it. The auth forms' own bucket takes
+/// production's numbers: ten posts pass, the eleventh is a 429 while the
+/// site-wide bucket still has tokens.
 #[test]
 fn test_environment_has_the_burst_the_request_tests_expect() {
     let settings = Settings::from_config(&load(&Environment::Test)).expect("settings");

@@ -89,13 +89,14 @@ impl Hooks for App {
         ctx.shared_store.insert(options);
         ctx.shared_store.insert(assets);
         ctx.shared_store.insert(Settings::from_config(&ctx.config)?);
-        // A production secret that is set but empty or still `replace-me`
-        // refuses the boot; a missing one `get_env` refused already.
+        // A production mail secret that is set but empty or still
+        // `replace-me` refuses the boot; a missing one `get_env` refused
+        // already.
         deploy_checks::refuse_placeholders(&ctx)?;
 
         // From the settings and the stylesheet now in the store.
         let limit = rate_limit::auth_bucket(&ctx)?;
-        ctx.shared_store.insert(controllers::auth::AuthLimit(limit));
+        ctx.shared_store.insert(rate_limit::AuthLimit(limit));
         // The login's dummy hash, built now so the first sign-in with an
         // unknown email doesn't take longer than the rest (src/hashing.rs).
         hashing::prepare();
@@ -162,11 +163,16 @@ impl Hooks for App {
 
     fn routes(ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
-            .add_route(controllers::auth::routes(ctx))
+            // Loco's JSON auth API stays unmounted: the pages below sign in
+            // with cookie sessions, and the configs carry no JWT key
+            // (controllers/auth.rs; tests/requests/not_found.rs keeps it out).
+            // .add_route(controllers::auth::routes(ctx))
             .add_route(controllers::home::routes())
             .add_route(controllers::login::routes(ctx))
+            .add_route(controllers::register::routes(ctx))
+            .add_route(controllers::forgot::routes(ctx))
             .add_route(controllers::reset::routes())
-            .add_route(controllers::verify::routes())
+            .add_route(controllers::verify::routes(ctx))
             .add_route(controllers::robots::routes())
             .add_route(controllers::security_txt::routes())
             .add_route(controllers::llms::routes())

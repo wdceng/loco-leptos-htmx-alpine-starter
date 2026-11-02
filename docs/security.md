@@ -17,22 +17,22 @@ updates it in the same commit.
 | Clickjacking | `frame-ancestors 'none'`, `X-Frame-Options: DENY` | `config/*.yaml` | `tests/config.rs` |
 | Downgrade, sniffing | HSTS with preload, `nosniff` | `config/*.yaml` | `tests/config.rs` |
 | Cross-origin leaks | COOP, COEP, CORP, `Referrer-Policy` | `config/*.yaml` | `tests/config.rs` |
-| Brute force, mail flooding | Rate limits per visitor, per /64 for IPv6; a stricter bucket on `/api/auth`; no bucket state on an allowed answer, so a bot can't pace itself under the limit | `src/middleware/rate_limit.rs` | `tests/requests/rate_limit.rs` |
-| Which emails have accounts | Every refused login is the same 401 after one password check, a dummy one for an unknown email; a taken email registers like a new one | `src/controllers/auth.rs`, `src/hashing.rs` | `tests/requests/auth.rs` |
-| Someone else's address | An unverified account can't log in; the welcome mail's link opens a page whose button verifies, so a mail scanner that opens it verifies nothing; the link works for a day; a magic link verifies, as it reached the inbox | `src/controllers/verify.rs`, `src/controllers/auth.rs`, `src/models/users.rs` | `tests/requests/verify.rs`, `tests/requests/auth.rs` |
-| One mailbox, two accounts | An address is stored and looked up lowercase | `src/models/users.rs` | `tests/requests/auth.rs` |
-| Weak passwords | 8 to 128 characters, everywhere one is set | `src/models/users.rs` | `tests/requests/auth.rs` |
+| Brute force, mail flooding | Rate limits per visitor, per /64 for IPv6; a stricter bucket shared by the auth forms' posts (sign-in, sign-up, forgotten password, a new welcome mail); no bucket state on an allowed answer, so a bot can't pace itself under the limit | `src/middleware/rate_limit.rs` | `tests/requests/rate_limit.rs` |
+| Which emails have accounts | Every refused sign-in is the same page after one password check, a dummy one for an unknown email; a taken email signs up like a new one; the forgotten-password and new-mail forms answer every address alike | `src/controllers/login.rs`, `register.rs`, `forgot.rs`, `verify.rs`, `src/hashing.rs` | `tests/requests/login.rs`, `register.rs`, `forgot.rs`, `verify.rs` |
+| Someone else's address | An unverified account can't sign in; the welcome mail's link opens a page whose button verifies, so a mail scanner that opens it verifies nothing; the link works for a day | `src/controllers/verify.rs`, `src/models/users.rs` | `tests/requests/verify.rs` |
+| One mailbox, two accounts | An address is stored and looked up lowercase | `src/models/users.rs` | `tests/requests/register.rs` |
+| Weak passwords | 8 to 128 characters, everywhere one is set | `src/models/users.rs` | `tests/requests/register.rs`, `reset.rs` |
 | Hashing as a denial of service | Argon2id off the async threads, four at once | `src/hashing.rs` | `src/hashing.rs` |
-| A reset token leaking | Works once, for 30 minutes, and ends a pending magic link; its page sends `no-referrer` and `no-store`; the log names its route, never the token | `src/controllers/reset.rs`, `src/middleware/request_log.rs` | `tests/requests/reset.rs`, `src/middleware/request_log.rs` |
-| A stolen token | JWTs live one day | `config/*.yaml` | `tests/config.rs` |
+| A reset token leaking | Works once, for 30 minutes; its page sends `no-referrer` and `no-store`; the log names its route, never the token | `src/controllers/reset.rs`, `src/middleware/request_log.rs` | `tests/requests/reset.rs`, `src/middleware/request_log.rs` |
+| A token that can't be revoked | None: Loco's JWT API is unmounted, and no config carries a JWT key | `src/app.rs`, `config/*.yaml` | `tests/requests/not_found.rs`, `tests/config.rs` |
 | A stolen session | A row per sign-in, closed at sign-out and by a new password; 12 hours; the row keeps the secret's SHA-256, so a copy of the database signs nobody in; the cookie `HttpOnly`, `SameSite=Lax`, `Secure` and `__Host-` over HTTPS; the page that names who is signed in `no-store` | `src/models/sessions.rs`, `src/cookies.rs`, `src/secret.rs`, `src/controllers/login.rs` | `tests/models/sessions.rs`, `tests/requests/login.rs`, `tests/requests/reset.rs` |
-| Another site's page posting our forms (CSRF) | Every form's target refuses a post the browser says came from another site (`Sec-Fetch-Site`), before anything else; the cookie isn't sent with another site's post (`SameSite=Lax`) | `src/controllers/cross_site.rs` | `tests/requests/login.rs`, `reset.rs`, `verify.rs` |
+| Another site's page posting our forms (CSRF) | Every form's target refuses a post the browser says came from another site (`Sec-Fetch-Site`), before anything else; the cookie isn't sent with another site's post (`SameSite=Lax`) | `src/controllers/cross_site.rs` | `tests/requests/login.rs`, `register.rs`, `forgot.rs`, `reset.rs`, `verify.rs` |
 | Big or slow requests | 64 KB body limit, 15 s timeout | `config/*.yaml` | `tests/config.rs` |
 | Bypassing the CDN | Firewall to Cloudflare only, the origin key, dropped from Caddy's log | `production.md`, "Caddy's log" in the three deploy docs | by hand |
 | Another service on the box | Each unit's database its own user's alone (`0700`, `0600`); no capabilities, an ordinary service's system calls and sockets, no link-local address (a cloud's metadata service); the app on loopback even without its `BINDING`; Caddy's admin API a socket only `caddy` and root reach, so no process reads the origin key or loads a config; Caddy itself behind the same walls, its certificates the only thing it writes | the units, "Caddy's admin socket" and "Caddy's hardening" in `production.md`, `staging.md`, `dev-server.md`; `config/*.yaml` | `tests/config.rs`; by hand (`stat`, `systemctl is-active`, `ss -ltn`) |
-| Secrets when deployed | No JWT secret from git: required, and refused at boot while empty or a placeholder, everywhere deployed; production's mail account and security contact too | `src/deploy_checks.rs`, `config/*.yaml` | `src/deploy_checks.rs`, `tests/config.rs` |
-| Personal data in logs | No email address in any log line, and no token: a request is logged by its route; the journal keeps 30 days | `src/controllers/auth.rs`, `src/middleware/request_log.rs`, `production.md` | `src/middleware/request_log.rs`, by hand |
-| The welcome mail as someone's message | Its subject is the app's, never the name the visitor typed | `src/mailers/auth.rs` | `tests/requests/auth.rs` |
+| Secrets when deployed | Production's mail account required, and refused at boot while empty or a placeholder, its security contact too; no signing key anywhere to leak | `src/deploy_checks.rs`, `config/*.yaml` | `src/deploy_checks.rs`, `tests/config.rs` |
+| Personal data in logs | No email address in any log line, and no token: a request is logged by its route; the journal keeps 30 days | `src/controllers/`, `src/middleware/request_log.rs`, `production.md` | `src/middleware/request_log.rs`, by hand |
+| The welcome mail as someone's message | Its subject is the app's, never the name the visitor typed | `src/mailers/auth.rs` | `tests/requests/register.rs` |
 | A link in the app opening a file or another app | The app hands the system only the schemes it names; any other goes nowhere | `src-tauri/src/lib.rs` | `src-tauri/src/lib.rs` |
 | Known-vulnerable crates | `cargo audit` as the production deploy's first gate (`production.md`), and in CI when Actions is on | `.cargo/audit.toml` | the deploy chain |
 
@@ -62,11 +62,11 @@ configs, the app, the dependencies.
 | # | Finding | Status |
 |---|---|---|
 | 1 | Account pre-hijack: anyone registers someone's address with a password of their own, and a mail scanner's GET on the verification link verifies it | **Fixed:** the mail links to `/verify`, whose button posts the token; the mail says to ignore it without a sign-up. A press on a mail nobody expected is accepted (below) |
-| 2 | The magic link is spent by a GET, which answers with the JWT: a mail scanner that follows it first gets the token, the person a refusal | **Open:** its page needs cookie sessions (below) |
+| 2 | The magic link is spent by a GET, which answers with the JWT: a mail scanner that follows it first gets the token, the person a refusal | **Fixed** (2026-11-02): gone with Loco's auth API, unmounted; no page sends a magic link |
 | 3 | Live tokens in the journal: Loco's logger wrote the whole address, the reset link's query included | **Fixed:** `src/middleware/request_log.rs` logs the route's pattern or the path, never a query |
 | 4 | Addresses were case-sensitive: one mailbox, two accounts | **Fixed:** lowercase, stored and looked up |
 | 5 | The welcome mail's subject carried the visitor's name, to any address | **Fixed:** the app's name |
-| 6 | Staging and the dev server booted on a JWT secret in git when their secrets file had none | **Fixed:** no default, and refused empty or `replace-me` everywhere deployed |
+| 6 | Staging and the dev server booted on a JWT secret in git when their secrets file had none | **Fixed:** no default, and refused empty or `replace-me` everywhere deployed; since 2026-11-02 no config has a JWT key at all |
 | 7 | A verification link never expired | **Fixed:** a day; resending the mail gives a new one |
 | 8 | A password reset left a pending magic link open | **Fixed:** the reset clears it |
 | 9 | The app handed every unknown scheme to the system (`file:`, `intent:`) | **Fixed:** the schemes it names; the rest go nowhere |
@@ -77,9 +77,9 @@ configs, the app, the dependencies.
 
 ## Accepted risks
 
-- **No lockout per account.** Limits are per visitor: ten auth calls or
-  sign-ins at once, then one every 30 s, about 120 guesses an hour from one
-  address.
+- **No lockout per account.** Limits are per visitor: ten posts to the
+  auth forms at once, then one every 30 s, about 120 guesses an hour from
+  one address.
   A lockout per account would let anyone lock a victim out.
 - **Public health routes.** Loco's `/_health` and `/_readiness` say whether
   the database and queue are up. Behind Cloudflare and the origin key, only
@@ -87,9 +87,10 @@ configs, the app, the dependencies.
 - **`/up` answers any origin.** The app's start page reads it from
   outside the site (`Access-Control-Allow-Origin: *`). It says `ok` and
   nothing else, and no cookie is sent with it.
-- **A few milliseconds in `forgot`, `magic-link` and `resend`.** A real
-  account costs a database write and a queued mail; an unknown one costs
-  neither. The mail itself is sent in the background.
+- **A few milliseconds in the sign-up, `/forgot` and a new welcome
+  mail.** A real account, or a new one, costs a database write and a
+  queued mail; an unknown or taken one costs neither. The mail itself is
+  sent in the background.
 - **Two ignored advisories.** The `rsa` timing issue (no RSA key exists
   here) and unmaintained compile-time crates. Re-check when loco-rs or
   Leptos changes them.
@@ -111,10 +112,14 @@ configs, the app, the dependencies.
 Each of these brings its own risks. The template has none of them yet.
 
 - **A magic link that signs in:** it opens a page whose button posts the
-  token, as `/verify` does, and the session starts there. Today's
-  `GET /api/auth/magic-link/{token}` is spent by a
-  mail scanner that follows it first, and answers it the JWT (the review of
-  2026-10-31, #2).
+  token, as `/verify` does, and the session starts there. Loco's
+  `GET /api/auth/magic-link/{token}`, unmounted with its API, was spent by
+  a mail scanner that followed it first, and answered it the JWT (the
+  review of 2026-10-31, #2).
+- **A client that wants tokens** (a phone app of its own, another
+  server): mounting Loco's auth API again brings back a JWT key in every
+  config, required and refused while a placeholder, and tokens that can't
+  be revoked before they expire.
 - **A second factor:** passkeys or an authenticator app, recovery codes.
   Passkeys inside the Android app, as an islands app on this stack found
   on a real phone, need all of:

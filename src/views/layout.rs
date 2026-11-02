@@ -158,6 +158,32 @@ pub const PROBLEM: &str = "mt-6 font-semibold text-danger";
 /// which drops the button's name and value from the post.
 pub const BUTTON: &str = "mt-6 min-h-11 rounded-md bg-primary px-4 py-2 font-semibold text-white transition-opacity busy:pointer-events-none busy:opacity-60 busy:delay-200";
 
+/// A link standing on its own line, the next step from a page: the way
+/// home under a notice, the sign-in page's ways to sign up or start over.
+/// Never in running text, where a link is told by more than its colour.
+pub const LINK: &str = "font-semibold text-primary";
+
+/// The ways on from an auth form, under it: one link a line.
+#[component]
+pub fn NextSteps(links: Vec<(&'static str, &'static str)>) -> impl IntoView {
+    view! {
+        <ul class="mt-8 space-y-3">
+            {links
+                .into_iter()
+                .map(|(href, words)| {
+                    view! {
+                        <li>
+                            <a href=href class=LINK>
+                                {words}
+                            </a>
+                        </li>
+                    }
+                })
+                .collect_view()}
+        </ul>
+    }
+}
+
 /// The browser tab's title: the page's own name, then the app's. An empty
 /// name is the app's alone (the home page). The one place the app's name
 /// joins a title, the 429 page's too.
@@ -330,7 +356,9 @@ pub fn Notice(heading: &'static str, #[prop(into)] lead: String) -> impl IntoVie
         <h1 class=TITLE>{heading}</h1>
         <p class=LEAD>{lead}</p>
         <p class="mt-8">
-            <a href="/" class="font-semibold text-primary">"Back to the home page"</a>
+            <a href="/" class=LINK>
+                "Back to the home page"
+            </a>
         </p>
     }
 }

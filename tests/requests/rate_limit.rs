@@ -10,7 +10,7 @@ use serial_test::serial;
 const BURST: u32 = 20;
 
 /// `settings.rate_limit.auth.burst` in `config/test.yaml`: the bucket on
-/// `/api/auth` alone, inside the site-wide one.
+/// the auth forms' posts alone, inside the site-wide one.
 const AUTH_BURST: u32 = 10;
 
 /// The bucket's state, never shown: a bot would read its tries left and
@@ -112,31 +112,50 @@ async fn request_past_the_burst_is_rejected_with_a_page() {
     .await;
 }
 
-/// The auth API has a second, stricter bucket (`controllers::auth::routes`):
-/// `register` mails any address and `login` takes a password. A request
-/// there spends a token from both buckets.
+/// The auth forms' posts share a second, stricter bucket
+/// (`rate_limit::auth_limited`): the sign-in takes a password, the
+/// sign-up, the forgotten password and a new welcome mail mail any address.
+/// A post there spends a token from both buckets.
 #[tokio::test]
 #[serial]
-async fn the_auth_api_has_its_own_stricter_bucket() {
+async fn the_auth_forms_share_one_stricter_bucket() {
     request::<App, _, _>(|request, _ctx| async move {
-        let payload = serde_json::json!({ "email": "nobody@example.com", "password": "wrong" });
+        let email = "nobody@example.com";
+        let posts = [
+            (
+                "/login",
+                serde_json::json!({ "email": email, "password": "wrong" }),
+            ),
+            (
+                "/register",
+                serde_json::json!({ "name": "loco", "email": email, "password": "short" }),
+            ),
+            ("/forgot", serde_json::json!({ "email": email })),
+            ("/verify/resend", serde_json::json!({ "email": email })),
+        ];
 
-        // Within the auth burst: refused as bad credentials, not as too many,
-        // and neither bucket's state shown.
-        for attempt in 1..=AUTH_BURST {
-            let res = request.post("/api/auth/login").json(&payload).await;
-            assert_eq!(res.status_code(), 401, "login attempt {attempt}");
+        // Within the auth burst, the four forms taking turns: each answered
+        // as itself, not as too many, and neither bucket's state shown.
+        for attempt in 0..AUTH_BURST as usize {
+            let (path, form) = &posts[attempt % posts.len()];
+            let res = request.post(path).form(form).await;
+            assert_ne!(res.status_code(), 429, "{path}, post {attempt}");
             for told in BUCKET_STATE {
                 assert!(
                     res.maybe_header(told).is_none(),
-                    "{told} on login attempt {attempt}"
+                    "{told} on {path}, post {attempt}"
                 );
             }
         }
 
-        // The auth bucket is empty: the 429 page, with the wait until its
-        // next token.
-        let res = request.post("/api/auth/login").json(&payload).await;
+        // The shared bucket is empty for every one of them: the 429 page,
+        // with the wait until its next token.
+        for (path, form) in &posts {
+            let res = request.post(path).form(form).await;
+            assert_eq!(res.status_code(), 429, "{path}");
+        }
+        let (path, form) = &posts[0];
+        let res = request.post(path).form(form).await;
         assert_eq!(res.status_code(), 429);
         // The wait is the auth bucket's, one token per 30 s, not the
         // site-wide bucket's second.
@@ -148,8 +167,8 @@ async fn the_auth_api_has_its_own_stricter_bucket() {
         assert_eq!(res.header("cache-control"), "no-store");
         assert!(res.text().contains("Too many requests"));
 
-        // The site-wide bucket still has tokens (twenty, minus the eleven
-        // auth requests and this one), so everything else still answers.
+        // The site-wide bucket still has tokens (twenty, minus the fifteen
+        // auth posts and this one), so everything else still answers.
         let res = request.get("/robots.txt").await;
         assert_eq!(res.status_code(), 200);
     })

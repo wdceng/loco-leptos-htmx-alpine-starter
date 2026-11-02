@@ -1,13 +1,15 @@
-mod auth;
 mod error_page;
+mod forgot;
 mod home;
 mod links;
 mod llms;
 mod login;
+mod mails;
 mod not_found;
 mod prepare_data;
 mod races;
 mod rate_limit;
+mod register;
 mod reset;
 mod robots;
 mod security_headers;

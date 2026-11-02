@@ -60,7 +60,7 @@ doing one thing.
 
 | Loco's guide says | Here |
 |---|---|
-| Views are Tera templates or JSON (`src/views/`) | Pages are **Leptos** components (`src/views/`), rendered through `render_page` (`src/render.rs`). `src/views/auth.rs` still holds the auth API's JSON shapes |
+| Views are Tera templates or JSON (`src/views/`) | Pages are **Leptos** components (`src/views/`), rendered through `render_page` (`src/render.rs`). `src/views/auth.rs` holds the unmounted auth API's JSON shapes |
 | Mailers use Tera `.t` templates (`mail_template`) | The HTML part is a Leptos component (`src/views/mail.rs`), subject and text are `format!`, sent with `Mailer::mail`. `cargo loco generate mailer` writes Tera templates, which won't compile here; write new mails like `src/mailers/auth.rs` |
 | Query through Sea-ORM | Loco's own models stay on Sea-ORM. **The app's own queries use SQLx `query!`** on `sql::pool(&ctx)`: checked against the schema at compile time ("Sea-ORM and SQLx" in `docs/architecture.md`) |
 | Environments `development`, `test`, `production` (`LOCO_ENV`, default `development`) | The same three, plus **`dev-server`** and **`staging`**, which Loco reads as `Environment::Any`. `config/dev-server.yaml` must stay staging's copy apart from its defaults (`tests/config.rs`): change both together. Check "is this local?" with `settings::is_local` |

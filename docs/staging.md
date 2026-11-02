@@ -20,7 +20,7 @@ Staging is production's twin. The differences:
 | | staging | production |
 |---|---|---|
 | Binary profile | `release`: production's exact binary | `release` |
-| Secrets | `JWT_SECRET` required; mail placeholders, so a file without mail boots | no defaults, a missing one stops the boot |
+| Secrets | mail placeholders, so a file without mail boots | no defaults, a missing one stops the boot |
 | Static cache | 60 s | one year |
 | Search engines | `Disallow: /` and `X-Robots-Tag: noindex, nofollow` | `Allow: /` |
 | Logs | compact, debug, backtraces on | JSON, info |
@@ -199,21 +199,18 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-stg"
 - Secrets live in `secrets.staging.env` in the repo root on your machine.
   It's git-ignored and every deploy uploads it as `secrets.env`. Never use
   production's file here.
-- `JWT_SECRET` is required: without it the app refuses to boot. Without
-  the `MAILER_*` lines it boots on the placeholders in
-  `config/staging.yaml`, and mail fails to send. A missing file stops the
-  unit.
+- Nothing in it is required: without a real mail account the app boots,
+  and mail fails to send. A missing file stops the unit.
 
-Create it once from its example, which explains every key, with its own
-`JWT_SECRET`. Uncomment the `MAILER_*` lines when staging should send real
-mail (details in `docs/production.md`):
+Create it once from its example, then fill in the `MAILER_*` lines when
+staging should send real mail (details in `docs/production.md`):
 
 ```bash
-umask 077 && cp secrets.staging.env.example secrets.staging.env && printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 64 | tr -d '\n')" >> secrets.staging.env
+umask 077 && cp secrets.staging.env.example secrets.staging.env
 ```
 
-- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
-  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
+- **An old `JWT_SECRET` line does nothing.** No config reads it since
+  sign-in moved to cookie sessions; delete it.
 
 ## One-time setup
 
@@ -361,8 +358,6 @@ ssh <server> "systemd-analyze security app-stg --no-pager | tail -1"
 | `the site folder ... is missing` | `site/` not uploaded next to the binary |
 | `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
-| a `get_env` error naming `JWT_SECRET` | `secrets.env` without its `JWT_SECRET` line |
-| `staging won't start: JWT_SECRET empty or still replace-me` | the line is there, the key isn't (`src/deploy_checks.rs`) |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

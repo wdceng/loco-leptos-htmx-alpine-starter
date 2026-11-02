@@ -116,8 +116,9 @@ settings:
     # bucket below. Generous locally: the dev loop reloads pages constantly.
     per_second: 1
     burst: 300
-    # The auth API's own bucket, inside the one above: a request to
-    # /api/auth spends a token from both. Generous locally too.
+    # The auth forms' own bucket, inside the one above: a post to the
+    # sign-in, the sign-up, /forgot or a new welcome mail spends a token
+    # from both. Generous locally too.
     auth:
       per_second: 1
       burst: 30
@@ -228,25 +229,7 @@ database:
   # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_recreate: false
 
-# Authentication Configuration
-auth:
-  # JWT authentication
-  jwt:
-    # Secret key for token generation and verification. Loco decodes it as
-    # base64 before signing (a `-` in it signs nothing): this is "development
-    # only, not a secret" encoded. `tests/config.rs` checks it signs.
-    secret: ZGV2ZWxvcG1lbnQgb25seSwgbm90IGEgc2VjcmV0
-    # Token expiration time in seconds. One day: a JWT can't be revoked, so
-    # a stolen one works until it expires. Longer sessions and a logout need
-    # cookie sessions (docs/security.md).
-    expiration: 86400 # 1 day
-    # Where to read the token from. Omitted => `Authorization: Bearer <token>`.
-    # A cookie or query parameter is a single map with a `from:` tag:
-    #
-    # location:
-    #   from: Cookie
-    #   name: auth_token
-    #
-    # `from:` is one of Bearer, Cookie, Query. Cookie and Query also take a
-    # `name:`. A YAML list of these tries each in order and uses the first
-    # that yields a token. See https://loco.rs/docs/how-to/jwt-locations
+# No `auth:` block (2026-11-02): the site signs in with sessions of its own
+# (src/models/sessions.rs), and the starter's JWT API, compiled, is not
+# mounted (src/app.rs), so nothing reads a JWT secret; the API mounted would
+# fail closed, "no JWT config found".

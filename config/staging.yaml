@@ -3,8 +3,8 @@
 # Same deploy layout as production (binary, config/, site/), selected with
 # LOCO_ENV=staging. It differs from production only where testing benefits:
 # readable debug logs, a short asset cache so testers always see the latest
-# build, and its own host. Unlike production, every value but JWT_SECRET has
-# a default, so the unit boots with LOCO_ENV and a JWT secret; the unit
+# build, and its own host. Unlike production, every value has a default, so
+# the unit boots with LOCO_ENV alone; the unit
 # sets PORT, and BINDING to loopback as the default does, so the app listens
 # only behind Caddy, and MAILER_* replace the placeholder defaults below
 # once they exist.
@@ -111,10 +111,10 @@ settings:
     # Routes only; the static files have their own bucket below.
     per_second: 1
     burst: 120
-    # The auth API's own bucket, inside the one above: ten calls at once per
+    # The auth forms' own bucket, inside the one above: ten posts at once per
     # visitor IP, then one every 30 seconds. Enough for a person to
-    # register, verify, log in and retry a password; too little to use
-    # `register` as a mail relay or to guess passwords at speed.
+    # sign up, verify, sign in and retry a password; too little to use
+    # the sign-up as a mail relay or to guess passwords at speed.
     auth:
       per_second: 30
       burst: 10
@@ -219,18 +219,7 @@ database:
   # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_recreate: false
 
-# Authentication Configuration
-auth:
-  # JWT authentication
-  jwt:
-    # Secret key for token generation and verification. Required, with no
-    # default, as in production: a key in git is one anyone can sign a token
-    # with, and the boot refuses an empty one or `replace-me`
-    # (src/deploy_checks.rs). A different value from production: a staging
-    # token must not open a production account. Base64, which Loco decodes
-    # before signing; it comes from secrets.staging.env (docs/staging.md).
-    secret: <%= get_env(name="JWT_SECRET") %>
-    # Token expiration time in seconds. One day: a JWT can't be revoked, so
-    # a stolen one works until it expires. Longer sessions and a logout need
-    # cookie sessions (docs/security.md).
-    expiration: 86400 # 1 day
+# No `auth:` block (2026-11-02): the site signs in with sessions of its own
+# (src/models/sessions.rs), and the starter's JWT API, compiled, is not
+# mounted (src/app.rs), so nothing reads a JWT secret; the API mounted would
+# fail closed, "no JWT config found".

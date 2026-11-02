@@ -20,6 +20,8 @@ use loco_rs::testing::prelude::*;
 use regex::Regex;
 use serial_test::serial;
 
+use super::mails::unfolded;
+
 const BROWSER: &str = "text/html,application/xhtml+xml,*/*;q=0.8";
 
 /// A file in `public/`, which cargo-leptos copies to the site root. A
@@ -125,41 +127,32 @@ async fn the_manifest_names_the_app_and_versioned_icons() {
     .await;
 }
 
-/// The links in the three auth mails, requested the way a person clicking
-/// them would.
+/// The links in the auth mails the pages send, the welcome mail and the
+/// reset mail, requested the way a person clicking them would.
 #[tokio::test]
 #[serial]
 async fn every_link_in_the_mails_leads_somewhere() {
     request::<App, _, _>(|request, ctx| async move {
-        // `@example.com`: one of the two domains magic-link login accepts.
         let email = "links@example.com";
         request
-            .post("/api/auth/register")
-            .json(&serde_json::json!({ "name": "Links", "email": email, "password": "12341234" }))
+            .post("/register")
+            .form(&serde_json::json!({ "name": "Links", "email": email, "password": "12341234" }))
             .await;
         request
-            .post("/api/auth/forgot")
-            .json(&serde_json::json!({ "email": email }))
-            .await;
-        request
-            .post("/api/auth/magic-link")
-            .json(&serde_json::json!({ "email": email }))
+            .post("/forgot")
+            .form(&serde_json::json!({ "email": email }))
             .await;
 
         let deliveries = ctx.mailer.unwrap().deliveries();
-        assert_eq!(deliveries.count, 3, "welcome, reset and magic-link mails");
+        assert_eq!(deliveries.count, 2, "the welcome and reset mails");
 
-        // Quoted-printable may wrap a long line ("=" + line break) and writes
-        // "=" itself as "=3D", so both come out before the links are read.
+        // Quoted-printable may wrap a long line and writes "=" itself as
+        // "=3D", so both come out before the links are read.
         let link = Regex::new(r"http://localhost:5150(/[A-Za-z0-9_./#?&=%-]+)").expect("regex");
         let mut paths: Vec<String> = deliveries
             .messages
             .iter()
-            .map(|mail| {
-                mail.replace("=\r\n", "")
-                    .replace("=\n", "")
-                    .replace("=3D", "=")
-            })
+            .map(|mail| unfolded(mail))
             .flat_map(|mail| {
                 link.captures_iter(&mail)
                     .map(|c| c[1].to_string())
@@ -168,7 +161,7 @@ async fn every_link_in_the_mails_leads_somewhere() {
             .collect();
         paths.sort();
         paths.dedup();
-        assert_eq!(paths.len(), 3, "one link per mail: {paths:?}");
+        assert_eq!(paths.len(), 2, "one link per mail: {paths:?}");
 
         for path in paths {
             // The part after `#` never reaches the server.

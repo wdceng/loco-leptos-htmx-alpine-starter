@@ -68,7 +68,7 @@ settings:
     enable: true
     per_second: 1
     burst: 20
-    # The auth API's own bucket, production's numbers: ten calls pass, the
+    # The auth forms' own bucket, production's numbers: ten posts pass, the
     # eleventh is a 429 while the site-wide bucket still has tokens
     # (tests/requests/rate_limit.rs).
     auth:
@@ -161,15 +161,7 @@ database:
   # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_recreate: true
 
-# Authentication Configuration
-auth:
-  # JWT authentication
-  jwt:
-    # Secret key for token generation and verification. Loco decodes it as
-    # base64 before signing (a `-` in it signs nothing): this is "test only,
-    # not a secret" encoded. `tests/config.rs` checks it signs.
-    secret: dGVzdCBvbmx5LCBub3QgYSBzZWNyZXQ=
-    # Token expiration time in seconds. One day: a JWT can't be revoked, so
-    # a stolen one works until it expires. Longer sessions and a logout need
-    # cookie sessions (docs/security.md).
-    expiration: 86400 # 1 day
+# No `auth:` block (2026-11-02): the site signs in with sessions of its own
+# (src/models/sessions.rs), and the starter's JWT API, compiled, is not
+# mounted (src/app.rs), so nothing reads a JWT secret; the API mounted would
+# fail closed, "no JWT config found".

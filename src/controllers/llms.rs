@@ -20,7 +20,9 @@ pub fn body_for(host: &str) -> String {
          > {DESCRIPTION}\n\n\
          ## Pages\n\n\
          - [Home]({host}/): what the site is\n\
-         - [Sign in]({host}/login): sign in to your account\n"
+         - [Sign in]({host}/login): sign in to your account\n\
+         - [Sign up]({host}/register): make an account\n\
+         - [Forgot your password]({host}/forgot): get a link to choose a new one\n"
     )
 }
 

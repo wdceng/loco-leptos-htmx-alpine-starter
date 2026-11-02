@@ -10,29 +10,16 @@ use app::{
 use loco_rs::{app::AppContext, testing::prelude::*};
 use serial_test::serial;
 
-use super::prepare_data;
+use super::prepare_data::{PASSWORD, signs_in, user};
 
-fn login(email: &str, password: &str) -> serde_json::Value {
-    serde_json::json!({ "email": email, "password": password })
-}
+const EMAIL: &str = "reset@example.com";
 
 #[tokio::test]
 #[serial]
 async fn the_reset_page_changes_the_password_once() {
     request::<App, _, _>(|request, ctx| async move {
-        let email = prepare_data::init_user_login(&request, &ctx)
-            .await
-            .user
-            .email;
-        request
-            .post("/api/auth/forgot")
-            .json(&serde_json::json!({ "email": email }))
-            .await;
-        let token = users::Model::find_by_email(&ctx.db, &email)
-            .await
-            .expect("the user")
-            .reset_token
-            .expect("a reset token");
+        let email = user(&ctx, EMAIL, true).await.email;
+        let token = reset_token(&request, &ctx, &email).await;
 
         // The mail's link: the form, the token in it, the address kept out
         // of referrers and caches, out of search results.
@@ -112,16 +99,14 @@ async fn the_reset_page_changes_the_password_once() {
             .await;
         assert_eq!(done.status_code(), 200);
         assert!(done.text().contains("Your password is changed"));
-        let new = request
-            .post("/api/auth/login")
-            .json(&login(&email, "a-new-password"))
-            .await;
-        assert_eq!(new.status_code(), 200, "the new password");
-        let old = request
-            .post("/api/auth/login")
-            .json(&login(&email, "12341234"))
-            .await;
-        assert_eq!(old.status_code(), 401, "the old password");
+        assert!(
+            signs_in(&request, &email, "a-new-password").await,
+            "the new password"
+        );
+        assert!(
+            !signs_in(&request, &email, PASSWORD).await,
+            "the old password"
+        );
 
         // The link is spent.
         let again = request
@@ -134,11 +119,12 @@ async fn the_reset_page_changes_the_password_once() {
     .await;
 }
 
-/// The reset token of a user who asked for one, by their email.
+/// The reset token of a user who asked for one on the `/forgot` page, by
+/// their email.
 async fn reset_token(request: &loco_rs::TestServer, ctx: &AppContext, email: &str) -> String {
     request
-        .post("/api/auth/forgot")
-        .json(&serde_json::json!({ "email": email }))
+        .post("/forgot")
+        .form(&serde_json::json!({ "email": email }))
         .await;
     users::Model::find_by_email(&ctx.db, email)
         .await
@@ -153,7 +139,7 @@ async fn reset_token(request: &loco_rs::TestServer, ctx: &AppContext, email: &st
 #[serial]
 async fn a_new_password_signs_out_everywhere() {
     request::<App, _, _>(|request, ctx| async move {
-        let user = prepare_data::init_user_login(&request, &ctx).await.user;
+        let user = user(&ctx, EMAIL, true).await;
         let pool = sql::pool(&ctx);
         Session::open(pool, user.id).await.expect("opened");
         Session::open(pool, user.id).await.expect("opened");
@@ -174,7 +160,7 @@ async fn a_new_password_signs_out_everywhere() {
 #[serial]
 async fn another_sites_post_changes_no_password() {
     request::<App, _, _>(|request, ctx| async move {
-        let user = prepare_data::init_user_login(&request, &ctx).await.user;
+        let user = user(&ctx, EMAIL, true).await;
         let token = reset_token(&request, &ctx, &user.email).await;
 
         let refused = request
@@ -187,7 +173,7 @@ async fn another_sites_post_changes_no_password() {
             .await
             .expect("the user");
         assert_eq!(kept.reset_token, Some(token), "the link still unspent");
-        assert!(kept.verify_password("12341234").await, "the old password");
+        assert!(kept.verify_password(PASSWORD).await, "the old password");
     })
     .await;
 }

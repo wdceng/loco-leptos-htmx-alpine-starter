@@ -26,7 +26,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A page's language, title, description, robots tag | `PageMeta` | `src/views/layout.rs` |
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
-| A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
+| A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers, "check your mail"). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
 | The app's name, anywhere | `APP_NAME` | `src/views/layout.rs` |
 | The site in one sentence (meta description, manifest, llms.txt) | `DESCRIPTION` | `src/controllers/home.rs` |
 | The centred content column | `COLUMN` | `src/views/layout.rs` |
@@ -37,6 +37,11 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A page no copy is kept of (`no-store`): one that names who is signed in | `render_private_page` | `src/render.rs` |
 | A password reset from the mail's link: the form, done, expired | `ResetForm`, `ResetDone`, `ResetExpired`; the address `reset::PATH` | `src/views/reset.rs`, `src/controllers/reset.rs` |
 | Email verification from the welcome mail's link: the button, done, no longer works | `VerifyForm`, `VerifyDone`, `VerifyExpired`; the address `verify::PATH` | `src/views/verify.rs`, `src/controllers/verify.rs` |
+| The welcome mail again, with a fresh link: `/verify` without a token | `ResendForm`, `ResendSent`; the post `verify::RESEND` | `src/views/verify.rs`, `src/controllers/verify.rs` |
+| Sign in, and who is signed in with the way out | `LoginForm`, `SignedIn`; the addresses `login::PATH`, `login::LOGOUT` | `src/views/login.rs`, `src/controllers/login.rs` |
+| Sign up: the form, "check your mail" | `RegisterForm`, `RegisterSent`; the address `register::PATH` | `src/views/register.rs`, `src/controllers/register.rs` |
+| A forgotten password: the form that mails the reset link | `ForgotForm`, `ForgotSent`; the address `forgot::PATH` | `src/views/forgot.rs`, `src/controllers/forgot.rs` |
+| A link on its own line, the next step from a page; an auth form's ways on, under it | `LINK`; `NextSteps` | `src/views/layout.rs` |
 | A password's rule (8 to 128 characters), anywhere one is set | `password_problem` | `src/models/users.rs` |
 | A new account's name (2 to 100 characters) and email, checked before anything else | `name_or_email_problem`, from `Validator` | `src/models/users.rs` |
 | An email address as it is stored and looked up: lowercase | `normalized_email` | `src/models/users.rs` |
@@ -116,7 +121,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A signed-in session: opened, found, closed | `Session` | `src/models/sessions.rs` |
 | "Is this a developer's machine or the tests?" (development, test, e2e) | `settings::is_local` | `src/settings.rs` |
 | The app's typed settings | `Settings` | `src/settings.rs` |
-| A rate-limit bucket | `site_bucket`, `auth_bucket`, `files_bucket`; on a form's POST alone, `limited` | `src/middleware/rate_limit.rs` |
+| A rate-limit bucket | `site_bucket`, `auth_bucket`, `files_bucket`; on an auth form's POST alone, `auth_limited` | `src/middleware/rate_limit.rs` |
 | Who is signed in | `Signed`, a handler's extractor (nobody: to `/login`); `signed_in` where a page shows a visitor something else | `src/controllers/signed.rs` |
 | A post another site's page sent, refused | `cross_site::refused`, first in every form's target | `src/controllers/cross_site.rs` |
 | A visitor's address, behind the proxy or not | `VisitorIp`, `key_source` | `src/middleware/rate_limit.rs` |

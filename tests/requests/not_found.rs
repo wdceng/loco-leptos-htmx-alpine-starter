@@ -90,6 +90,43 @@ async fn a_miss_gets_the_security_headers_and_a_request_id() {
     .await;
 }
 
+/// Loco's starter auth API stays unmounted (src/app.rs, `Hooks::routes`):
+/// the site signs in with cookie sessions through its own pages, and the
+/// configs carry no JWT key, so its addresses are misses and no token or
+/// `api_key` opens anything. As an islands app on this stack keeps it out.
+#[tokio::test]
+#[serial]
+async fn the_starters_auth_api_is_not_there() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for path in [
+            "/api/auth/register",
+            "/api/auth/login",
+            "/api/auth/forgot",
+            "/api/auth/reset",
+            "/api/auth/magic-link",
+            "/api/auth/resend-verification-mail",
+        ] {
+            let res = request.post(path).json(&serde_json::json!({})).await;
+            assert_eq!(res.status_code(), 404, "POST {path}");
+        }
+        for path in [
+            "/api/auth/current",
+            "/api/auth/verify/any-token",
+            "/api/auth/magic-link/any-token",
+        ] {
+            let res = request
+                .get(path)
+                .add_header(
+                    "authorization",
+                    "Bearer lo-00000000-0000-0000-0000-000000000000",
+                )
+                .await;
+            assert_eq!(res.status_code(), 404, "GET {path}");
+        }
+    })
+    .await;
+}
+
 /// Misses have a bucket of their own with the site-wide numbers: the
 /// site-wide limiter covers matched routes only.
 #[tokio::test]

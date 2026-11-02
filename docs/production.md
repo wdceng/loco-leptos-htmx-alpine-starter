@@ -209,19 +209,18 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-prod"
   machine. It's git-ignored and every deploy uploads it as `secrets.env`.
   Staging has its own, `secrets.staging.env`. Never share one between the
   two.
-- Production has no defaults for `JWT_SECRET`, `MAILER_HOST`,
-  `MAILER_USER`, `MAILER_PASSWORD` and `MAILER_FROM`. A missing one stops
-  the boot.
+- Production has no defaults for `MAILER_HOST`, `MAILER_USER`,
+  `MAILER_PASSWORD` and `MAILER_FROM`. A missing one stops the boot.
 
-Create the file once from its example, which explains every key, then put
-your real mail account in place of each `replace-me`:
+Create the file once from its example, then put your real mail account in
+place of each `replace-me`:
 
 ```bash
-umask 077 && cp secrets.production.env.example secrets.production.env && sed -i '' "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')|" secrets.production.env
+umask 077 && cp secrets.production.env.example secrets.production.env
 ```
 
-- **`JWT_SECRET` is 64 bytes,** as RFC 7518 asks of an HS512 key, Loco's.
-  `openssl` wraps its output at 64 characters; `tr` joins it into one line.
+- **An old `JWT_SECRET` line does nothing.** No config reads it since
+  sign-in moved to cookie sessions; delete it.
 
 - `MAILER_FROM` is the sender, `Name <address>`, in double quotes: the
   manual run reads the file with the shell. A sender the mailer would
@@ -396,9 +395,9 @@ ssh <server> "systemd-analyze security app-prod --no-pager | tail -1"
 | `the site folder ... is missing` | `site/` not uploaded next to the binary |
 | `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
-| a `get_env` error naming `JWT_SECRET` or `MAILER_*` | `secrets.env` missing or incomplete |
+| a `get_env` error naming `MAILER_*` | `secrets.env` missing or incomplete |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
-| `production won't start: JWT_SECRET, MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
+| `production won't start: MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

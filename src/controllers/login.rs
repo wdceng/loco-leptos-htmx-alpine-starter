@@ -22,10 +22,9 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    app::stored,
-    controllers::{auth::AuthLimit, cross_site, signed::signed_in},
+    controllers::{cross_site, signed::signed_in},
     cookies, hashing,
-    middleware::rate_limit::limited,
+    middleware::rate_limit::auth_limited,
     models::{sessions::Session, users},
     render::render_private_page,
     sql,
@@ -145,19 +144,10 @@ async fn logout(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Res
     Ok(res)
 }
 
-/// The page, its post on the auth bucket ([`AuthLimit`]), and the
-/// sign-out. The bucket missing from the store cannot happen after
-/// `after_context`; the branch that says so leaves the post under the
-/// site-wide limit rather than refusing to build the routes.
+/// The page, its post on the auth bucket (`auth_limited`), and the
+/// sign-out.
 pub fn routes(ctx: &AppContext) -> Routes {
-    let bucket = match stored::<AuthLimit>(ctx) {
-        Ok(AuthLimit(bucket)) => bucket,
-        Err(e) => {
-            tracing::error!(error = %e, "login: the post has only the site-wide limit");
-            None
-        }
-    };
     Routes::new()
-        .add(PATH, get(page).merge(limited(post(submit), bucket)))
+        .add(PATH, get(page).merge(auth_limited(ctx, post(submit))))
         .add(LOGOUT, post(logout))
 }

@@ -115,9 +115,7 @@ database:
   dangerously_truncate: false
   dangerously_recreate: false
 
-auth:
-  jwt:
-    # Local only, like development's: "e2e only, not a secret" in base64,
-    # which Loco decodes before signing (`tests/config.rs` checks it signs).
-    secret: ZTJlIG9ubHksIG5vdCBhIHNlY3JldA==
-    expiration: 86400 # 1 day
+# No `auth:` block (2026-11-02): the site signs in with sessions of its own
+# (src/models/sessions.rs), and the starter's JWT API, compiled, is not
+# mounted (src/app.rs), so nothing reads a JWT secret; the API mounted would
+# fail closed, "no JWT config found".

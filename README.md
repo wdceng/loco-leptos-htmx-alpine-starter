@@ -98,6 +98,8 @@ src-tauri/linux.sh
 
 - **Security:** headers, a CSP with a nonce per page, rate limits,
   `security.txt` ([docs/security.md](docs/security.md)).
+- **Accounts:** sign-in pages on cookie sessions, sign-up, a forgotten
+  password, email verification; Loco's JWT API left unmounted.
 - **Pages:** favicons, web manifest, 404, 429 and error pages,
   `robots.txt`, `llms.txt`.
 - **Phones:** edge to edge, 44px tap targets, Reduce Motion.

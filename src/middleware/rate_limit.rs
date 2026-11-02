@@ -17,9 +17,9 @@
 //! Numbers live under `settings.rate_limit` in `config/<env>.yaml`
 //! (see `crate::settings`). Every bucket is built here, the same way:
 //! [`site_bucket`] for the routes and the misses, and [`auth_bucket`] for
-//! the auth API's stricter one (`settings.rate_limit.auth`), built in
-//! `after_context` and attached to `/api/auth` alone with Loco's
-//! `Routes::layer` in `controllers::auth`.
+//! the auth forms' stricter one (`settings.rate_limit.auth`), built in
+//! `after_context` and attached to each auth form's POST alone
+//! ([`auth_limited`]).
 //!
 //! An answer let through carries no `x-ratelimit-*` header: a bot would
 //! read its tries left from it and pace itself just under the limit (ecs's
@@ -293,11 +293,11 @@ pub fn site_bucket(ctx: &AppContext) -> Result<Option<Bucket>> {
     bucket(ctx, Duration::from_secs(site.per_second), site.burst).map(Some)
 }
 
-/// The auth API's stricter bucket (`settings.rate_limit.auth`), `None` when
-/// the limiter is off: built in `after_context`, attached to `/api/auth`
-/// in `controllers::auth` and to the sign-in's POST ([`limited`]). A
-/// request there spends a token from both
-/// buckets; `retry-after` on a 429 is from the bucket that refused.
+/// The auth forms' stricter bucket (`settings.rate_limit.auth`), `None`
+/// when the limiter is off: built in `after_context`, parked in the shared
+/// store as [`AuthLimit`], and attached to each auth form's POST
+/// ([`auth_limited`]). A request there spends a token from both buckets;
+/// `retry-after` on a 429 is from the bucket that refused.
 ///
 /// # Errors
 /// As [`site_bucket`].
@@ -314,18 +314,28 @@ pub fn auth_bucket(ctx: &AppContext) -> Result<Option<Bucket>> {
     .map(Some)
 }
 
-/// A form's POST under `bucket`, the auth bucket for the sign-in's
-/// (`controllers::login`), when the limiter is on: on the POST alone
-/// (`route_layer`), so visits to the page with the form never spend the
-/// tokens a submission needs, and the path's 405 for another method spends
-/// none either. As an islands app on this stack limits its forms.
-pub fn limited(
-    route: MethodRouter<AppContext>,
-    bucket: Option<Bucket>,
-) -> MethodRouter<AppContext> {
-    match bucket {
-        Some(bucket) => route.route_layer(bucket),
-        None => route,
+/// The auth bucket ([`auth_bucket`]) in the shared store, because
+/// `Hooks::routes` cannot fail. `None` when the limiter is off.
+#[derive(Clone)]
+pub struct AuthLimit(pub Option<Bucket>);
+
+/// An auth form's POST under the auth bucket ([`AuthLimit`]), when the
+/// limiter is on: the sign-in, the sign-up, the forgotten password and a
+/// new verification mail, each of which takes a password or mails any
+/// address. On the POST alone (`route_layer`), so visits to the page with
+/// the form never spend the tokens a submission needs, and the path's 405
+/// for another method spends none either. As an islands app on this stack
+/// limits its forms. The bucket missing from the store cannot happen after
+/// `after_context`; the branch that says so leaves the post under the
+/// site-wide limit rather than refusing to build the routes.
+pub fn auth_limited(ctx: &AppContext, route: MethodRouter<AppContext>) -> MethodRouter<AppContext> {
+    match stored::<AuthLimit>(ctx) {
+        Ok(AuthLimit(Some(bucket))) => route.route_layer(bucket),
+        Ok(AuthLimit(None)) => route,
+        Err(e) => {
+            tracing::error!(error = %e, "rate limit: an auth form's post has only the site-wide limit");
+            route
+        }
     }
 }
 

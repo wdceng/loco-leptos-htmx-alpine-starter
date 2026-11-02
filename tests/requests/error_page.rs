@@ -102,24 +102,35 @@ async fn a_non_browser_keeps_the_original_answer() {
     .await;
 }
 
-/// The JSON API answers in JSON, even to a browser.
+/// A JSON API under `/api/` answers in JSON, even to a browser. The app
+/// mounts none (Loco's auth API is unmounted, src/app.rs), so the layer is
+/// mounted on a router with one that refuses.
 #[tokio::test]
 #[serial]
-async fn the_api_keeps_its_json() {
-    request::<App, _, _>(|request, _ctx| async move {
-        let res = request
-            .post("/api/auth/login")
-            .add_header("accept", BROWSER)
-            .json(&serde_json::json!({ "email": 1 }))
-            .await;
+async fn an_api_keeps_its_json() {
+    let boot = boot_test::<App>()
+        .await
+        .expect("Failed to boot test application");
+    let ctx = boot.app_context;
+    let router = Router::new().route(
+        "/api/refuse",
+        get(|| async { Err::<(), loco_rs::Error>(loco_rs::Error::BadRequest("no".into())) }),
+    );
+    let router = ErrorPages::from_context(&ctx)
+        .apply(router)
+        .expect("layer applies")
+        .with_state(ctx.clone());
+    let server = TestServer::new(router).expect("test server");
 
-        assert!(res.status_code().is_client_error(), "{res:?}");
-        assert!(
-            content_type(res.headers()).starts_with("application/json"),
-            "{res:?}"
-        );
-    })
-    .await;
+    let res = server
+        .get("/api/refuse")
+        .add_header("accept", BROWSER)
+        .await;
+    assert_eq!(res.status_code(), 400);
+    assert!(
+        content_type(res.headers()).starts_with("application/json"),
+        "{res:?}"
+    );
 }
 
 /// A failing handler's 500, JSON from Loco, becomes the page for a

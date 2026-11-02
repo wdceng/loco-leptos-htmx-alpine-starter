@@ -238,6 +238,15 @@ change of mind gets a new line, and the old one moves to
   once; a JWT stays good until it expires, and only a script could send
   one, where a cookie goes with every form and htmx request. One lookup
   per request. 12 hours. As an islands app on this stack signs in.
+- 2026-11-02: **Loco's auth API is unmounted, and no config has a JWT
+  key.** The sign-up, the forgotten password and a new welcome mail are
+  pages (`/register`, `/forgot`, `/verify` without a token), their posts
+  on the auth bucket with the sign-in's. No magic link: its GET handed a
+  mail scanner the token (security.md, #2), and an islands app on this
+  stack signs in without one. `controllers/auth.rs` stays compiled, as
+  Loco wrote it; an app with a client that wants tokens mounts it again
+  with an `auth:` block in each config. A key nothing reads is a secret
+  to keep and rotate for nothing.
 - 2026-11-02: **Every form refuses another site's post by
   `Sec-Fetch-Site`,** checked first: `same-origin` and `none` pass, any
   other claim is a 403; no header at all passes, as it's no browser
@@ -250,7 +259,8 @@ change of mind gets a new line, and the old one moves to
   to wait (`retry-after`, `x-ratelimit-after`). From an islands app on
   this stack.
 - 2026-10-18: **JWTs live one day.** They can't be revoked; logout and
-  longer sessions come with cookie sessions, an app's step.
+  longer sessions come with cookie sessions, an app's step. Ended
+  2026-11-02: no JWT at all.
 - 2026-10-18: **Passwords: length only, 8 to 128 characters,** as NIST SP
   800-63B advises. No composition rules; a breached-password check is an
   app's choice.
@@ -277,7 +287,7 @@ change of mind gets a new line, and the old one moves to
   Staging and the dev server lost their committed defaults: a secrets file
   without the line booted on a key anyone could read, and sign a token
   with. Their mail placeholders stay, so they still boot without a mail
-  account.
+  account. Ended 2026-11-02: no config has a JWT key.
 - 2026-10-31: **The request log names a route, never an address.** Loco's
   logger wrote the whole URI, and a reset token in the query stayed valid
   in the journal for half an hour. The project's own logger takes Loco's
@@ -286,13 +296,15 @@ change of mind gets a new line, and the old one moves to
   one mailbox, one account.
 - 2026-10-31: **The welcome mail links to a page whose button verifies**
   (`/verify`), as the reset mail's does: a mail scanner opening Loco's
-  `GET /api/auth/verify/{token}` verified the account. That route stays,
-  for an API client. No new password at verification, which would close a
+  `GET /api/auth/verify/{token}` verified the account. That route stayed
+  for an API client until the API was unmounted (2026-11-02). No new password at verification, which would close a
   press on an unexpected mail too: every new user would type one twice.
 - 2026-10-31: **A JWT secret is 64 bytes** (`openssl rand -base64 64`,
   joined into one line): RFC 7518 §3.2 says an HMAC key MUST be at least
   the hash's size, 512 bits for HS512, Loco's. The docs made 48. Secrets
-  made before keep working; a new one is made at 64.
+  made before keep working; a new one is made at 64. Ended 2026-11-02:
+  no config has a JWT key; an app that mounts the API again makes its key
+  this way.
 - 2026-10-31: **The three units keep the service to what it needs:**
   their database their own user's alone, no capabilities, an ordinary
   service's system calls and sockets. Three units share one box. A server

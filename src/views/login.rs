@@ -5,8 +5,12 @@
 use leptos::prelude::*;
 
 use crate::{
-    controllers::login::{LOGOUT, PATH},
-    views::layout::{BUTTON, FIELD, LEAD, PROBLEM, TITLE},
+    controllers::{
+        forgot,
+        login::{LOGOUT, PATH},
+        register, verify,
+    },
+    views::layout::{BUTTON, FIELD, LEAD, NextSteps, PROBLEM, TITLE},
 };
 
 /// The `id` of the line saying why the sign-in was refused.
@@ -71,6 +75,11 @@ pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
                 "Sign in"
             </button>
         </form>
+        <NextSteps links=vec![
+            (forgot::PATH, "Forgot your password?"),
+            (register::PATH, "No account yet? Sign up"),
+            (verify::PATH, "No welcome mail? Send it again"),
+        ] />
     }
 }
 
