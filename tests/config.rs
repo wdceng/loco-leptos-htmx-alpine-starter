@@ -261,6 +261,64 @@ fn every_todo_value_is_on_the_new_projects_checklist() {
     );
 }
 
+/// The folder each environment serves its files from is the one its
+/// process reads the build from (`assets::one_site_folder`, checked at
+/// boot), each read where it is set: a server's unit, in its deploy doc
+/// (`Environment=LEPTOS_SITE_ROOT=`), development's `Cargo.toml`
+/// (`site-root`), the browser tests' `e2e/run.sh`
+/// (`export LEPTOS_SITE_ROOT=`). The test environment serves none. As an
+/// islands app on this stack pins them.
+#[test]
+fn every_environment_serves_the_folder_its_build_is_read_from() {
+    /// The value after `marker` on the first line of `path` holding it,
+    /// its quotes aside.
+    fn set_in(path: &str, marker: &str) -> String {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        text.lines()
+            .find_map(|line| line.trim().strip_prefix(marker))
+            .map(|value| value.trim().trim_matches('"').to_string())
+            .unwrap_or_else(|| panic!("{path}: no `{marker}`"))
+    }
+    for (env, root) in [
+        (
+            dev_server(),
+            set_in("docs/dev-server.md", "Environment=LEPTOS_SITE_ROOT="),
+        ),
+        (
+            staging(),
+            set_in("docs/staging.md", "Environment=LEPTOS_SITE_ROOT="),
+        ),
+        (
+            Environment::Production,
+            set_in("docs/production.md", "Environment=LEPTOS_SITE_ROOT="),
+        ),
+        (
+            Environment::Development,
+            set_in("Cargo.toml", "site-root ="),
+        ),
+        (e2e(), set_in("e2e/run.sh", "export LEPTOS_SITE_ROOT=")),
+    ] {
+        let config = load(&env);
+        let served = config
+            .server
+            .middlewares
+            .static_assets
+            .as_ref()
+            .filter(|files| files.enable)
+            .map(|files| files.folder.path.as_path());
+        assert!(served.is_some(), "{env}: no static files");
+        app::assets::one_site_folder(served, &root).unwrap_or_else(|e| panic!("{env}: {e}"));
+    }
+    assert!(
+        load(&Environment::Test)
+            .server
+            .middlewares
+            .static_assets
+            .is_none_or(|files| !files.enable),
+        "the test environment serves files"
+    );
+}
+
 /// The reading itself: a call without a default is required, one with a
 /// default or in a comment is not.
 #[test]

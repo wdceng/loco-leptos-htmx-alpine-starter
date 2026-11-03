@@ -118,6 +118,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Job | Use | Where |
 |---|---|---|
 | A query of the app's own | `sqlx::query!` on `sql::pool(&ctx)` | `src/sql.rs` |
+| A transaction of the app's own. Guarded | `sql::write`: `BEGIN IMMEDIATE`, a connection a full disk left stuck closed (sqlx #4434) | `src/sql.rs` |
 | A secret handed to a browser, kept as its digest | `secret::fresh`, `digest`, `is_secret` | `src/secret.rs` |
 | A cookie written or read | `cookies::set_cookie`, `store`, `value` | `src/cookies.rs` |
 | A signed-in session: opened, found, closed | `Session` | `src/models/sessions.rs` |

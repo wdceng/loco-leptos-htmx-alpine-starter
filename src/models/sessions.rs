@@ -16,7 +16,7 @@ use axum::http::HeaderMap;
 use chrono::{DateTime, Duration, Utc};
 use sqlx::SqlitePool;
 
-use crate::{cookies, secret};
+use crate::{cookies, secret, sql};
 
 /// The cookie's name.
 pub const COOKIE: &str = "session";
@@ -44,7 +44,7 @@ impl Session {
         let digest = secret::digest(&secret);
         let now = Utc::now();
         let expires_at = now + Duration::hours(SESSION_HOURS);
-        let mut tx = pool.begin().await?;
+        let mut tx = sql::write(pool).await?;
         sqlx::query!("DELETE FROM sessions WHERE expires_at <= ?", now)
             .execute(&mut *tx)
             .await?;

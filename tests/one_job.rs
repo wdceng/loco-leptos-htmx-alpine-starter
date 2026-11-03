@@ -260,6 +260,14 @@ fn every_secret_is_made_and_digested_one_way() {
     assert_one_home("Sha256", &["secret.rs"], "`digest` (src/secret.rs)");
 }
 
+/// Every SQLx transaction begins in one place, `BEGIN IMMEDIATE`, closing
+/// a connection a full disk left stuck (sqlx #4434). Sea-ORM's own, Loco's
+/// users model's `db.begin()`, is the other library's and stays.
+#[test]
+fn every_sqlx_transaction_begins_one_way() {
+    assert_one_home("pool.begin", &["sql.rs"], "`write` (src/sql.rs)");
+}
+
 /// Whether another site's page sent a post is read in one place, which
 /// every form's target calls first.
 #[test]

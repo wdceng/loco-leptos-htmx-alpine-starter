@@ -180,6 +180,7 @@ Both, each for its own job, on one connection pool.
 | Connection | opens it (`ctx.db`) | borrows its pool: `sql::pool(&ctx)` (`src/sql.rs`) |
 | Schema | the migrations (`migration/`) | none, it reads the migrated schema |
 | Queries | Loco's own: the users/auth model, the test harness's reset | everything the app adds: `query!`, `query_as!`, `query_scalar!` |
+| Transactions | its own, `db.begin()` | `sql::write`: `BEGIN IMMEDIATE`, and a connection a full disk left stuck inside a transaction closed and the write tried again (sqlx #4434, open) |
 | Checked | Rust types, but the SQL is built at runtime | the SQL itself, at compile time, against the real schema |
 | Tools | `cargo loco db migrate`, `auto_migrate` at boot, `cargo loco generate` | `cargo sqlx prepare -- --all-targets`, the `.sqlx/` cache |
 
