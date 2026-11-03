@@ -16,7 +16,8 @@
 #      Leptos hydrates by. Workaround: parseHTMLUnsafe deleted, so htmx
 #      parses with DOMParser (public/js/htmx-islands.js), until Chrome 156
 #      is below the low bar. htmx's own fix in 4.0.1 (#4150) throws in
-#      Chrome 124 to 145, #4182, which is what is watched now.
+#      Chrome 124 to 145, #4182, which is what is watched now; the deleted
+#      function keeps 4.0.1 off that path too, so the line stays for both.
 #   5. leptos PR #4978 (issue #4959): the islands loader waits for idle time
 #      with no timeout, so Chrome 114 to 123 can start no island.
 #      Workaround: Leptos from a fork with the timeout ([patch.crates-io] in

@@ -166,9 +166,9 @@ async fn the_shell_moves_between_pages_in_place() {
 
         // htmx first, its extensions and the glue after it, Alpine last.
         let order = [
-            "/vendor/htmx-4.0.0.min.js",
-            "/vendor/hx-alpine-compat-4.0.0.min.js",
-            "/vendor/hx-preload-4.0.0.min.js",
+            "/vendor/htmx-4.0.1.min.js",
+            "/vendor/hx-alpine-compat-4.0.1.min.js",
+            "/vendor/hx-preload-4.0.1.min.js",
             "/js/htmx-islands.js",
             "/vendor/alpinejs-csp-3.17.4.min.js",
         ];

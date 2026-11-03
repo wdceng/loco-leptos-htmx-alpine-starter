@@ -86,7 +86,7 @@ src-tauri/linux.sh
 |---|---|---|
 | Server, database, accounts, e-mail, jobs | Loco's Rest API starter | Loco 1.2.0, Sea-ORM 2.0.4 |
 | Pages, rendered on the server | Leptos in islands mode | 0.8.22, from a fork ([Fixed upstream](#fixed-upstream)) |
-| Moves between pages, without a reload | htmx 4 | 4.0.0, its preload and alpine-compat extensions 4.0.0 |
+| Moves between pages, without a reload | htmx 4 | 4.0.1, its preload and alpine-compat extensions 4.0.1 |
 | Small page state, like a menu | Alpine, its CSP build | 3.17.4 |
 | Styling | Tailwind v4, its default look | v4, the one cargo-leptos downloads, unpinned |
 | The app's own queries | SQLx `query!`, checked at compile time | 0.9.0 |
@@ -231,7 +231,7 @@ crates.io whether it is; how to undo each workaround is under "Way back" in
 | Leptos: an island's state stayed in memory after htmx swapped it out | [#4952](https://github.com/leptos-rs/leptos/issues/4952) | [#4953](https://github.com/leptos-rs/leptos/pull/4953), merged, for 0.9 | An island collector (`src/collect.rs`) | Leptos 0.9; `htmx-islands.js` then calls its `$$dispose` |
 | Leptos: the islands loader waited for idle time forever, so Chrome 114 to 123 could start no island | [#4959](https://github.com/leptos-rs/leptos/issues/4959) | [#4978](https://github.com/leptos-rs/leptos/pull/4978) by Leptos's author, merged, for 0.9 | Leptos from our fork, the wait capped at 2 s, pinned in `Cargo.toml` | The Leptos release with #4978 (0.9, or a backport to 0.8) |
 | htmx: Chrome 150 to 156 drops the comments Leptos hydrates by | [#4147](https://github.com/bigskysoftware/htmx/issues/4147) | Chrome 157 | `public/js/htmx-islands.js` removes `parseHTMLUnsafe`, so htmx parses with DOMParser | **Stays** while Chrome 150 to 156 are above the low bar |
-| htmx 4.0.1: every swap fails in Chrome 124 to 145, from its own fix for the row above ([#4150](https://github.com/bigskysoftware/htmx/pull/4150)) | [#4182](https://github.com/bigskysoftware/htmx/issues/4182) | Open | htmx stays on 4.0.0 | A release that fixes #4182; then htmx can move past 4.0.0 |
+| htmx 4.0.1: every swap fails in Chrome 124 to 145, from its own fix for the row above ([#4150](https://github.com/bigskysoftware/htmx/pull/4150)) | [#4182](https://github.com/bigskysoftware/htmx/issues/4182) | Open | The same line: with `parseHTMLUnsafe` gone, htmx never makes the call | **Stays** until a release fixes #4182 and Chrome 156 is below the low bar |
 | htmx 4: an extension loaded with `defer` can miss the first page, so its links don't preload (seen in Chrome 114) | [#4170](https://github.com/bigskysoftware/htmx/issues/4170) | Closed: `defer` is outside htmx's documented way | htmx and its extensions as plain tags, as its docs show | Stays: it's the documented way |
 
 ## Docs

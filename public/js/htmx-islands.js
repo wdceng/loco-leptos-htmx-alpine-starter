@@ -8,8 +8,11 @@
 //    without it htmx falls back to DOMParser, which keeps them, in every
 //    browser, as an islands app on this stack does it. Passing options
 //    instead, the htmx maintainer's way, throws in a Chrome without the
-//    options overload (145 on Android), and every swap failed. Remove once
-//    Chrome 156 is below the low bar.
+//    options overload (145 on Android), and every swap failed. Stays past
+//    htmx 4.0.0 too: 4.0.1's fix for #4147 calls it with that second
+//    argument, which Chrome 124 to 145 refuse, every swap then failing
+//    (htmx #4182); gone, htmx never calls it. Remove only once Chrome 156
+//    is below the low bar and an htmx release has #4182's fix.
 delete Document.parseHTMLUnsafe;
 
 // In blocks, so these consts stay out of the page's global scope.

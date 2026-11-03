@@ -111,6 +111,16 @@ change of mind gets a new line, and the old one moves to
   Alpine for small page state, an island for what neither can. Vendored
   byte for byte from npm (`htmx.org` 4.0.0, `@alpinejs/csp` 3.17.4), each
   checked against the package before it came in.
+- 2026-11-03: **htmx 4.0.1,** its two extensions with it, byte for byte
+  from npm (the tarball against npm's hash; the Alpine extension
+  unchanged). Why: 4.0.0's `hx-sync … replace` could let a slow earlier
+  answer land over a newer one (#4028); 4.0.1 also cancels a delayed
+  request on a submit or reset, and fixes Back and Forward (#4067). Its
+  regression, every swap failing in Chrome 124 to 145 (#4182, open), isn't
+  ours: `delete Document.parseHTMLUnsafe` keeps htmx on `DOMParser`, so the
+  line stays on every version (`e2e/tests/health.rs` checks it on every
+  page). As an islands app on this stack moved, the same day. Proved by
+  the low bar's Chrome lanes.
 - 2026-10-18: **The `parseHTMLUnsafe` workaround** in
   `public/js/htmx-islands.js` (htmx #4147: Chrome drops the comments
   Leptos hydrates by).

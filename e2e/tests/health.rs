@@ -3,8 +3,8 @@
 //! five widths, a phone's tap targets 44px tall, nothing the accessibility
 //! audit finds, a turned phone's camera side kept clear, the top clear of a
 //! status bar over the page, Reduce Motion read and obeyed, the islands
-//! waking on every load in one tab, no script error or CSP refusal, and the
-//! skip link first on Tab. A new page goes into [`PAGES`]. What
+//! waking on every load in one tab, no script error or CSP refusal, htmx
+//! parsing with `DOMParser`, and the skip link first on Tab. A new page goes into [`PAGES`]. What
 //! needs DevTools' emulation (the insets, Reduce Motion asked for) runs in
 //! Chrome and Edge and skips elsewhere, saying why.
 
@@ -66,6 +66,29 @@ async fn no_page_has_a_script_error_or_a_csp_refusal() {
             }
         }
         assert!(found.is_empty(), "trouble:\n{}", found.join("\n"));
+        Ok(())
+    })
+    .await;
+}
+
+/// htmx parses every answer with `DOMParser` on every page: the islands
+/// script takes `Document.parseHTMLUnsafe` away (public/js/htmx-islands.js),
+/// which drops Leptos's comments in Chrome 150 to 156 (htmx #4147) and,
+/// called as htmx 4.0.1 calls it, fails every swap in Chrome 124 to 145
+/// (htmx #4182). Checked in every browser, so a page without the line fails
+/// here, not only in the Chromes it would break (docs/decisions.md,
+/// 2026-11-03).
+#[tokio::test]
+async fn htmx_parses_with_the_dom_parser_on_every_page() {
+    browse(|page| async move {
+        expect_the_miss(&page);
+        for path in PAGES {
+            page.open(path).await?;
+            let gone = page
+                .eval("return typeof Document.parseHTMLUnsafe === 'undefined' && typeof htmx === 'object'")
+                .await?;
+            assert_eq!(gone, Value::Bool(true), "{path}: parseHTMLUnsafe still there");
+        }
         Ok(())
     })
     .await;

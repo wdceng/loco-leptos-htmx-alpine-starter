@@ -101,9 +101,9 @@ fn title_text(text: &str) -> String {
 fn Scripts() -> impl IntoView {
     view! {
         <meta name="htmx-config" content=HTMX_CONFIG/>
-        <script src=vendor::HTMX_4_0_0_MIN_JS></script>
-        <script src=vendor::HX_ALPINE_COMPAT_4_0_0_MIN_JS></script>
-        <script src=vendor::HX_PRELOAD_4_0_0_MIN_JS></script>
+        <script src=vendor::HTMX_4_0_1_MIN_JS></script>
+        <script src=vendor::HX_ALPINE_COMPAT_4_0_1_MIN_JS></script>
+        <script src=vendor::HX_PRELOAD_4_0_1_MIN_JS></script>
         <script src=js::HTMX_ISLANDS_JS></script>
         <script src=vendor::ALPINEJS_CSP_3_17_4_MIN_JS defer></script>
     }
