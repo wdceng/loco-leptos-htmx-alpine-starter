@@ -151,7 +151,7 @@ settings:
   # the dev server boot; MAILER_FROM replaces it together with the other
   # MAILER_*.
   mail:
-    from: '<%= get_env(name="MAILER_FROM", default="SaaS Starter <noreply@dev.example.com>") %>'
+    from: '<%= get_env(name="MAILER_FROM", default="TODO App <noreply@dev.example.com>") %>'
   # Who may ask for a magic link (src/controllers/auth.rs): addresses on
   # these domains alone, written as after the `@`, lowercase
   # (`[example.com]`). Empty: any address.

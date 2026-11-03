@@ -46,6 +46,7 @@ fn meta() -> PageMeta {
         title: "Forgot your password".into(),
         description: "Get a link to choose a new password.".into(),
         robots: None,
+        canonical: None,
     }
 }
 

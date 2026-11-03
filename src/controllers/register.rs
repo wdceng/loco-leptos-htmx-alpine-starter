@@ -52,6 +52,7 @@ fn meta() -> PageMeta {
         title: "Sign up".into(),
         description: "Make an account.".into(),
         robots: None,
+        canonical: None,
     }
 }
 

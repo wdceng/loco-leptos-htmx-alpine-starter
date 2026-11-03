@@ -629,7 +629,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -d 'name=Ana&email=ana@example.com&pass
 ```
 
 Expected: `200`, and in the catcher's inbox (http://localhost:8025) one
-mail from `SaaS Starter <noreply@example.com>` (`settings.mail.from` in
+mail from `TODO App <noreply@example.com>` (`settings.mail.from` in
 `config/development.yaml`, never Loco's `System <system@example.com>`),
 with a verification link starting `http://localhost:5150/verify?token=`
 (`server.host` as written, not `host:port`).

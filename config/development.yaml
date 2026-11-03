@@ -150,7 +150,7 @@ settings:
   # Outgoing mail (src/mailers/): the sender on every message, `Name
   # <address>`. The local catcher on port 1025 accepts any sender.
   mail:
-    from: SaaS Starter <noreply@example.com>
+    from: TODO App <noreply@example.com>
   # Who may ask for a magic link (src/controllers/auth.rs): addresses on
   # these domains alone, written as after the `@`, lowercase
   # (`[example.com]`). Empty: any address.

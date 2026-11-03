@@ -1,4 +1,9 @@
-use app::{app::App, paths::assets::js::SAFE_AREA_JS, views::layout::APP_NAME};
+use app::{
+    app::App,
+    controllers::home::DESCRIPTION,
+    paths::assets::js::SAFE_AREA_JS,
+    views::layout::{APP_NAME, OG_LOCALE},
+};
 use chrono::Datelike;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
@@ -76,6 +81,49 @@ async fn home_renders_html() {
 /// wrapped as an island, in its server state. The browser switches it to
 /// "running" once its split chunk has loaded (docs/testing.md, "Islands in
 /// the browser").
+/// Every page carries its link preview (Open Graph, X's card) from the
+/// shell: the title and description the page names, its address absolute
+/// from `server.host`, without the query, so a mail link's token never
+/// lands in a preview. No picture in the template (`OG_IMAGE`), so the
+/// small card; no canonical link unless a page names one.
+#[tokio::test]
+#[serial]
+async fn every_page_carries_its_link_preview() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let home = request.get("/").await.text();
+        for wanted in [
+            r#"<meta property="og:type" content="website">"#.to_owned(),
+            format!(r#"<meta property="og:site_name" content="{APP_NAME}">"#),
+            format!(r#"<meta property="og:locale" content="{OG_LOCALE}">"#),
+            format!(r#"<meta property="og:title" content="{APP_NAME}">"#),
+            format!(r#"<meta property="og:description" content="{DESCRIPTION}">"#),
+            r#"<meta property="og:url" content="http://localhost:5150/">"#.to_owned(),
+            r#"<meta name="twitter:card" content="summary">"#.to_owned(),
+        ] {
+            assert!(home.contains(&wanted), "{wanted}:\n{home}");
+        }
+        assert!(!home.contains("og:image"), "{home}");
+        assert!(!home.contains(r#"rel="canonical""#), "{home}");
+
+        let reset = request.get("/reset?token=s3cret").await.text();
+        assert!(
+            reset.contains(r#"<meta property="og:url" content="http://localhost:5150/reset">"#),
+            "{reset}"
+        );
+        assert!(
+            reset.contains(&format!(
+                r#"<meta property="og:title" content="Reset your password | {APP_NAME}">"#
+            )),
+            "{reset}"
+        );
+        assert!(
+            !reset.contains("token=s3cret"),
+            "the address with its token:\n{reset}"
+        );
+    })
+    .await;
+}
+
 #[tokio::test]
 #[serial]
 async fn home_renders_the_lazy_islands_check() {

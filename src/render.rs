@@ -36,7 +36,7 @@ use crate::{
     assets::Assets,
     islands,
     settings::{NONCE_PLACEHOLDER, Settings},
-    views::layout::{PageMeta, shell},
+    views::layout::{Address, PageMeta, shell},
 };
 
 /// The header every page names its build in ([`Assets::build`]), by the
@@ -84,9 +84,22 @@ where
     let build = HeaderValue::from_str(&assets.build)
         .map_err(|e| Error::Message(format!("x-build header: {e}")))?;
 
+    let address = Address {
+        host: ctx.config.server.host.clone(),
+        path: req.uri().path().to_owned(),
+    };
+
     let render = leptos_axum::render_app_to_stream_with_context(
         move || provide_context(nonce.clone()),
-        move || shell(options.clone(), assets.clone(), meta.clone(), page()),
+        move || {
+            shell(
+                options.clone(),
+                assets.clone(),
+                address.clone(),
+                meta.clone(),
+                page(),
+            )
+        },
     );
     // A page answered to a post is the page the form was on, sent back with
     // what it refused, or the page it led to: its address stays the one the

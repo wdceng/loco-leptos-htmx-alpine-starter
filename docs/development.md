@@ -516,7 +516,8 @@ The desktops and the phones run the same app: `run` in `src-tauri/src/lib.rs`.
   your PC", _More info_, _Run anyway_. macOS: right-click the app, _Open_.
 - **A downloaded Mac app is "damaged":** macOS's quarantine on an
   unsigned app. This lifts it:
-  `xattr -dr com.apple.quarantine "/Applications/SaaS Starter.app"`
+  `xattr -dr com.apple.quarantine "/Applications/TODO App.app"`, the
+  name being `productName`'s
 - Each build is the program alone, nothing to install. Windows gets no
   installer: the `.exe` is the app, a few MB that open the site.
 - **Keep only the icons the builds read:** `icon.ico`, `icon.icns`,
@@ -630,14 +631,18 @@ iPhone:
 
 ## Start a new project
 
-Replace the template's placeholders before your first deploy. Production's
-check (`production.md`) stops on what's left.
+Replace the template's placeholders before your first deploy: every value
+reading `TODO` is one. The tab shows "TODO App" until the name is in.
+Production's boot and its deploy chain (`production.md`) stop on what's
+left; `tests/config.rs` keeps every `TODO` value in a file this table
+names.
 
 | What | Where |
 |---|---|
 | The app's name in titles, header, footer and on home screens | `APP_NAME` in `src/views/layout.rs` |
-| The description | `DESCRIPTION` in `src/controllers/home.rs` |
-| The mail sender | `config/development.yaml`, `test.yaml`, `staging.yaml`; production reads `MAILER_FROM` |
+| The description, for search, link previews and `/llms.txt` | `DESCRIPTION` in `src/controllers/home.rs` |
+| The link preview's picture, 1200×630 (optional) | `OG_IMAGE` in `src/views/layout.rs`; `OG_LOCALE` beside it for another language |
+| The mail sender | `config/development.yaml`, `config/test.yaml`, `config/e2e.yaml`, `config/dev-server.yaml`, `config/staging.yaml`; production reads `MAILER_FROM` |
 | The security contact | `contact:` under `security:` in `config/production.yaml`; production won't boot on `example.com` |
 | The tagline | `src/views/home.rs` |
 | Favicon and the apps' icons | `public/favicon/`, `src-tauri/icons/`, the phones' in `gen/`: four drawings of one logo ("The app", Icons), never the site's icon run through `cargo tauri icon` |

@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use app::settings::Settings;
+use app::{settings::Settings, views::layout::APP_NAME};
 use axum::http::HeaderValue;
 use loco_rs::{
     config::Config,
@@ -37,7 +37,7 @@ const PLACEHOLDERS: &[(&str, &str)] = &[
     ("MAILER_USER", "canary"),
     ("MAILER_PASSWORD", "canary"),
     // A sender: `settings.mail.from` is validated as one at boot.
-    ("MAILER_FROM", "SaaS Starter <canary@example.test>"),
+    ("MAILER_FROM", "TODO App <canary@example.test>"),
 ];
 
 /// The CSP of everything that is not a page (pages send their own): the
@@ -210,6 +210,55 @@ fn every_required_variable_is_in_the_example_secrets(#[case] env: Environment) {
             "{env}: config/{env}.yaml requires {name} (no default), which {path} doesn't name"
         );
     }
+}
+
+/// Every file below `dir`, the generated and built ones aside (`gen/`, the
+/// phones' projects, made again from `tauri.conf.json`; `target/`).
+fn files_below(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
+        let path = entry.expect("a directory entry").path();
+        if path.is_dir() {
+            if !path.ends_with("gen") && !path.ends_with("target") {
+                found.extend(files_below(&path));
+            }
+        } else {
+            found.push(path);
+        }
+    }
+    found
+}
+
+/// Every value the template leaves to each app reads `TODO` (`TODO App`, or
+/// a sentence starting `"TODO:`), and sits in a file "Start a new project"
+/// (docs/development.md) names, so the checklist misses none. The boot
+/// check that refuses one (src/deploy_checks.rs) is the marker's home.
+#[test]
+fn every_todo_value_is_on_the_new_projects_checklist() {
+    let guide = std::fs::read_to_string("docs/development.md").expect("the guide");
+    let checklist = guide
+        .split("## Start a new project")
+        .nth(1)
+        .and_then(|rest| rest.split("\n## ").next())
+        .expect("the checklist");
+    let mut missing = Vec::new();
+    for dir in ["src", "config", "src-tauri"] {
+        for path in files_below(Path::new(dir)) {
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue; // not text: an icon, a font
+            };
+            let name = path.display().to_string();
+            let marked = text.contains("TODO App") || text.contains("\"TODO:");
+            if marked && name != "src/deploy_checks.rs" && !checklist.contains(&format!("`{name}`"))
+            {
+                missing.push(name);
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "a TODO value in a file \"Start a new project\" doesn't name: {missing:?}"
+    );
 }
 
 /// The reading itself: a call without a default is required, one with a
@@ -604,17 +653,22 @@ fn static_files_are_limited_only_when_deployed(#[case] env: Environment, #[case]
 /// Every mail the app sends names its sender (`settings.mail.from`,
 /// src/mailers/auth.rs): Loco's own default is `System <system@example.com>`,
 /// which most SMTP services refuse. Deployed environments read it from
-/// `MAILER_FROM`, which the placeholder table stands in for here.
+/// `MAILER_FROM`, which the placeholder table stands in for here. The name
+/// on it is the app's (`APP_NAME`), so a rename shows in every config.
 #[rstest]
-#[case::development(Environment::Development, "SaaS Starter <noreply@example.com>")]
-#[case::test_env(Environment::Test, "SaaS Starter <noreply@example.com>")]
-#[case::e2e(e2e(), "SaaS Starter <noreply@example.com>")]
-#[case::dev_server(dev_server(), "SaaS Starter <canary@example.test>")]
-#[case::staging(staging(), "SaaS Starter <canary@example.test>")]
-#[case::production(Environment::Production, "SaaS Starter <canary@example.test>")]
-fn every_environment_names_the_mail_sender(#[case] env: Environment, #[case] from: &str) {
+#[case::development(Environment::Development, "<noreply@example.com>")]
+#[case::test_env(Environment::Test, "<noreply@example.com>")]
+#[case::e2e(e2e(), "<noreply@example.com>")]
+#[case::dev_server(dev_server(), "<canary@example.test>")]
+#[case::staging(staging(), "<canary@example.test>")]
+#[case::production(Environment::Production, "<canary@example.test>")]
+fn every_environment_names_the_mail_sender(#[case] env: Environment, #[case] address: &str) {
     let settings = Settings::from_config(&load(&env)).expect("settings");
-    assert_eq!(settings.mail.from, from, "{env}: settings.mail.from");
+    assert_eq!(
+        settings.mail.from,
+        format!("{APP_NAME} {address}"),
+        "{env}: settings.mail.from"
+    );
 }
 
 /// The request tests count on this: twenty requests pass, the next is a 429.

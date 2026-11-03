@@ -1,6 +1,6 @@
 {
-  "productName": "SaaS Starter",
-  "mainBinaryName": "SaaS Starter",
+  "productName": "TODO App",
+  "mainBinaryName": "TODO App",
   "version": "0.1.0",
   "identifier": "com.example.app",
   "build": {
@@ -10,7 +10,7 @@
     "windows": [
       {
         "create": false,
-        "title": "SaaS Starter",
+        "title": "TODO App",
         "url": "index.html",
         "width": 1280,
         "height": 800,

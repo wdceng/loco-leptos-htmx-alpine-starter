@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">"SaaS Starter"</string>
-    <string name="main_activity_title">"SaaS Starter"</string>
+    <string name="app_name">"TODO App"</string>
+    <string name="main_activity_title">"TODO App"</string>
 </resources>

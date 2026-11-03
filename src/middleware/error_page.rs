@@ -130,6 +130,7 @@ async fn page(
         title: heading.into(),
         description: lead.into(),
         robots: Some("noindex"),
+        canonical: None,
     };
     render_page(ctx, req, meta, move || view! { <Notice heading lead /> }).await
 }

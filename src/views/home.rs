@@ -13,7 +13,7 @@ use crate::{
 pub fn HomePage() -> impl IntoView {
     view! {
         <h1 class=TITLE>{APP_NAME}</h1>
-        <p class=LEAD>"Loco on the server, Leptos islands in the browser."</p>
+        <p class=LEAD>"TODO: what the app does for its visitor, in a line."</p>
         <IslandsCheck/>
     }
 }

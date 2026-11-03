@@ -65,6 +65,7 @@ fn meta() -> PageMeta {
         description: "Finish signing up by verifying your email address.".into(),
         // A page reached from a mail, never from a search.
         robots: Some("noindex"),
+        canonical: None,
     }
 }
 

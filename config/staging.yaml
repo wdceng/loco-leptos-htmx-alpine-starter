@@ -151,7 +151,7 @@ settings:
   # transactional service wants one it has verified. The default lets
   # staging boot; MAILER_FROM replaces it together with the other MAILER_*.
   mail:
-    from: '<%= get_env(name="MAILER_FROM", default="SaaS Starter <noreply@stg.example.com>") %>'
+    from: '<%= get_env(name="MAILER_FROM", default="TODO App <noreply@stg.example.com>") %>'
   # Who may ask for a magic link (src/controllers/auth.rs): addresses on
   # these domains alone, written as after the `@`, lowercase
   # (`[example.com]`). Empty: any address.

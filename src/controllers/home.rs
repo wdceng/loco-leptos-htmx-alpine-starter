@@ -11,10 +11,11 @@ use crate::{
     views::{home::HomePage, layout::PageMeta},
 };
 
-/// The site in one sentence: the home page's meta description, and the
-/// summary line of `/llms.txt` (controllers/llms.rs).
-pub const DESCRIPTION: &str =
-    "A full-stack starter: Loco on the server, Leptos islands in the browser.";
+/// The site in one sentence: the home page's meta description, the link
+/// preview's, the manifest's, and the summary line of `/llms.txt`
+/// (controllers/llms.rs). A `TODO` left in it refuses production's boot
+/// (src/deploy_checks.rs).
+pub const DESCRIPTION: &str = "TODO: what the site is, in one sentence.";
 
 #[debug_handler]
 async fn index(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
@@ -24,6 +25,7 @@ async fn index(State(ctx): State<AppContext>, req: Request) -> Result<Response> 
         title: String::new(),
         description: DESCRIPTION.into(),
         robots: None,
+        canonical: None,
     };
     render_page(&ctx, req, meta, || view! { <HomePage/> }).await
 }

@@ -67,6 +67,7 @@ async fn miss(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
         // The 404 status keeps it out of the index already; the tag says
         // so in the page too.
         robots: Some("noindex"),
+        canonical: None,
     };
     let mut res = render_page(&ctx, req, meta, || view! { <NotFoundPage/> }).await?;
     *res.status_mut() = StatusCode::NOT_FOUND;

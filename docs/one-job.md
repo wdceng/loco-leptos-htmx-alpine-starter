@@ -23,7 +23,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Render a page | `render_page` (CSP nonce, shell, status) | `src/render.rs` |
 | Whether a request asks for a page or a plain answer (`Accept` names HTML): the not-found page, the error pages. Guarded | `accepts_html` | `src/render.rs` |
 | The document around every page: head, header, footer, skip link | `shell` | `src/views/layout.rs` |
-| A page's language, title, description, robots tag | `PageMeta` | `src/views/layout.rs` |
+| A page's language, title, description, robots tag, canonical address | `PageMeta` | `src/views/layout.rs` |
+| A link preview (Open Graph, X's card): every page's, from the shell | `shell` with `Address`; the picture `OG_IMAGE`, the language `OG_LOCALE` | `src/views/layout.rs` |
+| A value each app fills in: `TODO` in it, its file on the checklist. Guarded | "Start a new project"; production refuses a name or description still `TODO` (`still_todo`) | `docs/development.md`, `src/deploy_checks.rs`, `tests/config.rs` |
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
 | A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers, "check your mail"). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |

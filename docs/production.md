@@ -35,7 +35,7 @@ must print nothing.
 The template's placeholders:
 
 ```bash
-grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs
+grep -n 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs
 ```
 
 The secrets file's placeholders:
@@ -59,7 +59,7 @@ LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
 ### Build and deploy
 
 ```bash
-cargo audit && ! grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs &&
+cargo audit && ! grep -n 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs &&
 test -s secrets.production.env && ! grep -q "replace_me" secrets.production.env && tools/cargo-leptos/check.sh &&
 cargo clippy --all-targets && cargo test &&
 LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&

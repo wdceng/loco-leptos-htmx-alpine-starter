@@ -10,7 +10,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: SaaS Starter
+      PRODUCT_NAME: TODO App
       PRODUCT_BUNDLE_IDENTIFIER: com.example.app
 targetTemplates:
   app:

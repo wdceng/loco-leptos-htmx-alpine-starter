@@ -82,7 +82,7 @@ settings:
       form-action 'self';
       frame-ancestors 'none'
   mail:
-    from: SaaS Starter <noreply@example.com>
+    from: TODO App <noreply@example.com>
   magic_link:
     allowed_domains: []
   nightly_restart:

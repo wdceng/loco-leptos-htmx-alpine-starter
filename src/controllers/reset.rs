@@ -59,6 +59,7 @@ fn meta() -> PageMeta {
         description: "Choose a new password for your account.".into(),
         // A page reached from a mail, never from a search.
         robots: Some("noindex"),
+        canonical: None,
     }
 }
 

@@ -111,8 +111,9 @@ fn Scripts() -> impl IntoView {
 
 /// Shown in the header, the footer, the browser tab and under the icon on a
 /// phone's home screen (the web manifest). One place to change when the
-/// app gets its real name.
-pub const APP_NAME: &str = "SaaS Starter";
+/// app gets its real name: a `TODO` left in it refuses production's boot
+/// (src/deploy_checks.rs), and the browser tab shows the marker until then.
+pub const APP_NAME: &str = "TODO App";
 
 /// The page's surface colour as hex: `--color-surface` in
 /// `style/tailwind.css` (Tailwind's white). Used where CSS can't reach: the
@@ -211,6 +212,12 @@ pub struct PageMeta {
     /// no business in search results (the not-found page, the error page).
     /// `None` renders no tag: index and follow.
     pub robots: Option<&'static str>,
+    /// The page's one address for search engines and link previews,
+    /// absolute (`server.host` first): a page reached at several addresses
+    /// (a list sorted or filtered, say) names the plain one. `None`: no
+    /// `<link rel="canonical">`, and the preview's `og:url` is the address
+    /// asked for, its query left out.
+    pub canonical: Option<String>,
 }
 
 impl PageMeta {
@@ -224,20 +231,65 @@ impl PageMeta {
     }
 }
 
+/// The language of the link previews (`og:locale`), the same as the
+/// pages' `lang`, written the way Open Graph asks (`language_TERRITORY`).
+pub const OG_LOCALE: &str = "en_US";
+
+/// The picture a link preview shows (`og:image`): 1200×630, a constant
+/// from `paths::assets` once the file is in `public/`. `None` in the
+/// template, so a preview is the small card without one.
+/// TODO: the app's own picture, as `public/img/og.png`.
+pub const OG_IMAGE: Option<&str> = None;
+
+/// Where a page is served: the public origin (`server.host`) and the
+/// path asked for, without its query (a mail link's token stays out of
+/// every preview). Link previews and the canonical address are absolute.
+#[derive(Clone, Debug)]
+pub struct Address {
+    pub host: String,
+    pub path: String,
+}
+
+impl Address {
+    /// `path` on this site, absolute.
+    #[must_use]
+    pub fn absolute(&self, path: &str) -> String {
+        format!("{}{path}", self.host.trim_end_matches('/'))
+    }
+}
+
+/// A link preview's `<meta property=…>`: Open Graph names its tags with
+/// `property`, which Leptos's `<meta>` has no attribute for.
+#[component]
+fn OgMeta(property: &'static str, #[prop(into)] content: String) -> impl IntoView {
+    leptos::html::meta()
+        .attr("property", property)
+        .attr("content", content)
+}
+
 /// Wraps `page` in the full document. `options` comes from
 /// `[package.metadata.leptos]` (or the env vars cargo-leptos sets) and
 /// tells the hydration scripts where the bundle lives. `assets` was resolved
 /// at boot (`src/assets.rs`): the stylesheet's address, hashed in a release
-/// build, and the build's name.
+/// build, and the build's name. `address` is where the page is served, for
+/// the link previews.
 pub fn shell(
     options: LeptosOptions,
     assets: Assets,
+    address: Address,
     meta: PageMeta,
     page: impl IntoView,
 ) -> impl IntoView {
     // Rendered per request on the server, so the footer never goes stale.
     // UTC rather than the server's local zone: deterministic wherever it runs.
     let year = chrono::Utc::now().year();
+    let title = full_title(&meta.title);
+    let description = Some(meta.description).filter(|text| !text.is_empty());
+    let og_url = meta
+        .canonical
+        .clone()
+        .unwrap_or_else(|| address.absolute(&address.path));
+    let og_image = OG_IMAGE.map(|path| address.absolute(path));
 
     view! {
         <!DOCTYPE html>
@@ -255,9 +307,32 @@ pub fn shell(
                 // view: a title holds characters alone, so the marker a dev
                 // build's erased view leaves after its content (`<!>`)
                 // showed in every tab, and htmx copies it on every swap.
-                <title inner_html=title_text(&full_title(&meta.title))></title>
-                <meta name="description" content=meta.description/>
+                <title inner_html=title_text(&title)></title>
+                {description.clone().map(|content| view! { <meta name="description" content=content/> })}
                 {meta.robots.map(|content| view! { <meta name="robots" content=content/> })}
+                {meta.canonical.map(|href| view! { <link rel="canonical" href=href/> })}
+                // The link preview a chat or a social site draws (Open
+                // Graph; X reads the same tags, `twitter:card` its own):
+                // the title, the description, the address and, once the
+                // app has one, the picture (`OG_IMAGE`), the large card
+                // then; the small card without it.
+                <OgMeta property="og:type" content="website"/>
+                <OgMeta property="og:site_name" content=APP_NAME/>
+                <OgMeta property="og:locale" content=OG_LOCALE/>
+                <OgMeta property="og:title" content=title/>
+                {description.map(|content| view! { <OgMeta property="og:description" content/> })}
+                <OgMeta property="og:url" content=og_url/>
+                {og_image.clone().map(|image| view! {
+                    <OgMeta property="og:image" content=image/>
+                    <OgMeta property="og:image:width" content="1200"/>
+                    <OgMeta property="og:image:height" content="630"/>
+                    <OgMeta property="og:image:alt" content=APP_NAME/>
+                })}
+                <meta
+                    name="twitter:card"
+                    content=if og_image.is_some() { "summary_large_image" } else { "summary" }
+                />
+
                 // Icons live in public/favicon, which cargo-leptos copies to
                 // target/site/favicon. Browsers also probe /favicon.ico on
                 // their own, so that one is linked explicitly. Each address
@@ -380,6 +455,7 @@ mod tests {
             title: "Reset".into(),
             description: String::new(),
             robots: None,
+            canonical: None,
         };
         assert_eq!(
             full_title(&meta.refused().title),

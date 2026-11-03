@@ -2,15 +2,17 @@
 //! sender, the subject, the text with its transfer encoding undone, and the
 //! HTML part as a mail program renders it.
 
+use app::views::layout::APP_NAME;
+
 /// Every auth mail is sent from `settings.mail.from` (`config/test.yaml`),
-/// never Loco's default `System <system@example.com>`.
+/// the app's name on it, never Loco's default `System <system@example.com>`.
 pub fn assert_from_the_configured_sender(mail: &str) {
     let from = mail
         .lines()
         .find(|line| line.starts_with("From: "))
         .unwrap_or_else(|| panic!("no From header:\n{mail}"));
     assert!(
-        from.contains("SaaS Starter") && from.contains("<noreply@example.com>"),
+        from.contains(APP_NAME) && from.contains("<noreply@example.com>"),
         "sender is not settings.mail.from: {from}"
     );
 }

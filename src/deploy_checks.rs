@@ -6,7 +6,8 @@
 //!   password that is empty or still reads `replace_me` (the placeholder
 //!   `docs/production.md` writes into `secrets.production.env`) refuses the
 //!   boot, and so does `settings.security.contact` still at the template's
-//!   `example.com`: `security.txt` would send reports nowhere. Dev-server
+//!   `example.com`: `security.txt` would send reports nowhere; and so do
+//!   the app's name and description still the template's `TODO`. Dev-server
 //!   and staging keep their mail placeholders on purpose: they boot without
 //!   a mail account, and their mail fails to send. No JWT secret is
 //!   checked: the configs carry none (src/app.rs, Loco's auth API
@@ -32,11 +33,17 @@ use tracing::{info, warn};
 
 use crate::{
     app::stored,
+    controllers::home::DESCRIPTION,
     settings::{Settings, is_local},
+    views::layout::APP_NAME,
 };
 
 /// What `docs/production.md` writes for a value still to be filled in.
 pub const PLACEHOLDER: &str = "replace_me";
+
+/// The marker in a value of the app's own the template leaves to each app
+/// (its name, its description): "Start a new project", docs/development.md.
+pub const TODO: &str = "TODO";
 
 /// The secrets a deployed boot reads, by the variable that sets them: the
 /// mail account's.
@@ -68,12 +75,13 @@ fn not_filled_in(values: &[(&'static str, String)]) -> Vec<&'static str> {
 }
 
 /// Refuses production's boot with a mail secret that is empty or still
-/// `replace_me`, or with the template's security contact. Every other
-/// environment passes.
+/// `replace_me`, with the template's security contact, or with the app's
+/// name or description still `TODO`. Every other environment passes.
 ///
 /// # Errors
 /// Production with `MAILER_HOST`, `MAILER_USER` or `MAILER_PASSWORD` not
-/// filled in, or the template's security contact.
+/// filled in, the template's security contact, or `APP_NAME` or
+/// `DESCRIPTION` still `TODO`.
 pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
     let env = &ctx.environment;
     if !matches!(env, Environment::Production) {
@@ -93,12 +101,29 @@ pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
             settings.security.contact
         )));
     }
+    let unnamed: Vec<&str> = [("APP_NAME", APP_NAME), ("DESCRIPTION", DESCRIPTION)]
+        .into_iter()
+        .filter(|(_, value)| still_todo(value))
+        .map(|(name, _)| name)
+        .collect();
+    if !unnamed.is_empty() {
+        return Err(Error::Message(format!(
+            "production won't start: {} still `{TODO}`. Fill in the app's own (\"Start a new project\", docs/development.md)",
+            unnamed.join(", ")
+        )));
+    }
     Ok(())
 }
 
 /// Whether the security contact is still the template's.
 fn contact_is_a_placeholder(contact: &str) -> bool {
     contact.contains("example.com") || contact.contains(PLACEHOLDER)
+}
+
+/// Whether a value of the app's own is still the template's: its `TODO`
+/// marker ("Start a new project", docs/development.md).
+fn still_todo(value: &str) -> bool {
+    value.contains(TODO)
 }
 
 /// An SMTP transport for `smtp`, built the way Loco's
@@ -201,5 +226,12 @@ mod tests {
         assert!(contact_is_a_placeholder("mailto:replace_me"));
         assert!(!contact_is_a_placeholder("mailto:security@shop.hr"));
         assert!(!contact_is_a_placeholder("https://shop.hr/security"));
+    }
+
+    #[test]
+    fn a_value_still_todo_is_the_templates() {
+        assert!(still_todo("TODO App"));
+        assert!(still_todo("TODO: what the site is, in one sentence."));
+        assert!(!still_todo("Ljekarna Štefan"));
     }
 }
