@@ -150,6 +150,14 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
             &format!("return location.pathname + location.search === {RESET:?}"),
         )
         .await?;
+        // The reset page swapped in: the address comes at once, the page a
+        // moment later, and htmx 4.0.1's Back marks no request to wait on
+        // (an islands app on this stack, 2026-11-03: 64 ms in Firefox).
+        page.until(
+            "the reset page in place",
+            "return !!document.querySelector('form[action=\"/reset\"]')",
+        )
+        .await?;
         page.settled().await?;
         assert!(page.in_place().await?, "Back in place");
         page.until(

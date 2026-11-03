@@ -79,6 +79,11 @@ pub const BUILD_HEADER: &str = "x-build";
 /// htmx's own keys.
 const SCROLL_KEY: &str = "pageScroll";
 
+/// htmx's mark on an entry it restores in place, written with the scroll:
+/// htmx 4.0.1 replaces a state without it, the scroll with it
+/// (docs/decisions.md, 2026-11-03).
+const HTMX_KEY: &str = "htmx";
+
 /// How long the page rests after a scroll before its entry keeps it: one
 /// write when the scrolling stops, not one a frame (Safari refuses more
 /// than a hundred history writes in thirty seconds).
@@ -231,8 +236,9 @@ fn kept_scroll() -> Option<f64> {
 }
 
 /// The current entry keeps the page's scroll in its state, htmx's own keys
-/// kept beside it (Back restores only the entries htmx marked). Best
-/// effort: a browser that refuses the write keeps the entry as it was.
+/// and its mark ([`HTMX_KEY`]) kept beside it (Back restores only the
+/// entries htmx marked). Best effort: a browser that refuses the write
+/// keeps the entry as it was.
 fn keep_scroll() {
     let (Ok(history), Ok(y)) = (window().history(), window().scroll_y()) else {
         return;
@@ -245,7 +251,9 @@ fn keep_scroll() {
     {
         Object::assign(&kept, &state);
     }
-    if Reflect::set(&kept, &JsValue::from_str(SCROLL_KEY), &JsValue::from_f64(y)).is_ok() {
+    if Reflect::set(&kept, &JsValue::from_str(SCROLL_KEY), &JsValue::from_f64(y)).is_ok()
+        && Reflect::set(&kept, &JsValue::from_str(HTMX_KEY), &JsValue::TRUE).is_ok()
+    {
         let _ = history.replace_state(&kept, "");
     }
 }

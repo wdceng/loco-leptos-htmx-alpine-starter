@@ -120,7 +120,15 @@ change of mind gets a new line, and the old one moves to
   ours: `delete Document.parseHTMLUnsafe` keeps htmx on `DOMParser`, so the
   line stays on every version (`e2e/tests/health.rs` checks it on every
   page). As an islands app on this stack moved, the same day. Proved by
-  the low bar's Chrome lanes.
+  the low bar's Chrome lanes. What else 4.0.1 broke, found by that app's
+  desktop lanes: it marks a fully loaded page's history entry
+  `{htmx: true}` only at its first swap, replacing the whole state where
+  the mark is missing, so the scroll `keep_scroll` kept there was gone
+  and Back to that page came back at its top in Firefox and Safari (their
+  Back goes through the state, Chrome's and Edge's through the Navigation
+  API). `keep_scroll` now writes htmx's mark with the scroll (`HTMX_KEY`,
+  `src/islands.rs`). And its Back marks no element `htmx-request`, so a
+  browser test waits for the page Back brings, not for htmx's requests.
 - 2026-10-18: **The `parseHTMLUnsafe` workaround** in
   `public/js/htmx-islands.js` (htmx #4147: Chrome drops the comments
   Leptos hydrates by).

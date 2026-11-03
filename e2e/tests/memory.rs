@@ -214,15 +214,22 @@ async fn back_and_forward_leave_nothing_behind() {
         page.mark().await?;
         page.add_link(RESET).await?;
         page.move_to("#e2e-link", RESET).await?;
+        // Each page waited for by what it shows, the reset page's form: the
+        // address comes at once, the page a moment later, and htmx 4.0.1's
+        // Back and Forward mark no request to wait on (an islands app on
+        // this stack, 2026-11-03).
         let step = || async {
             page.eval("history.back()").await?;
-            page.until("Back home", "return location.pathname === '/'")
-                .await?;
+            page.until(
+                "Back home",
+                "return location.pathname === '/' && !document.querySelector('form[action=\"/reset\"]')",
+            )
+            .await?;
             page.settled().await?;
             page.eval("history.forward()").await?;
             page.until(
                 "Forward to the reset page",
-                "return location.pathname === '/reset'",
+                "return location.pathname === '/reset' && !!document.querySelector('form[action=\"/reset\"]')",
             )
             .await?;
             page.settled().await
