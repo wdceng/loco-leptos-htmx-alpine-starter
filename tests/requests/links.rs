@@ -110,6 +110,15 @@ async fn the_manifest_names_the_app_and_versioned_icons() {
         let manifest: serde_json::Value = serde_json::from_str(&res.text()).expect("JSON");
         assert_eq!(manifest["name"], APP_NAME);
         assert_eq!(manifest["short_name"], SHORT_NAME);
+        // The label under the icon on an iPhone's home screen, the short
+        // name as Android's `short_name`: a full name is cut there.
+        let home = request.get("/").await.text();
+        assert!(
+            home.contains(&format!(
+                r#"<meta name="apple-mobile-web-app-title" content="{SHORT_NAME}">"#
+            )),
+            "{home}"
+        );
         assert_eq!(manifest["background_color"], SURFACE_HEX);
         assert_eq!(manifest["display"], "standalone");
         let icons = manifest["icons"].as_array().expect("icons");

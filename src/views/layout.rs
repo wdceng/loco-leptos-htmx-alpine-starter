@@ -367,9 +367,11 @@ pub fn shell(
                 // is left out: Chrome reports it as deprecated, and iOS needs
                 // it only for startup images, which this template does not
                 // have. The label under the icon on an iPhone is the Apple
-                // tag below; Android takes the manifest's.
+                // tag below, the short name, as the manifest's `short_name`
+                // Android reads: a full name is cut there (an islands app on
+                // this stack, 2026-11-03).
                 <meta name="mobile-web-app-capable" content="yes"/>
-                <meta name="apple-mobile-web-app-title" content=APP_NAME/>
+                <meta name="apple-mobile-web-app-title" content=SHORT_NAME/>
                 // Which side of a turned phone keeps its inset, marked on
                 // <html> before the stylesheet draws anything, so nothing
                 // moves on load: no `defer` (public/js/safe-area.js).

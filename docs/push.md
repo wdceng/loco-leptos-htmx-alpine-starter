@@ -6,12 +6,10 @@ with the mistakes it made on the way.
 
 ## Before you start
 
-- **Cookie sessions first** (`security.md`, "When your app grows"). A push
-  belongs to a signed-in browser: the service worker asks the site what to
-  say with that person's session, and signing out of the browser stops it.
-  The starter's auth is a JWT JSON API with no browser session.
-- **A page of the app's own** for the switch, an account page. The starter
-  has none.
+- **A push belongs to a signed-in browser,** a cookie session
+  (`src/models/sessions.rs`): the service worker asks the site what to say
+  with that person's session, and signing out of the browser stops it.
+- **A page for the switch,** the account page.
 - **Who gets pushes, and for what.** One event first (a new order, a held
   post), to the people who act on it alone.
 

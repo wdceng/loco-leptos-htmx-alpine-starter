@@ -1,0 +1,39 @@
+{
+  // Rust files get the Tailwind server beside rust-analyzer, so class
+  // names in `view!` markup get completion and hover.
+  "languages": {
+    "Rust": {
+      "language_servers": [
+        "rust-analyzer",
+        "tailwindcss-language-server",
+        "..."
+      ]
+    },
+    // The stylesheet under Tailwind's CSS mode, which knows v4's @theme
+    // and @source, in place of the plain CSS server.
+    "CSS": {
+      "language_servers": [
+        "tailwindcss-intellisense-css",
+        "!vscode-css-language-server",
+        "..."
+      ]
+    }
+  },
+  "lsp": {
+    "tailwindcss-language-server": {
+      "settings": {
+        "includeLanguages": { "rust": "html" },
+        // The same three rules as .vscode/settings.json: a `class="…"`
+        // written in place, a constant's string, a `format!`'s around its
+        // `{…}`.
+        "experimental": {
+          "classRegex": [
+            ["class\\s*=\\s*\"([^\"]*)\"", "([^\\s\"]+)"],
+            ["const\\s+[A-Z][A-Z0-9_]*\\s*:\\s*&str\\s*=\\s*\"([^\"]*)\"", "([^\\s\"]+)"],
+            ["format!\\(\\s*\"([^\"]*)\"", "([^\\s\"{}]+)"]
+          ]
+        }
+      }
+    }
+  }
+}
