@@ -35,8 +35,13 @@ must print nothing.
 The template's placeholders:
 
 ```bash
-grep -n 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs
+grep -Hn 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)'
 ```
+
+- **Comments don't count:** the config's own comments name `example.com`
+  as the template's placeholder, and stay.
+- **The chain counts the lines left with `grep -q .`:** macOS's grep
+  answers `-v` with `-q` with the wrong status.
 
 The secrets file's placeholders:
 
@@ -59,7 +64,7 @@ LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
 ### Build and deploy
 
 ```bash
-cargo audit && ! grep -n 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs &&
+cargo audit && ! grep -Hn 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)' | grep -q . &&
 test -s secrets.production.env && ! grep -q "replace_me" secrets.production.env && tools/cargo-leptos/check.sh &&
 cargo clippy --all-targets && cargo test &&
 LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&
@@ -561,32 +566,75 @@ ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload c
 
 ## Firewall (once per server)
 
-Only Cloudflare may reach ports 80 and 443. Otherwise a request straight to
-the server's IP can fake `CF-Connecting-IP` and dodge the rate limiter.
+Only Cloudflare may reach ports 80 and 443, and only your own address port
+22. Otherwise a request straight to the server's IP can fake
+`CF-Connecting-IP` and dodge the rate limiter, and anyone may try SSH.
 
 ```bash
-ssh <server> 'apt install -y ufw && ufw allow OpenSSH && for ip in $(curl -s https://www.cloudflare.com/ips-v4) $(curl -s https://www.cloudflare.com/ips-v6); do ufw allow proto tcp from $ip to any port 80,443; done && ufw --force enable && ufw status'
+ssh <server> 'apt install -y ufw && ufw allow from <your-address> to any port 22 proto tcp && for ip in $(curl -s https://www.cloudflare.com/ips-v4) $(curl -s https://www.cloudflare.com/ips-v6); do ufw allow proto tcp from $ip to any port 80,443; done && ufw --force enable && ufw status'
 ```
 
-- **`ufw allow OpenSSH` comes first.** Without it, enabling the firewall
-  locks you out.
+Strangers' SSH tries in the last day, 0 once the rule is in:
+
+```bash
+ssh <server> 'journalctl -u ssh --since -1day --no-pager | grep -ciE "invalid user|preauth"'
+```
+
+- **The SSH rule comes first.** Without it, enabling the firewall locks you
+  out.
+- **A new address at home locks SSH out.** Change the rule from your
+  provider's web console, which works from anywhere.
 - Shared box? Every site on it now needs Cloudflare in front.
 - Cloudflare's list rarely changes. If it does, run the loop again.
 
 ## Log retention (once per server)
 
 The app's logs go to the journal. They name accounts by `pid`, never by
-email, but a request log still holds IP addresses: keep 30 days, then let
-them go.
+email, but a request log still holds IP addresses: keep 30 days and at
+most 1 GB, then let them go.
 
 ```bash
-ssh <server> 'mkdir -p /etc/systemd/journald.conf.d && printf "[Journal]\nMaxRetentionSec=30day\n" > /etc/systemd/journald.conf.d/retention.conf && systemctl restart systemd-journald && journalctl --disk-usage'
+ssh <server> 'mkdir -p /etc/systemd/journald.conf.d && printf "[Journal]\nMaxRetentionSec=30day\nMaxFileSec=1week\n" > /etc/systemd/journald.conf.d/retention.conf && printf "[Journal]\nSystemMaxUse=1G\n" > /etc/systemd/journald.conf.d/size.conf && systemctl restart systemd-journald && journalctl --disk-usage'
 ```
 
 - It covers every unit on the box, the app's three included.
+- **Whole files go, a week at a time,** so the oldest line can be up to a
+  week past 30 days.
 - A different period? Change `30day` and run it again. Privacy law usually
   asks for "no longer than needed": write down why yours is the length it
   is.
+
+## The box (once per server)
+
+SSH, the kernel and the services, for every project on the box. As an
+islands app on this stack set its box, 2026-11-01.
+
+SSH: no forwarding, three tries, the ed25519 host key alone; checked
+before the reload, then a new login tried:
+
+```bash
+ssh <server> "printf 'X11Forwarding no\nAllowTcpForwarding no\nMaxAuthTries 3\nHostKey /etc/ssh/ssh_host_ed25519_key\n' > /etc/ssh/sshd_config.d/01-hardening.conf && sshd -t && systemctl reload ssh" && ssh <server> true && echo "new login ok"
+```
+
+The kernel: no ICMP redirects, faked senders dropped and logged, its own
+addresses hidden; it prints the 13 lines:
+
+```bash
+ssh <server> "printf 'net.ipv4.conf.all.accept_redirects = 0\nnet.ipv4.conf.default.accept_redirects = 0\nnet.ipv6.conf.all.accept_redirects = 0\nnet.ipv6.conf.default.accept_redirects = 0\nnet.ipv4.conf.all.send_redirects = 0\nnet.ipv4.conf.default.send_redirects = 0\nnet.ipv4.conf.all.rp_filter = 2\nnet.ipv4.conf.default.rp_filter = 2\nnet.ipv4.conf.all.log_martians = 1\nnet.ipv4.conf.default.log_martians = 1\nkernel.kptr_restrict = 1\nkernel.yama.ptrace_scope = 1\nnet.core.bpf_jit_harden = 2\n' > /etc/sysctl.d/90-hardening.conf && sysctl -p /etc/sysctl.d/90-hardening.conf"
+```
+
+One-time jobs off, since nothing uses them; it prints `disabled`:
+
+```bash
+ssh <server> "systemctl disable --now atd && systemctl is-enabled atd"
+```
+
+- **Keys only first:** password logins off in the box's own setup
+  (`PasswordAuthentication no`); `01-hardening.conf` sits beside it.
+- **VS Code's Remote-SSH needs `AllowTcpForwarding`.** Drop that line
+  before using it on the box.
+- The RSA and ECDSA host key files stay on disk unused: Debian makes them
+  again at every boot.
 
 ## The origin key (once per server)
 
