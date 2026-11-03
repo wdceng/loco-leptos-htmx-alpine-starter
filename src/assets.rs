@@ -198,11 +198,52 @@ fn hash_line<'a>(contents: &'a str, kind: &str) -> Option<&'a str> {
         .map(|(_, hash)| hash.trim())
 }
 
+/// The site folder is named twice: Loco serves the files from
+/// `static.folder.path` (`config/<env>.yaml`), and Leptos names the bundle
+/// and this module finds the stylesheet in `site_root`
+/// (`LEPTOS_SITE_ROOT`). Apart, a page would link a stylesheet resolved in
+/// one folder and be served the files of another, so the boot refuses
+/// that. `served` is `None` where the `static` block is off (the test
+/// environment), which nothing serves to compare.
+///
+/// # Errors
+/// The two name different folders, `./` aside.
+pub fn one_site_folder(served: Option<&Path>, site_root: &str) -> Result<()> {
+    let Some(served) = served else {
+        return Ok(());
+    };
+    let clean = |path: &Path| -> PathBuf {
+        path.components()
+            .filter(|part| !matches!(part, std::path::Component::CurDir))
+            .collect()
+    };
+    if clean(served) == clean(Path::new(site_root)) {
+        return Ok(());
+    }
+    Err(Error::Message(format!(
+        "two site folders: Loco serves `{}` (static.folder.path) and Leptos builds in `{site_root}` (LEPTOS_SITE_ROOT); set both to the same folder",
+        served.display()
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const UNHASHED_LOADER: &str = "__wasm_split.______________________.js";
+
+    #[test]
+    fn the_served_folder_is_the_built_one() {
+        assert!(one_site_folder(Some(Path::new("site")), "site").is_ok());
+        assert!(one_site_folder(Some(Path::new("./target/site")), "target/site").is_ok());
+        assert!(
+            one_site_folder(None, "target/site").is_ok(),
+            "nothing served"
+        );
+        let err = one_site_folder(Some(Path::new("target/site")), "target/site-release")
+            .expect_err("two folders");
+        assert!(err.to_string().contains("target/site-release"), "{err}");
+    }
 
     #[test]
     fn hashes_are_read_from_the_hash_file() {

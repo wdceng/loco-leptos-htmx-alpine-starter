@@ -421,7 +421,8 @@ An island, for what htmx and Alpine can't do:
 - **Content comes in as `children`:** it renders on the server and never
   goes to the browser. **Props are plain data:** a `String`, a number, a
   struct with `Serialize` and `Deserialize`. **Nothing server-only,** like
-  the database: ask the JSON API.
+  the database: the page's handler passes it in as props, or htmx asks
+  the server for HTML.
 
 Then clippy on both halves (Lint and Format, above).
 
@@ -755,6 +756,13 @@ Inspector), then this line in its console:
   `cargo`. It only costs a few seconds.
 - **`target/site` and `target/site-release` are wiped on every build.** Put
   static files in `public/`.
+- **One site folder.** `static.folder.path` in the config and
+  `LEPTOS_SITE_ROOT` name the same folder; the boot refuses two
+  (`assets::one_site_folder`).
+- **No `<Suspense>` in a page.** Without it the handler renders the whole
+  page before the answer starts, so a failure still becomes the error page
+  with its status. Inside one, a failure comes after the 200 went out
+  (unchecked here, Leptos's streaming).
 - **Two `Error` types.** Loco and Leptos both export one. In files that use
   both, import Leptos items by name, not `leptos::prelude::*`.
 - **`as` and `type` are keywords.** In `view!`, write `r#as` and `r#type`.

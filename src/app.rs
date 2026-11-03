@@ -83,6 +83,16 @@ impl Hooks for App {
         let conf = get_configuration(manifest.exists().then_some("Cargo.toml"))
             .map_err(|e| Error::Message(format!("leptos configuration: {e}")))?;
         let mut options = conf.leptos_options;
+        // Loco serves the folder Leptos built into, or the boot stops.
+        let served = ctx
+            .config
+            .server
+            .middlewares
+            .static_assets
+            .as_ref()
+            .filter(|assets| assets.enable)
+            .map(|assets| assets.folder.path.as_path());
+        assets::one_site_folder(served, options.site_root.as_ref())?;
         // Hashed asset names when the release build's hash file sits next
         // to the binary; switches `options.hash_files` on accordingly.
         let assets = assets::detect(&mut options, &ctx.environment)?;
