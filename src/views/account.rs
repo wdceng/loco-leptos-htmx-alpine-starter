@@ -7,12 +7,13 @@ use chrono::{DateTime, Utc};
 use leptos::prelude::*;
 
 use crate::{
-    controllers::account::{CLOSE_OTHERS, DELETE, PASSWORD, close_one},
+    controllers::account::{AVATAR, CLOSE_OTHERS, DELETE, PASSWORD, close_one},
     controllers::login::LOGOUT,
     models::{
         sessions::{Browser, PROVEN_MINUTES},
         users::{PASSWORD_MAX, PASSWORD_MIN},
     },
+    uploads::{SHRINK_SIDE, SHRINK_UNDER},
     views::{
         layout::{BUTTON, FIELD, LEAD, Notice, PROBLEM, TITLE},
         parts::{DANGER_BUTTON, Dialog, DialogCancel},
@@ -21,6 +22,9 @@ use crate::{
 
 /// A section's heading on the page.
 const HEADING: &str = "mt-12 text-2xl font-bold tracking-tight";
+
+/// The `id` of the line saying why the picture was refused.
+const AVATAR_PROBLEM: &str = "avatar-problem";
 
 /// The `id` of the line saying why the new password was refused.
 const PASSWORD_PROBLEM: &str = "password-problem";
@@ -34,6 +38,7 @@ const DELETE_DIALOG: &str = "delete-account";
 /// What a form on the page refused, by the form.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Problem {
+    Avatar(String),
     Password(String),
     Delete(String),
 }
@@ -104,10 +109,16 @@ pub fn AccountPage(
     name: String,
     email: String,
     browsers: Browsers,
+    /// The avatar's address, if one was sent.
+    avatar: Option<String>,
     proven: bool,
     problem: Option<Problem>,
     said: Option<&'static str>,
 ) -> impl IntoView {
+    let avatar_problem = match &problem {
+        Some(Problem::Avatar(said)) => Some(said.clone()),
+        _ => None,
+    };
     let password_problem = match &problem {
         Some(Problem::Password(said)) => Some(said.clone()),
         _ => None,
@@ -121,6 +132,53 @@ pub fn AccountPage(
         <h1 class=TITLE>"Your account"</h1>
         <p class=LEAD>{format!("{name}, {email}.")}</p>
         {said.map(|said| view! { <p role="status" class="mt-6 font-semibold">{said}</p> })}
+
+        <h2 class=HEADING>"Your picture"</h2>
+        {avatar
+            .map(|src| {
+                view! {
+                    <img
+                        src=src
+                        alt="Your picture"
+                        width="96"
+                        height="96"
+                        class="mt-6 size-24 rounded-full"
+                    />
+                }
+            })}
+        <ProblemLine id=AVATAR_PROBLEM said=avatar_problem.clone() />
+        // A photo shrunk in the browser before it goes (`data-shrink`, the
+        // `shrink` in islands.rs), so a phone's photo doesn't go up whole
+        // over mobile data; the server makes the avatar either way.
+        <form
+            method="post"
+            action=AVATAR
+            enctype="multipart/form-data"
+            class="mt-6 max-w-sm"
+            hx-sync="this:drop"
+            x-data="{ sending: false }"
+            x-on:htmx:before:request="sending = true"
+            x-on:htmx:finally:request="sending = false"
+            x-bind:aria-busy="sending"
+        >
+            <label for="avatar" class="block font-semibold">
+                "A photo, JPEG, PNG or WebP"
+            </label>
+            <input
+                id="avatar"
+                name="avatar"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                required
+                data-shrink=SHRINK_SIDE.to_string()
+                data-shrink-under=SHRINK_UNDER.to_string()
+                aria-describedby=avatar_problem.is_some().then_some(AVATAR_PROBLEM)
+                class=FIELD
+            />
+            <button type="submit" class=BUTTON>
+                "Save the picture"
+            </button>
+        </form>
 
         <h2 class=HEADING>"Where you're signed in"</h2>
         <ul class="mt-6 space-y-4">

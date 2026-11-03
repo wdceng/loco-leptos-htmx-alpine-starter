@@ -257,7 +257,13 @@ fn every_secret_is_made_and_digested_one_way() {
         &["secret.rs", "models/users.rs"],
         "`fresh` (src/secret.rs)",
     );
-    assert_one_home("Sha256", &["secret.rs"], "`digest` (src/secret.rs)");
+    // An upload's file named by its contents' hash is another job, a
+    // name, not a secret (src/uploads.rs, `name_of`).
+    assert_one_home(
+        "Sha256",
+        &["secret.rs", "uploads.rs"],
+        "`digest` (src/secret.rs)",
+    );
 }
 
 /// Every SQLx transaction begins in one place, `BEGIN IMMEDIATE`, closing

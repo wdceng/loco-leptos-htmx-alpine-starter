@@ -48,6 +48,8 @@ pub mod sql;
 #[cfg(feature = "ssr")]
 pub mod tasks;
 #[cfg(feature = "ssr")]
+pub mod uploads;
+#[cfg(feature = "ssr")]
 pub mod views;
 #[cfg(feature = "ssr")]
 pub mod workers;

@@ -6,6 +6,10 @@
 debug/
 target/
 
+# The pictures people upload in development (settings.uploads.path,
+# src/uploads.rs): never in git.
+/uploads/
+
 # Linux deploy artifacts (binary, hash.txt, site/) staged by the deploy
 # chains in docs/dev-server.md, docs/staging.md and docs/production.md
 # before upload.

@@ -33,6 +33,8 @@ use tera::{Context, Kwargs, State, Tera, TeraResult, Value};
 const PLACEHOLDERS: &[(&str, &str)] = &[
     ("HOST", "https://example.test"),
     ("DATABASE_URL", "sqlite://canary.sqlite?mode=rwc"),
+    // Each server's own folder by default (src/uploads.rs).
+    ("UPLOADS_PATH", "/var/lib/app-canary/uploads"),
     ("MAILER_HOST", "smtp.example.test"),
     ("MAILER_USER", "canary"),
     ("MAILER_PASSWORD", "canary"),
@@ -135,7 +137,7 @@ fn load(env: &Environment) -> Config {
 
 /// The dev server is staging's twin. Rendered with the same placeholders,
 /// which stand in for everything the unit sets (`HOST`, `DATABASE_URL`,
-/// `MAILER_*`), the two files are the same config; only the
+/// `UPLOADS_PATH`, `MAILER_*`), the two files are the same config; only the
 /// defaults behind those variables differ.
 #[test]
 fn dev_server_is_staging_on_its_own_host() {

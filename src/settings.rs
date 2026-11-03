@@ -56,6 +56,27 @@ pub struct Settings {
     /// Optional: a config without the block has no nightly restart.
     #[serde(default)]
     pub nightly_restart: NightlyRestartSettings,
+    /// Optional: a config without the block keeps uploads in `uploads/`
+    /// beside the process (src/uploads.rs).
+    #[serde(default)]
+    pub uploads: UploadsSettings,
+}
+
+/// Where the pictures people upload are kept (src/uploads.rs): a folder
+/// outside the site's, made at boot when missing. On a server, inside the
+/// unit's `StateDirectory`, the one place it may write (the deploy docs).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UploadsSettings {
+    pub path: std::path::PathBuf,
+}
+
+impl Default for UploadsSettings {
+    fn default() -> Self {
+        Self {
+            path: "uploads".into(),
+        }
+    }
 }
 
 impl Settings {

@@ -401,6 +401,7 @@ ssh <server> "systemd-analyze security app-prod --no-pager | tail -1"
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |
+| `the uploads' folder … can't be made` | `settings.uploads.path` outside the unit's `StateDirectory`, the one place it may write; the default is `/var/lib/app-prod/uploads` |
 | `Operation not permitted` | a hardening line refuses a call, which the kernel does not log: the app's own error in `journalctl -u app-prod` says what failed, then the hardening lines out one by one, the last added first |
 | `version GLIBC_2.31 not found` | server too old, see Step 0 |
 
@@ -643,8 +644,9 @@ ssh <server> -t "systemctl stop app-prod && cd /srv/app/prod && { pkill -f '^/sr
    months, subdomains and preload on. That matches the header in
    `config/production.yaml`.
 5. A backup, which the template doesn't set up: the database every night
-   with `sqlite3 … ".backup"` (never a copy of the live file), off the
-   box, `0600`, seven kept, and a restore tried once.
+   with `sqlite3 … ".backup"` (never a copy of the live file), and the
+   uploads' folder (`/var/lib/app-prod/uploads`) with it, off the box,
+   `0600`, seven kept, and a restore tried once.
 6. Submit `<domain>` at https://hstspreload.org. **Last on purpose:** from
    then on every subdomain must be https, and removal takes months.
 

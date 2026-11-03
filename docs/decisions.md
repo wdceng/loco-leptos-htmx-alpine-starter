@@ -273,6 +273,14 @@ change of mind gets a new line, and the old one moves to
   signed in isn't asked again, and the code, an app or a passkey can prove
   it later. A session's last use is written once in five minutes, not on
   every request. As an islands app on this stack has it.
+- 2026-11-04: **Uploads as an islands app on this stack makes its photos:**
+  the browser shrinks a photo before it goes (its shrink island, ported
+  without its crop), and the server decodes it as its check, makes it with
+  fixed settings and keeps only what it made, named by its hash, outside
+  the site's folder (`settings.uploads.path`, inside a server's
+  `StateDirectory`). The template's one use is an avatar, a 256-pixel
+  square JPEG: the whole path in a small example. That app's WebP and
+  AVIF sets, its placeholder and its nudity check are a shop's needs.
 - 2026-11-04: **Two roles, `member` and `admin`,** a `Role` enum an app
   extends, kept in `users.role` and read with SQLx, so Loco's users entity
   stays as generated. An islands app on this stack has three, a shop's

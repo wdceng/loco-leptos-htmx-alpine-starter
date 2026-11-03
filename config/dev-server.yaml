@@ -167,6 +167,10 @@ settings:
     enable: true
     hour: 3
     zone: UTC
+  # The pictures people upload (src/uploads.rs): inside the unit's
+  # StateDirectory, the one place it may write (docs/dev-server.md).
+  uploads:
+    path: <%= get_env(name="UPLOADS_PATH", default="/var/lib/app-dev/uploads") %>
 
 # Worker Configuration
 workers:

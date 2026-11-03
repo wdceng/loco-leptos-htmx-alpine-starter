@@ -51,6 +51,8 @@ use web_sys::{
 
 use crate::collect::collected;
 
+mod shrink;
+
 /// The page's region, the part a move between pages replaces (the shell's
 /// `#page`, views/layout.rs), by its id.
 pub const PAGE_REGION: &str = "page";
@@ -184,7 +186,19 @@ pub fn Navigation() -> impl IntoView {
             }
         });
         let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
+        // A picture chosen in a field marked `data-shrink` shrunk before
+        // its form goes (shrink.rs): on every page, as this island is.
+        let chosen = window_event_listener_untyped("change", |ev| {
+            if let Some(field) = ev
+                .target()
+                .and_then(|target| target.dyn_into::<web_sys::HtmlInputElement>().ok())
+                .filter(|field| field.has_attribute("data-shrink"))
+            {
+                shrink::chosen(field);
+            }
+        });
         on_cleanup(move || {
+            chosen.remove();
             fresher.remove();
             swapped.remove();
             settled.remove();

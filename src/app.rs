@@ -26,9 +26,9 @@ use crate::{
         rate_limit::{self, RateLimit},
         request_log::RequestLog,
     },
-    models::_entities::users,
+    models::{_entities::users, avatars::Avatars},
     settings::Settings,
-    tasks,
+    tasks, uploads,
     workers::downloader::DownloadWorker,
 };
 
@@ -98,7 +98,12 @@ impl Hooks for App {
         let assets = assets::detect(&mut options, &ctx.environment)?;
         ctx.shared_store.insert(options);
         ctx.shared_store.insert(assets);
-        ctx.shared_store.insert(Settings::from_config(&ctx.config)?);
+        let settings = Settings::from_config(&ctx.config)?;
+        // The avatars' folder, made now, so a server that may not write
+        // there says so at boot (src/uploads.rs).
+        ctx.shared_store
+            .insert(Avatars(uploads::avatars_folder(&settings.uploads)?));
+        ctx.shared_store.insert(settings);
         // A production mail secret that is set but empty or still
         // `replace_me` refuses the boot; a missing one `get_env` refused
         // already.
@@ -188,7 +193,8 @@ impl Hooks for App {
             .add_route(controllers::security_txt::routes())
             .add_route(controllers::llms::routes())
             .add_route(controllers::manifest::routes())
-            .add_route(controllers::up::routes());
+            .add_route(controllers::up::routes())
+            .add_route(controllers::uploads::routes());
         // The parts on one page, for the browser tests alone.
         if controllers::parts::mounted_in(&ctx.environment) {
             routes.add_route(controllers::parts::routes())

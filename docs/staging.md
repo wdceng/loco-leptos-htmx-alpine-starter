@@ -361,6 +361,7 @@ ssh <server> "systemd-analyze security app-stg --no-pager | tail -1"
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |
+| `the uploads' folder … can't be made` | `settings.uploads.path` outside the unit's `StateDirectory`, the one place it may write; the default is `/var/lib/app-stg/uploads` |
 | `Operation not permitted` | a hardening line refuses a call, which the kernel does not log: the app's own error in `journalctl -u app-stg` says what failed, then the hardening lines out one by one, the last added first |
 | `version GLIBC_2.31 not found` | server too old, see Step 0 |
 

@@ -105,6 +105,9 @@ settings:
     enable: false
     hour: 3
     zone: UTC
+  # The tests' uploads, in the build folder, never the repo's.
+  uploads:
+    path: target/test-uploads
 
 # Worker Configuration
 workers:

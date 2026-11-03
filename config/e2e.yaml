@@ -89,6 +89,9 @@ settings:
     enable: false
     hour: 3
     zone: UTC
+  # The browser tests' uploads, in the build folder.
+  uploads:
+    path: target/e2e/uploads
 
 workers:
   mode: BackgroundAsync

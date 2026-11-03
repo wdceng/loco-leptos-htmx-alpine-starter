@@ -15,7 +15,7 @@
 use axum::{
     Form,
     body::Body,
-    extract::{Path, Request},
+    extract::{DefaultBodyLimit, Multipart, Path, Request},
     http::{StatusCode, header::LOCATION, request::Parts},
 };
 // Named import on purpose: `leptos::prelude::*` also exports an `Error`
@@ -25,15 +25,17 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
+    app::stored,
     controllers::{cross_site, signed::Signed},
     cookies,
     middleware::rate_limit::auth_limited,
     models::{
+        avatars::{self, Avatars},
         sessions::Session,
         users::{self, password_problem},
     },
     render::render_private_page,
-    sql,
+    sql, uploads,
     views::{
         account::{AccountDeleted, AccountPage, Browsers, Problem},
         layout::PageMeta,
@@ -51,6 +53,9 @@ pub const CLOSE_ONE: &str = "/account/browsers/{id}/close";
 
 /// The new password's target.
 pub const PASSWORD: &str = "/account/password";
+
+/// The avatar's target.
+pub const AVATAR: &str = "/account/avatar";
 
 /// The deletion's target.
 pub const DELETE: &str = "/account/delete";
@@ -103,12 +108,17 @@ async fn answer(
     problem: Option<Problem>,
     said: Option<&'static str>,
 ) -> Result<Response> {
+    let pool = sql::pool(ctx);
     let browsers = Browsers::of(
-        Session::browsers(sql::pool(ctx), signed.user.id)
+        Session::browsers(pool, signed.user.id)
             .await
             .map_err(Error::wrap)?,
         signed.session.id,
     );
+    let avatar = avatars::of(pool, signed.user.id)
+        .await
+        .map_err(Error::wrap)?
+        .map(|name| format!("{}{name}", uploads::PREFIX));
     let meta = if problem.is_some() {
         meta().refused()
     } else {
@@ -125,6 +135,7 @@ async fn answer(
                 name=name.clone()
                 email=email.clone()
                 browsers=browsers.clone()
+                avatar=avatar.clone()
                 proven=proven
                 problem=problem.clone()
                 said=said
@@ -138,6 +149,77 @@ async fn answer(
 #[debug_handler]
 async fn page(State(ctx): State<AppContext>, signed: Signed, req: Request) -> Result<Response> {
     answer(&ctx, req, signed, StatusCode::OK, None, None).await
+}
+
+/// `POST /account/avatar`: the picture sent made into the avatar
+/// (src/uploads.rs), off the async threads, then the page again; the one
+/// it replaces gone once nobody shows it. Refused, the page with the
+/// reason, its title starting "Error: ".
+async fn avatar(
+    State(ctx): State<AppContext>,
+    signed: Signed,
+    parts: Parts,
+    mut form: Multipart,
+) -> Result<Response> {
+    if let Some(forbidden) = cross_site::refused(&parts.headers, "avatar") {
+        return Ok(forbidden);
+    }
+    let req = Request::from_parts(parts, Body::empty());
+    let mut upload = Vec::new();
+    while let Ok(Some(field)) = form.next_field().await {
+        if field.name() == Some("avatar") {
+            upload = field
+                .bytes()
+                .await
+                .map(|bytes| bytes.to_vec())
+                .unwrap_or_default();
+        }
+    }
+    let made = if upload.is_empty() {
+        Err("Choose a picture first.")
+    } else {
+        tokio::task::spawn_blocking(move || uploads::avatar(&upload))
+            .await
+            .map_err(Error::wrap)?
+    };
+    let jpeg = match made {
+        Ok(jpeg) => jpeg,
+        Err(reason) => {
+            let problem = Problem::Avatar(reason.to_string());
+            return answer(
+                &ctx,
+                req,
+                signed,
+                StatusCode::BAD_REQUEST,
+                Some(problem),
+                None,
+            )
+            .await;
+        }
+    };
+    let Avatars(folder) = stored(&ctx)?;
+    let name = uploads::keep(&folder, &jpeg).await.map_err(Error::wrap)?;
+    let pool = sql::pool(&ctx);
+    let before = avatars::set(pool, signed.user.id, Some(&name))
+        .await
+        .map_err(Error::wrap)?;
+    if let Some(before) = before.filter(|before| *before != name) {
+        forget_unused(&ctx, &folder, &before).await?;
+    }
+    tracing::info!(pid = signed.user.pid.to_string(), "avatar changed");
+    let said = "Your picture is changed.";
+    answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
+}
+
+/// The avatar `name` taken away from `folder` once no user shows it.
+async fn forget_unused(ctx: &AppContext, folder: &std::path::Path, name: &str) -> Result<()> {
+    if !avatars::in_use(sql::pool(ctx), name)
+        .await
+        .map_err(Error::wrap)?
+    {
+        uploads::forget(folder, name).await.map_err(Error::wrap)?;
+    }
+    Ok(())
 }
 
 /// `POST /account/browsers/{id}/close`: that browser signed out, if it is
@@ -260,12 +342,21 @@ async fn delete(
         )
         .await;
     }
-    Session::close_all(sql::pool(&ctx), signed.user.id)
+    let pool = sql::pool(&ctx);
+    Session::close_all(pool, signed.user.id)
+        .await
+        .map_err(Error::wrap)?;
+    let avatar = avatars::of(pool, signed.user.id)
         .await
         .map_err(Error::wrap)?;
     users::Entity::delete_by_id(signed.user.id)
         .exec(&ctx.db)
         .await?;
+    // The picture with the account, once nobody else shows it.
+    if let Some(avatar) = avatar {
+        let Avatars(folder) = stored(&ctx)?;
+        forget_unused(&ctx, &folder, &avatar).await?;
+    }
     tracing::info!(pid = signed.user.pid.to_string(), "account deleted");
     let mut res = (StatusCode::SEE_OTHER, [(LOCATION, DELETED)]).into_response();
     cookies::store(&mut res, &Session::cookie_deleted(cookies::secure(&ctx)))?;
@@ -293,6 +384,13 @@ pub fn routes(ctx: &AppContext) -> Routes {
         .add(CLOSE_ONE, post(close))
         .add(CLOSE_OTHERS, post(close_others))
         .add(PASSWORD, auth_limited(ctx, post(password)))
+        // The upload's own body limit, over the site's 64 KB: axum's
+        // `DefaultBodyLimit`, which Loco's `limit_payload` sets for every
+        // route and this route's layer, the inner one, overrides.
+        .add(
+            AVATAR,
+            auth_limited(ctx, post(avatar)).route_layer(DefaultBodyLimit::max(uploads::MAX_BYTES)),
+        )
         .add(DELETE, auth_limited(ctx, post(delete)))
         .add(DELETED, get(deleted))
 }

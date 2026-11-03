@@ -127,6 +127,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 |---|---|---|
 | A query of the app's own | `sqlx::query!` on `sql::pool(&ctx)` | `src/sql.rs` |
 | A transaction of the app's own. Guarded | `sql::write`: `BEGIN IMMEDIATE`, a connection a full disk left stuck closed (sqlx #4434) | `src/sql.rs` |
+| A picture someone uploads: checked, made with fixed settings, kept outside the site's folder, named by its hash, served for a year | `uploads::avatar`, `keep`, `forget`, `name_of`; `settings.uploads.path`; served by `controllers::uploads` | `src/uploads.rs`, `src/controllers/uploads.rs` |
+| A photo shrunk in the browser before it goes | a file field's `data-shrink` and `data-shrink-under`, the `shrink` the `Navigation` island arms | `src/islands/shrink.rs` |
+| A user's avatar | `avatars::of`, `set`, `in_use`; the folder `Avatars` | `src/models/avatars.rs` |
 | A secret handed to a browser, kept as its digest | `secret::fresh`, `digest`, `is_secret` | `src/secret.rs` |
 | A cookie written or read | `cookies::set_cookie`, `store`, `value` | `src/cookies.rs` |
 | A signed-in session: opened, found, closed | `Session` | `src/models/sessions.rs` |

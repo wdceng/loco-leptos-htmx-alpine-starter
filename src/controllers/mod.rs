@@ -14,4 +14,5 @@ pub mod robots;
 pub mod security_txt;
 pub mod signed;
 pub mod up;
+pub mod uploads;
 pub mod verify;

@@ -271,3 +271,139 @@ async fn another_sites_post_changes_nothing() {
     })
     .await;
 }
+
+/// A PNG of `width` by `height`, one colour.
+fn png(width: u32, height: u32, shade: u8) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    image::RgbImage::from_pixel(width, height, image::Rgb([shade, 0, 0]))
+        .write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
+        .expect("a PNG");
+    bytes
+}
+
+/// The avatar's form as a browser sends it, `picture` in its file field.
+fn avatar_form(picture: &[u8]) -> (String, axum::body::Bytes) {
+    const BOUNDARY: &str = "picture-boundary";
+    let mut body = format!(
+        "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"me.png\"\r\nContent-Type: image/png\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(picture);
+    body.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
+    (
+        format!("multipart/form-data; boundary={BOUNDARY}"),
+        body.into(),
+    )
+}
+
+/// The avatar's address on the account page.
+fn avatar_src(page: &str) -> String {
+    page.split(r#"<img src=""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("the avatar shown")
+        .to_string()
+}
+
+/// A picture sent becomes the avatar, served for a year; a new one takes
+/// its place and the old file goes; what isn't a picture is refused; the
+/// account's deletion takes the file away.
+#[tokio::test]
+#[serial]
+async fn the_avatar_is_made_served_replaced_and_taken_away() {
+    request::<App, _, _>(|request, ctx| async move {
+        user(&ctx, EMAIL, true).await;
+        let here = session_cookie(&request, EMAIL, MAC).await;
+
+        let page = request
+            .get("/account")
+            .add_header("cookie", here.clone())
+            .await
+            .text();
+        for wanted in [
+            r#"enctype="multipart/form-data""#,
+            r#"data-shrink="1024""#,
+            r#"data-shrink-under="1000000""#,
+        ] {
+            assert!(page.contains(wanted), "{wanted}: {page}");
+        }
+        assert!(!page.contains("<img src="), "no avatar yet");
+
+        let (kind, body) = avatar_form(&png(640, 480, 10));
+        let sent = request
+            .post("/account/avatar")
+            .add_header("cookie", here.clone())
+            .bytes(body)
+            .content_type(&kind)
+            .await;
+        assert_eq!(sent.status_code(), 200, "{}", sent.text());
+        let first = avatar_src(&sent.text());
+        assert!(first.starts_with("/uploads/avatars/"), "{first}");
+        let file = request.get(&first).await;
+        assert_eq!(file.status_code(), 200);
+        assert_eq!(file.header("content-type"), "image/jpeg");
+        assert_eq!(
+            file.header("cache-control"),
+            "public, max-age=31536000, immutable"
+        );
+        let made = image::load_from_memory(file.as_bytes()).expect("a picture");
+        assert_eq!((made.width(), made.height()), (256, 256));
+
+        let (kind, body) = avatar_form(&png(500, 500, 200));
+        let again = request
+            .post("/account/avatar")
+            .add_header("cookie", here.clone())
+            .bytes(body)
+            .content_type(&kind)
+            .await;
+        let second = avatar_src(&again.text());
+        assert_ne!(first, second);
+        assert_eq!(
+            request.get(&first).await.status_code(),
+            404,
+            "the old file gone"
+        );
+
+        let (kind, body) = avatar_form(b"not a picture");
+        let refused = request
+            .post("/account/avatar")
+            .add_header("cookie", here.clone())
+            .bytes(body)
+            .content_type(&kind)
+            .await;
+        assert_eq!(refused.status_code(), 400);
+        assert!(refused.text().contains("That isn't a picture we can use"));
+
+        let deleted = request
+            .post("/account/delete")
+            .add_header("cookie", here)
+            .form(&serde_json::json!({}))
+            .await;
+        assert_eq!(deleted.status_code(), 303);
+        assert_eq!(
+            request.get(&second).await.status_code(),
+            404,
+            "gone with the account"
+        );
+    })
+    .await;
+}
+
+/// Only a name the pictures are given is served: nothing outside the
+/// folder.
+#[tokio::test]
+#[serial]
+async fn only_an_avatars_own_name_is_served() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for path in [
+            "/uploads/avatars/..%2F..%2FCargo.toml",
+            "/uploads/avatars/abc.jpg",
+        ] {
+            assert_eq!(request.get(path).await.status_code(), 404, "{path}");
+        }
+    })
+    .await;
+}
