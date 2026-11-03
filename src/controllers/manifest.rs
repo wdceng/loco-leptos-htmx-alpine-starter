@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 use crate::{
     controllers::home::DESCRIPTION,
     paths::{self, assets},
-    views::layout::{APP_NAME, BRAND_HEX, SURFACE_HEX},
+    views::layout::{APP_NAME, BRAND_HEX, SHORT_NAME, SURFACE_HEX},
 };
 
 /// The manifest as JSON.
@@ -28,7 +28,7 @@ pub fn body() -> Value {
     json!({
         "id": "/",
         "name": APP_NAME,
-        "short_name": APP_NAME,
+        "short_name": SHORT_NAME,
         "description": DESCRIPTION,
         "lang": "en",
         "start_url": "/",

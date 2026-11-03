@@ -144,6 +144,16 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
         }
         assert!(before > 0.0, "the reset page scrolls in 300 pixels");
         page.move_to("#e2e-link", "/").await?;
+        // The move's page at its top (src/islands.rs, iOS's dropped scroll
+        // asked again), and the entry htmx pushed carrying its mark, which
+        // htmx 4.0.1 asks for before it restores an entry in place.
+        page.until("the new page at its top", "return window.scrollY === 0")
+            .await?;
+        assert_eq!(
+            page.eval("return history.state?.htmx === true").await?,
+            Value::Bool(true),
+            "htmx's mark in the home page's entry"
+        );
         page.eval("history.back()").await?;
         page.until(
             "the reset page back",
@@ -165,6 +175,13 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
             &format!("return Math.abs(window.scrollY - {before}) < 2"),
         )
         .await?;
+        // Its scroll still in the reset page's entry, by its key: htmx 4.0.1
+        // replaced a state without its mark, the scroll with it.
+        assert_eq!(
+            page.eval("return typeof history.state?.pageScroll").await?,
+            Value::from("number"),
+            "the reset page's scroll kept in its entry"
+        );
         Ok(())
     })
     .await;

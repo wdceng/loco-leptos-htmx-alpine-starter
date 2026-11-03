@@ -15,8 +15,12 @@
 //! Android the status bar takes the page's colour as each page loads
 //! (`paint_status_bar`).
 
+#[cfg(desktop)]
+use tauri::WebviewUrl;
+#[cfg(desktop)]
+use tauri::webview::NewWindowResponse;
 use tauri::webview::PageLoadEvent;
-use tauri::{Url, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Url, WebviewWindow, WebviewWindowBuilder, utils::config::WindowConfig};
 use tauri_plugin_opener::OpenerExt;
 
 /// Starts the app. The phones call it through `mobile_entry_point`, which
@@ -49,41 +53,99 @@ pub fn run() {
                 .csp
                 .as_ref()
                 .and_then(|csp| site_of(&csp.to_string()));
-            let handle = app.handle().clone();
-            WebviewWindowBuilder::from_config(app.handle(), &window)?
-                .on_navigation(move |url| match destination(url, site.as_ref()) {
-                    Destination::App => true,
-                    Destination::Nowhere => {
-                        eprintln!("{url} not opened: neither the app's nor one the system opens");
-                        false
-                    }
-                    Destination::System => {
-                        // Off the thread this hook runs on: Android calls it
-                        // on its UI thread, where the opener's own Kotlin
-                        // then waits to run, and the two waited for each
-                        // other, the app frozen (an islands app on this
-                        // stack, 2026-10-29).
-                        let (handle, address) = (handle.clone(), url.to_string());
-                        tauri::async_runtime::spawn_blocking(move || {
-                            if let Err(error) = handle.opener().open_url(&address, None::<&str>) {
-                                eprintln!("{address} could not be handed to the system: {error}");
-                            }
-                        });
-                        false
-                    }
-                })
-                .on_page_load(|window, payload| {
-                    if payload.event() == PageLoadEvent::Finished {
-                        paint_status_bar(&window);
-                    }
-                })
-                .build()?;
+            watched(app.handle(), &window, site)?.build()?;
             Ok(())
         })
         .run(tauri::generate_context!());
     if let Err(error) = started {
         eprintln!("the app could not start: {error}");
     }
+}
+
+/// The window `config` describes, its navigation watched: an address the
+/// page follows goes where [`destination`] says, and on the desktops a link
+/// to a new tab too ([`new_window`]). Every window of the app is built
+/// here, the first and the ones a link opens.
+fn watched<'a>(
+    handle: &'a AppHandle,
+    config: &WindowConfig,
+    site: Option<Url>,
+) -> tauri::Result<WebviewWindowBuilder<'a, tauri::Wry, AppHandle>> {
+    let builder = WebviewWindowBuilder::from_config(handle, config)?;
+    #[cfg(desktop)]
+    let builder = {
+        let (handle, config, site) = (handle.clone(), config.clone(), site.clone());
+        builder
+            .on_new_window(move |url, _features| new_window(&handle, &config, site.as_ref(), &url))
+    };
+    let handle = handle.clone();
+    Ok(builder
+        .on_navigation(move |url| match destination(url, site.as_ref()) {
+            Destination::App => true,
+            Destination::Nowhere => {
+                eprintln!("{url} not opened: neither the app's nor one the system opens");
+                false
+            }
+            Destination::System => {
+                to_system(&handle, url);
+                false
+            }
+        })
+        .on_page_load(|window, payload| {
+            if payload.event() == PageLoadEvent::Finished {
+                paint_status_bar(&window);
+            }
+        }))
+}
+
+/// `url` handed to the system: the browser, or the app its scheme is for.
+/// Off the thread the hooks run on: Android calls them on its UI thread,
+/// where the opener's own Kotlin then waits to run, and the two waited for
+/// each other, the app frozen (an islands app on this stack, 2026-10-29).
+fn to_system(handle: &AppHandle, url: &Url) {
+    let (handle, address) = (handle.clone(), url.to_string());
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Err(error) = handle.opener().open_url(&address, None::<&str>) {
+            eprintln!("{address} could not be handed to the system: {error}");
+        }
+    });
+}
+
+/// A link to a new tab, on the desktops (Tauri's hook has none on the
+/// phones, where an outside one reaches `on_navigation` first): another
+/// site's to the system, as any other address; the site's own in a second
+/// window of the app's, its new tab, so the page it was followed from (a
+/// form half filled) stays where it was. That window is the first's, from
+/// its config, its hooks the same ([`watched`]); the webview's own new
+/// window refused either way. Windows' webview did nothing with such a
+/// link without this hook, and Apple's opened no window for the site's own
+/// (an islands app on this stack, 2026-11-03). Untested here on Windows and
+/// on a Linux desktop.
+#[cfg(desktop)]
+fn new_window(
+    handle: &AppHandle,
+    config: &WindowConfig,
+    site: Option<&Url>,
+    url: &Url,
+) -> NewWindowResponse<tauri::Wry> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static OPENED: AtomicUsize = AtomicUsize::new(0);
+    match destination(url, site) {
+        Destination::System => to_system(handle, url),
+        Destination::Nowhere => {
+            eprintln!("{url} not opened: neither the app's nor one the system opens");
+        }
+        Destination::App => {
+            let mut tab = config.clone();
+            tab.label = format!("tab-{}", OPENED.fetch_add(1, Ordering::Relaxed) + 1);
+            tab.url = WebviewUrl::External(url.clone());
+            if let Err(error) = watched(handle, &tab, site.cloned()).and_then(|tab| tab.build()) {
+                eprintln!("{url} could not open in a window of its own: {error}");
+            }
+        }
+    }
+    NewWindowResponse::Deny
 }
 
 /// Android's status bar takes the page's own `theme-color`, the gradient
@@ -268,6 +330,41 @@ mod tests {
         assert!(
             code.contains(".open_js_links_on_click(false)"),
             "the opener's link script not turned off"
+        );
+    }
+
+    /// On the desktops a link to a new tab goes through `new_window`,
+    /// which `watched` wires to Tauri's hook for every window it builds,
+    /// and the webview's own new window is refused whatever the link, the
+    /// site's own opened in a window of the app's with the same hooks
+    /// (an islands app on this stack, 2026-11-03: Windows' webview had
+    /// done nothing with such a link). Read from this file's code above its
+    /// tests.
+    #[test]
+    fn the_desktops_links_to_a_new_tab_go_through_new_window() {
+        let code = include_str!("lib.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or_default();
+        let body = |definition: &str| {
+            code.split_once(definition)
+                .and_then(|(_, rest)| rest.split_once("\n}\n"))
+                .map(|(body, _)| body)
+                .unwrap_or_default()
+        };
+        let watched = body("fn watched<");
+        let gate = watched.find("#[cfg(desktop)]");
+        let hook = watched.find(".on_new_window(");
+        assert!(
+            gate.zip(hook).is_some_and(|(gate, hook)| gate < hook)
+                && watched.contains("new_window(&handle"),
+            "the desktops' new-tab hook not wired to new_window in watched"
+        );
+        assert!(
+            body("fn new_window(")
+                .trim_end()
+                .ends_with("NewWindowResponse::Deny"),
+            "new_window lets the webview's own window through"
         );
     }
 }

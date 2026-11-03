@@ -147,6 +147,7 @@ pub fn Navigation() -> impl IntoView {
         });
         let swapped = window_event_listener_untyped("htmx:after:swap", |_| {
             if moved() {
+                at_the_top_again();
                 arrive();
             }
         });
@@ -264,6 +265,24 @@ fn restored() {
     if let Some(top) = RESTORING.take() {
         scroll_to(top);
     }
+}
+
+/// A move's new page, which htmx's swap puts at its top (`show:top`, the
+/// shell's `hx-boost`), asked there again a frame later where it isn't:
+/// iOS's WebKit drops a scroll right after the swap now and then, and the
+/// new page showed at its foot; the second always takes (an islands app on
+/// this stack, a probe on the iPhone, 2026-11-03). An address with a `#`
+/// is left where it went.
+fn at_the_top_again() {
+    request_animation_frame(|| {
+        let anchored = window()
+            .location()
+            .hash()
+            .is_ok_and(|hash| !hash.is_empty());
+        if !anchored && window().scroll_y().is_ok_and(|y| y != 0.0) {
+            scroll_to(0.0);
+        }
+    });
 }
 
 /// The page scrolled to `top` at once, never a smooth glide from wherever

@@ -538,8 +538,14 @@ The desktops and the phones run the same app: `run` in `src-tauri/src/lib.rs`.
   an Apple-silicon Mac, hence the minutes; arm64 builds at full speed. The
   box is about 3 GB. The AppImage carries WebKitGTK and GTK themselves
   (169 libraries, 81 MB packed), so nothing is installed first.
-- **The Linux binary is `saa-s-starter`:** Tauri writes the product name
-  in kebab-case into the AppImage. The file keeps the name with its space.
+- **The Linux binary is the product name in kebab-case** (`todo-app`
+  until the name is in): Tauri writes it so into the AppImage. The file
+  keeps the name with its space.
+- **A link to a new tab opens a second window of the app** on the
+  desktops, the site's own page in it; another site's goes to the browser
+  (`new_window`, `src-tauri/src/lib.rs`). Windows' webview did nothing
+  with such a link before. Untested here on Windows and on a Linux
+  desktop.
 - **Tauri warns that `com.example.app` ends in `.app`,** the Mac's bundle
   extension. A project's identifier shouldn't (README, "Start a new
   project").
@@ -596,6 +602,10 @@ The phones:
 - **Apple may turn down an app that only shows a website** (its review
   guideline 4.2): a store app should do something the site can't, such as
   push.
+- **Built with the iOS 27 SDK, an app may need `UIApplicationSceneManifest`
+  in its `Info.plist` to launch** (Tauri #15719, cargo-mobile2 #519, both
+  open). Ours has none and starts on the Simulator with Xcode 27.2; a real
+  device or an App Store build is unchecked.
 - **The app's webview lies under the status bar** on iOS, iPadOS and
   Android (`viewport-fit=cover`; `enableEdgeToEdge` in `MainActivity.kt`):
   the page's top adds `--safe-area-top` ("Phones: safe areas and browser
@@ -641,6 +651,7 @@ names.
 | What | Where |
 |---|---|
 | The app's name in titles, header, footer and on home screens | `APP_NAME` in `src/views/layout.rs` |
+| A short name, where a home screen has room for a word or two | `SHORT_NAME` in `src/views/layout.rs` (the site's, Android's home screen); the iPhone app's `CFBundleDisplayName` in `src-tauri/gen/apple/app-native_iOS/Info.plist`, which `tauri ios build` keeps; the Android app's `app_name` and `main_activity_title` in `src-tauri/gen/android/app/src/main/res/values/strings.xml`, both, the home screen showing the second |
 | The description, for search, link previews and `/llms.txt` | `DESCRIPTION` in `src/controllers/home.rs` |
 | The link preview's picture, 1200×630 (optional) | `OG_IMAGE` in `src/views/layout.rs`; `OG_LOCALE` beside it for another language |
 | The mail sender | `config/development.yaml`, `config/test.yaml`, `config/e2e.yaml`, `config/dev-server.yaml`, `config/staging.yaml`; production reads `MAILER_FROM` |

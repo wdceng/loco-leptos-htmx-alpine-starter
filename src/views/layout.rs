@@ -115,6 +115,13 @@ fn Scripts() -> impl IntoView {
 /// (src/deploy_checks.rs), and the browser tab shows the marker until then.
 pub const APP_NAME: &str = "TODO App";
 
+/// The app's name where a home screen has room for a word or two: the web
+/// manifest's `short_name`, under the site's icon on an Android home
+/// screen. The apps' own labels are set in their projects
+/// ("Start a new project", docs/development.md). As an islands app on this
+/// stack names it.
+pub const SHORT_NAME: &str = "TODO App";
+
 /// The page's surface colour as hex: `--color-surface` in
 /// `style/tailwind.css` (Tailwind's white). Used where CSS can't reach: the
 /// `theme-color` tag and the manifest's `background_color`. Change it

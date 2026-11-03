@@ -14,7 +14,7 @@ use app::{
     app::App,
     middleware::rate_limit,
     paths,
-    views::layout::{APP_NAME, SURFACE_HEX},
+    views::layout::{APP_NAME, SHORT_NAME, SURFACE_HEX},
 };
 use loco_rs::testing::prelude::*;
 use regex::Regex;
@@ -109,6 +109,7 @@ async fn the_manifest_names_the_app_and_versioned_icons() {
         assert_eq!(res.header("content-type"), "application/manifest+json");
         let manifest: serde_json::Value = serde_json::from_str(&res.text()).expect("JSON");
         assert_eq!(manifest["name"], APP_NAME);
+        assert_eq!(manifest["short_name"], SHORT_NAME);
         assert_eq!(manifest["background_color"], SURFACE_HEX);
         assert_eq!(manifest["display"], "standalone");
         let icons = manifest["icons"].as_array().expect("icons");

@@ -35,7 +35,7 @@ use crate::{
     app::stored,
     controllers::home::DESCRIPTION,
     settings::{Settings, is_local},
-    views::layout::APP_NAME,
+    views::layout::{APP_NAME, SHORT_NAME},
 };
 
 /// What `docs/production.md` writes for a value still to be filled in.
@@ -80,7 +80,7 @@ fn not_filled_in(values: &[(&'static str, String)]) -> Vec<&'static str> {
 ///
 /// # Errors
 /// Production with `MAILER_HOST`, `MAILER_USER` or `MAILER_PASSWORD` not
-/// filled in, the template's security contact, or `APP_NAME` or
+/// filled in, the template's security contact, or `APP_NAME`, `SHORT_NAME` or
 /// `DESCRIPTION` still `TODO`.
 pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
     let env = &ctx.environment;
@@ -101,11 +101,15 @@ pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
             settings.security.contact
         )));
     }
-    let unnamed: Vec<&str> = [("APP_NAME", APP_NAME), ("DESCRIPTION", DESCRIPTION)]
-        .into_iter()
-        .filter(|(_, value)| still_todo(value))
-        .map(|(name, _)| name)
-        .collect();
+    let unnamed: Vec<&str> = [
+        ("APP_NAME", APP_NAME),
+        ("SHORT_NAME", SHORT_NAME),
+        ("DESCRIPTION", DESCRIPTION),
+    ]
+    .into_iter()
+    .filter(|(_, value)| still_todo(value))
+    .map(|(name, _)| name)
+    .collect();
     if !unnamed.is_empty() {
         return Err(Error::Message(format!(
             "production won't start: {} still `{TODO}`. Fill in the app's own (\"Start a new project\", docs/development.md)",
