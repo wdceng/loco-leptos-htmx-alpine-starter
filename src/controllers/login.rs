@@ -25,7 +25,10 @@ use crate::{
     controllers::{cross_site, signed::signed_in},
     cookies, hashing,
     middleware::rate_limit::auth_limited,
-    models::{sessions::Session, users},
+    models::{
+        sessions::{Session, label_of},
+        users,
+    },
     render::render_private_page,
     sql,
     views::{
@@ -119,7 +122,7 @@ async fn submit(
         )
         .await;
     };
-    let (secret, _) = Session::open(sql::pool(&ctx), user.id)
+    let (secret, _) = Session::open(sql::pool(&ctx), user.id, &label_of(&parts.headers))
         .await
         .map_err(Error::wrap)?;
     tracing::info!(pid = user.pid.to_string(), "signed in");

@@ -3,6 +3,7 @@
 //! `layout` and the page modules hold the Leptos components the page
 //! controllers render into HTML.
 
+pub mod account;
 pub mod auth;
 pub mod error;
 pub mod forgot;

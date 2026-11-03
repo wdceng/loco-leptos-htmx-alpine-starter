@@ -6,7 +6,7 @@ use leptos::prelude::*;
 
 use crate::{
     controllers::{
-        forgot,
+        account, forgot,
         login::{LOGOUT, PATH},
         register, verify,
     },
@@ -103,5 +103,6 @@ pub fn SignedIn(name: String) -> impl IntoView {
                 "Sign out"
             </button>
         </form>
+        <NextSteps links=vec![(account::PATH, "Your account")] />
     }
 }

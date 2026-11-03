@@ -1,3 +1,4 @@
+pub mod account;
 pub mod auth;
 pub mod cross_site;
 pub mod forgot;

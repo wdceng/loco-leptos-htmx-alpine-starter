@@ -55,6 +55,24 @@ pub fn without_nonce(csp: &HeaderValue, page: &str) -> String {
     page.replace(nonce, "")
 }
 
+/// The `Cookie` header of a session `email` and [`PASSWORD`] opened
+/// through the sign-in page, in a browser named by `user_agent`.
+pub async fn session_cookie(
+    request: &loco_rs::TestServer,
+    email: &str,
+    user_agent: &str,
+) -> String {
+    let res = request
+        .post("/login")
+        .add_header("user-agent", user_agent.to_owned())
+        .form(&sign_in(email, PASSWORD))
+        .await;
+    assert_eq!(res.status_code(), 303, "signed in: {}", res.text());
+    let set = res.header("set-cookie");
+    let set = set.to_str().expect("a cookie");
+    set.split(';').next().expect("the pair").to_string()
+}
+
 /// Whether `email` and `password` sign in through the page: a 303 with the
 /// session's cookie, where a refusal is the form again, a 400.
 pub async fn signs_in(request: &loco_rs::TestServer, email: &str, password: &str) -> bool {

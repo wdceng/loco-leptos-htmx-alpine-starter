@@ -88,6 +88,10 @@ so the suite runs in about a second.
 - `tests/models/sql_pool.rs`: SQLx reads, through `sql::pool`, a user
   Sea-ORM just wrote. It uses a real `query_scalar!`, so it also proves the
   `.sqlx/` cache works.
+- `tests/requests/account.rs`: the account page, signed in through the
+  sign-in page (`session_cookie`): the browsers listed and signed out, a
+  new password, the account deleted with the password or a fresh proof,
+  and another site's posts refused.
 - `tests/requests/register.rs`, `forgot.rs`, `verify.rs`: the auth pages
   a person uses, end to end. Users come from `prepare_data.rs` (the model,
   not a page); mails are read back through `mails.rs`. Also:

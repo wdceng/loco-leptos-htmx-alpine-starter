@@ -52,6 +52,11 @@ pub async fn signed_in(ctx: &AppContext, headers: &HeaderMap) -> Result<Option<S
     else {
         return Ok(None);
     };
+    // When it was last used, for the account page's list of browsers: a
+    // write once in a while, never one that fails the request.
+    if let Err(e) = session.seen(sql::pool(ctx)).await {
+        tracing::warn!(error = %e, "signed: the session's last use could not be written");
+    }
     Ok(Some(Signed { user, session }))
 }
 

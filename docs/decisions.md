@@ -265,6 +265,14 @@ change of mind gets a new line, and the old one moves to
   Loco wrote it; an app with a client that wants tokens mounts it again
   with an `auth:` block in each config. A key nothing reads is a secret
   to keep and rotate for nothing.
+- 2026-11-04: **An account page,** `/account`: the browsers signed in,
+  each signed out on its own or all but this one, a new password, the
+  account deleted (GDPR's erasure). A sensitive step asks for the password
+  only once the session's last proof is older than 15 minutes
+  (`proven_at`, GitHub's sudo mode), not on every form: the person who just
+  signed in isn't asked again, and the code, an app or a passkey can prove
+  it later. A session's last use is written once in five minutes, not on
+  every request. As an islands app on this stack has it.
 - 2026-11-02: **Every form refuses another site's post by
   `Sec-Fetch-Site`,** checked first: `same-origin` and `none` pass, any
   other claim is a 403; no header at all passes, as it's no browser

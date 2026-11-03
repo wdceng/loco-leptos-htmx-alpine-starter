@@ -41,6 +41,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Email verification from the welcome mail's link: the button, done, no longer works | `VerifyForm`, `VerifyDone`, `VerifyExpired`; the address `verify::PATH` | `src/views/verify.rs`, `src/controllers/verify.rs` |
 | The welcome mail again, with a fresh link: `/verify` without a token | `ResendForm`, `ResendSent`; the post `verify::RESEND` | `src/views/verify.rs`, `src/controllers/verify.rs` |
 | Sign in, and who is signed in with the way out | `LoginForm`, `SignedIn`; the addresses `login::PATH`, `login::LOGOUT` | `src/views/login.rs`, `src/controllers/login.rs` |
+| The signed-in user's own page: their browsers, a new password, the account deleted | `AccountPage`, `AccountDeleted`; the addresses in `controllers::account` | `src/views/account.rs`, `src/controllers/account.rs` |
+| A browser's name, from its `User-Agent` | `label_of`, `label_from` | `src/models/sessions.rs` |
+| Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |
 | Sign up: the form, "check your mail" | `RegisterForm`, `RegisterSent`; the address `register::PATH` | `src/views/register.rs`, `src/controllers/register.rs` |
 | A forgotten password: the form that mails the reset link | `ForgotForm`, `ForgotSent`; the address `forgot::PATH` | `src/views/forgot.rs`, `src/controllers/forgot.rs` |
 | A link on its own line, the next step from a page; an auth form's ways on, under it | `LINK`; `NextSteps` | `src/views/layout.rs` |

@@ -1,3 +1,4 @@
+mod account;
 mod error_page;
 mod forgot;
 mod home;

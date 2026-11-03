@@ -141,8 +141,12 @@ async fn a_new_password_signs_out_everywhere() {
     request::<App, _, _>(|request, ctx| async move {
         let user = user(&ctx, EMAIL, true).await;
         let pool = sql::pool(&ctx);
-        Session::open(pool, user.id).await.expect("opened");
-        Session::open(pool, user.id).await.expect("opened");
+        Session::open(pool, user.id, "Firefox on a Mac")
+            .await
+            .expect("opened");
+        Session::open(pool, user.id, "Safari on an iPhone")
+            .await
+            .expect("opened");
         let token = reset_token(&request, &ctx, &user.email).await;
 
         let done = request

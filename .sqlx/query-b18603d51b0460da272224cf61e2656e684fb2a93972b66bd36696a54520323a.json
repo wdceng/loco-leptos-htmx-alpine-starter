@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, user_id, expires_at AS \"expires_at: DateTime<Utc>\"\n               FROM sessions WHERE token_hash = ? AND expires_at > ?",
+  "query": "SELECT id, user_id, expires_at AS \"expires_at: DateTime<Utc>\",\n                 seen_at AS \"seen_at: DateTime<Utc>\", proven_at AS \"proven_at: DateTime<Utc>\"\n               FROM sessions WHERE token_hash = ? AND expires_at > ?",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,28 @@
             "name": "expires_at"
           }
         }
+      },
+      {
+        "name": "seen_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "seen_at"
+          }
+        }
+      },
+      {
+        "name": "proven_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "proven_at"
+          }
+        }
       }
     ],
     "parameters": {
@@ -43,8 +65,10 @@
     "nullable": [
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "84ecb422f4f4e94d15463f9381c906c14eaca21331774b5f390d4bf38bab8919"
+  "hash": "b18603d51b0460da272224cf61e2656e684fb2a93972b66bd36696a54520323a"
 }

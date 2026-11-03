@@ -179,6 +179,7 @@ impl Hooks for App {
             // .add_route(controllers::auth::routes(ctx))
             .add_route(controllers::home::routes())
             .add_route(controllers::login::routes(ctx))
+            .add_route(controllers::account::routes(ctx))
             .add_route(controllers::register::routes(ctx))
             .add_route(controllers::forgot::routes(ctx))
             .add_route(controllers::reset::routes())
