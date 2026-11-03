@@ -7,6 +7,7 @@ pub mod llms;
 pub mod login;
 pub mod manifest;
 pub mod not_found;
+pub mod parts;
 pub mod register;
 pub mod reset;
 pub mod robots;

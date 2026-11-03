@@ -6,3 +6,4 @@ mod boot;
 mod health;
 mod memory;
 mod moves;
+mod parts;

@@ -12,8 +12,12 @@ use app_e2e::{Browser, Key, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
 
 /// One page of each kind: the home page with its lazy island, a form, a
-/// notice (the not-found page).
-const PAGES: [&str; 3] = ["/", RESET, MISSING];
+/// notice (the not-found page), and the parts' page (`/e2e/parts`, the
+/// browser tests' environment alone: src/controllers/parts.rs).
+const PAGES: [&str; 4] = ["/", RESET, MISSING, PARTS];
+
+/// Every part of `views/parts.rs` on one page.
+const PARTS: &str = "/e2e/parts";
 
 /// The not-found page, asked for on purpose.
 const MISSING: &str = "/no-such-page";

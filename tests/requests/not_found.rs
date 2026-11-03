@@ -6,6 +6,18 @@ use app::{app::App, views::layout::APP_NAME};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+/// The parts' page is the browser tests' alone (src/controllers/parts.rs):
+/// anywhere else it is no page at all.
+#[tokio::test]
+#[serial]
+async fn the_parts_page_is_the_browser_tests_alone() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let res = request.get("/e2e/parts").await;
+        assert_eq!(res.status_code(), 404);
+    })
+    .await;
+}
+
 #[tokio::test]
 #[serial]
 async fn unknown_path_is_a_404_page_for_a_browser_and_a_line_for_a_probe() {

@@ -177,12 +177,21 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         let here = session_cookie(&request, EMAIL, MAC).await;
         let pool = sql::pool(&ctx);
 
-        // Fresh from the sign-in: no password field.
+        // Fresh from the sign-in: no password field. The step asked in a
+        // dialog (views/parts.rs), its button opening it.
         let page = request
             .get("/account")
             .add_header("cookie", here.clone())
             .await;
-        assert!(!page.text().contains(r#"id="delete-password""#));
+        let body = page.text();
+        assert!(!body.contains(r#"id="delete-password""#));
+        for wanted in [
+            r#"popovertarget="delete-account""#,
+            r#"id="delete-account" popover="auto" role="dialog""#,
+            r#"popovertargetaction="hide""#,
+        ] {
+            assert!(body.contains(wanted), "{wanted}: {body}");
+        }
 
         // An hour later: the password, and a wrong one keeps the account.
         let past = Utc::now() - Duration::hours(1);

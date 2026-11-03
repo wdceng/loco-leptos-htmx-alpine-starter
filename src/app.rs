@@ -172,7 +172,7 @@ impl Hooks for App {
     }
 
     fn routes(ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes() // controller routes below
+        let routes = AppRoutes::with_default_routes() // controller routes below
             // Loco's JSON auth API stays unmounted: the pages below sign in
             // with cookie sessions, and the configs carry no JWT key
             // (controllers/auth.rs; tests/requests/not_found.rs keeps it out).
@@ -188,7 +188,13 @@ impl Hooks for App {
             .add_route(controllers::security_txt::routes())
             .add_route(controllers::llms::routes())
             .add_route(controllers::manifest::routes())
-            .add_route(controllers::up::routes())
+            .add_route(controllers::up::routes());
+        // The parts on one page, for the browser tests alone.
+        if controllers::parts::mounted_in(&ctx.environment) {
+            routes.add_route(controllers::parts::routes())
+        } else {
+            routes
+        }
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;

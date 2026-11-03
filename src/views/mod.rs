@@ -12,6 +12,7 @@ pub mod layout;
 pub mod login;
 pub mod mail;
 pub mod not_found;
+pub mod parts;
 pub mod register;
 pub mod reset;
 pub mod too_many_requests;

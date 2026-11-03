@@ -13,7 +13,10 @@ use crate::{
         sessions::{Browser, PROVEN_MINUTES},
         users::{PASSWORD_MAX, PASSWORD_MIN},
     },
-    views::layout::{BUTTON, FIELD, LEAD, Notice, PROBLEM, TITLE},
+    views::{
+        layout::{BUTTON, FIELD, LEAD, Notice, PROBLEM, TITLE},
+        parts::{DANGER_BUTTON, Dialog, DialogCancel},
+    },
 };
 
 /// A section's heading on the page.
@@ -24,6 +27,9 @@ const PASSWORD_PROBLEM: &str = "password-problem";
 
 /// The `id` of the line saying why the deletion was refused.
 const DELETE_PROBLEM: &str = "delete-problem";
+
+/// The `id` of the dialog that asks before the account is deleted.
+const DELETE_DIALOG: &str = "delete-account";
 
 /// What a form on the page refused, by the form.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -218,6 +224,10 @@ pub fn AccountPage(
             "Your account and everything signed in with it are gone, at once and for good."
         </p>
         <ProblemLine id=DELETE_PROBLEM said=delete_problem.clone() />
+        <button type="button" popovertarget=DELETE_DIALOG class=DANGER_BUTTON>
+            "Delete my account"
+        </button>
+        <Dialog id=DELETE_DIALOG title="Delete your account?">
         <BusyForm action=DELETE.to_string()>
             {(!proven)
                 .then(|| {
@@ -248,10 +258,14 @@ pub fn AccountPage(
                         </p>
                     }
                 })}
-            <button type="submit" class=BUTTON>
-                "Delete my account"
-            </button>
+            <div class="flex flex-wrap gap-x-3">
+                <button type="submit" class=DANGER_BUTTON>
+                    "Delete it for good"
+                </button>
+                <DialogCancel target=DELETE_DIALOG />
+            </div>
         </BusyForm>
+        </Dialog>
     }
 }
 
