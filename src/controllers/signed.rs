@@ -18,7 +18,7 @@ use loco_rs::prelude::*;
 
 use crate::{
     controllers::login,
-    models::{_entities::users, sessions::Session},
+    models::{_entities::users, roles::Role, sessions::Session},
     render::accepts_html,
     sql,
 };
@@ -69,6 +69,34 @@ impl FromRequestParts<AppContext> for Signed {
             Ok(None) => Err(to_sign_in(&parts.headers)),
             Err(e) => {
                 tracing::error!(error = %e, "signed: the session could not be read");
+                Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
+            }
+        }
+    }
+}
+
+/// A signed-in admin (`Role::Admin`, src/models/roles.rs), a handler's
+/// proof of it: nobody signed in goes to the sign-in, as with [`Signed`];
+/// someone signed in with another role gets a 403, which the error page
+/// layer shows as a page to a browser (src/middleware/error_page.rs). An
+/// app with more roles writes one such extractor a role. As an islands
+/// app on this stack guards its staff's pages.
+#[derive(Clone, Debug)]
+pub struct Admin(pub Signed);
+
+impl FromRequestParts<AppContext> for Admin {
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, ctx: &AppContext) -> Result<Self, Response> {
+        let signed = Signed::from_request_parts(parts, ctx).await?;
+        match Role::of(sql::pool(ctx), signed.user.id).await {
+            Ok(Role::Admin) => Ok(Self(signed)),
+            Ok(_) => {
+                tracing::info!(pid = signed.user.pid.to_string(), "admin page refused");
+                Err(StatusCode::FORBIDDEN.into_response())
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "signed: the role could not be read");
                 Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
             }
         }

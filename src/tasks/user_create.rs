@@ -4,8 +4,10 @@ use crate::{
     mailers::auth::AuthMailer,
     models::{
         _entities::users,
+        roles::Role,
         users::{RegisterParams, name_or_email_problem, password_problem},
     },
+    sql,
 };
 
 pub struct UserCreate;
@@ -14,7 +16,7 @@ impl Task for UserCreate {
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "user:create".to_string(),
-            detail: "Create a new user with email, name, and password. Sends welcome email and sets up email verification.\nUsage:\ncargo run task user:create email:user@example.com name:\"John Doe\" password:\"securepassword\"".to_string(),
+            detail: "Create a new user with email, name, and password, and an optional role (member or admin). Sends welcome email and sets up email verification.\nUsage:\ncargo run task user:create email:user@example.com name:\"John Doe\" password:\"securepassword\" role:admin".to_string(),
         }
     }
     async fn run(&self, app_context: &AppContext, vars: &task::Vars) -> Result<()> {
@@ -27,6 +29,13 @@ impl Task for UserCreate {
         let password = vars
             .cli_arg("password")
             .map_err(|_| Error::string("password is mandatory"))?;
+        // Optional: `role:admin` makes the first admin; a sign-up is a
+        // member (src/models/roles.rs).
+        let role = match vars.cli_arg("role") {
+            Ok(word) => Role::named(word)
+                .ok_or_else(|| Error::string(&format!("role:{word} is not a role")))?,
+            Err(_) => Role::Member,
+        };
         // The same rules as the register route.
         if let Some(problem) =
             password_problem(password).or_else(|| name_or_email_problem(name, email))
@@ -61,6 +70,9 @@ impl Task for UserCreate {
         };
 
         let user_pid = user.pid.to_string();
+        role.give(sql::pool(app_context), user.id)
+            .await
+            .map_err(|err| Error::string(&format!("Failed to give the role. err: {err}")))?;
 
         // Set email verification sent (same as register controller)
         let user = user

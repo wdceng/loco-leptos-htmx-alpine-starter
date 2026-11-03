@@ -43,6 +43,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Sign in, and who is signed in with the way out | `LoginForm`, `SignedIn`; the addresses `login::PATH`, `login::LOGOUT` | `src/views/login.rs`, `src/controllers/login.rs` |
 | The signed-in user's own page: their browsers, a new password, the account deleted | `AccountPage`, `AccountDeleted`; the addresses in `controllers::account` | `src/views/account.rs`, `src/controllers/account.rs` |
 | A browser's name, from its `User-Agent` | `label_of`, `label_from` | `src/models/sessions.rs` |
+| What a user may do; a page for one role. Another role's request is a 403, the error page's | `Role` (`users.role`, read by SQLx); the extractor `Admin`, one an app adds a role | `src/models/roles.rs`, `src/controllers/signed.rs` |
 | Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |
 | Sign up: the form, "check your mail" | `RegisterForm`, `RegisterSent`; the address `register::PATH` | `src/views/register.rs`, `src/controllers/register.rs` |
 | A forgotten password: the form that mails the reset link | `ForgotForm`, `ForgotSent`; the address `forgot::PATH` | `src/views/forgot.rs`, `src/controllers/forgot.rs` |

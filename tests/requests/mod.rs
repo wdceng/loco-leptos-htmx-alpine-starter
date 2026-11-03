@@ -13,6 +13,7 @@ mod rate_limit;
 mod register;
 mod reset;
 mod robots;
+mod roles;
 mod security_headers;
 mod security_txt;
 mod up;

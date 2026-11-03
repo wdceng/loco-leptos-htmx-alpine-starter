@@ -171,7 +171,13 @@ cargo loco db entities
 Run a task; `cargo loco task` lists them:
 
 ```bash
-cargo loco task user_create
+cargo loco task
+```
+
+The first admin, from the command line alone (`src/models/roles.rs`):
+
+```bash
+cargo loco task user:create email:admin@example.com name:Admin password:a-long-password role:admin
 ```
 
 Migrations also run on every start, so you rarely need `migrate`. The

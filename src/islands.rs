@@ -61,11 +61,11 @@ pub const PAGE_ANNOUNCE: &str = "page-announce";
 
 /// The statuses the app answers with a page of its own, which a move in
 /// place shows in the region: a request refused (400, 405, 413, 415), a
-/// page not found (404), a slow answer (408), the server's own fault (500).
-/// Anything else is loaded plainly ([`Navigation`]): the 429, a page
-/// outside the shell, and a gateway's page in front of the app, a
-/// restart's 502 above all.
-pub const PAGE_STATUSES: [u16; 7] = [400, 404, 405, 408, 413, 415, 500];
+/// page another role's (403, `Admin`), a page not found (404), a slow
+/// answer (408), the server's own fault (500). Anything else is loaded
+/// plainly ([`Navigation`]): the 429, a page outside the shell, and a
+/// gateway's page in front of the app, a restart's 502 above all.
+pub const PAGE_STATUSES: [u16; 8] = [400, 403, 404, 405, 408, 413, 415, 500];
 
 /// The page's `<meta>` naming the build it loaded (views/layout.rs).
 pub const BUILD_META: &str = "build";

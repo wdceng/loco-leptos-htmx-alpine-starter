@@ -273,6 +273,12 @@ change of mind gets a new line, and the old one moves to
   signed in isn't asked again, and the code, an app or a passkey can prove
   it later. A session's last use is written once in five minutes, not on
   every request. As an islands app on this stack has it.
+- 2026-11-04: **Two roles, `member` and `admin`,** a `Role` enum an app
+  extends, kept in `users.role` and read with SQLx, so Loco's users entity
+  stays as generated. An islands app on this stack has three, a shop's
+  (customer, editor, staff); a template needs the least. The first admin
+  comes from the command line (`user:create … role:admin`), never a page.
+  A page for a role takes its extractor (`Admin`).
 - 2026-11-02: **Every form refuses another site's post by
   `Sec-Fetch-Site`,** checked first: `same-origin` and `none` pass, any
   other claim is a 403; no header at all passes, as it's no browser

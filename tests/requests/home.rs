@@ -212,7 +212,7 @@ async fn the_shell_moves_between_pages_in_place() {
             .unwrap_or_else(|| panic!("no page region:\n{body}"));
         assert!(region.contains("hx-boost:inherited"), "{region}");
         assert!(region.contains("hx-history-elt"), "{region}");
-        for status in [400, 404, 405, 408, 413, 415, 500] {
+        for status in [400, 403, 404, 405, 408, 413, 415, 500] {
             assert!(
                 region.contains(&format!("hx-status:{status}:inherited")),
                 "{status} is not shown in the region: {region}"

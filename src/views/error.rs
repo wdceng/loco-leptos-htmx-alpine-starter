@@ -14,6 +14,10 @@ pub fn wording(status: StatusCode) -> (&'static str, &'static str) {
             "This page can't do that",
             "The link or form you used doesn't fit this page. Go back and try again from the page itself.",
         ),
+        StatusCode::FORBIDDEN => (
+            "Not allowed here",
+            "Your account can't open this page or do this. Sign in with one that can.",
+        ),
         StatusCode::REQUEST_TIMEOUT => (
             "That took too long",
             "The server didn't finish in time. Please try again.",

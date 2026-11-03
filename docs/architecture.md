@@ -101,7 +101,7 @@ the split path in use, so CI builds and checks it.
 **Moves in place (htmx 4, Alpine)** - The shell's `#page` region boosts
 every link and form in it (`hx-boost`), so htmx fetches the next page and
 swaps its region in: no reload, the islands bundle stays loaded. Every
-status the app answers with a page (400, 404, 405, 408, 413, 415, 500)
+status the app answers with a page (400, 403, 404, 405, 408, 413, 415, 500)
 shows in the region too. htmx, its preload and Alpine extensions, and
 Alpine's CSP build are vendored byte for byte in `public/vendor/`, versioned
 like every public file. Leptos itself comes from a fork pinned in
