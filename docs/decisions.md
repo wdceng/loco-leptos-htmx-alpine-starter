@@ -324,7 +324,9 @@ change of mind gets a new line, and the old one moves to
   (`settings.magic_link.allowed_domains`, empty for any address), not
   Loco's regex of `example.com` and `gmail.com` in the controller: an app
   narrows it in its config, a wrong entry refuses the boot. `regex` left
-  the app with it, now a test dependency.
+  the app with it, now a test dependency. Ended 2026-11-04: the setting
+  went, the auth API being unmounted and nothing else reading it; an
+  islands app on this stack has none either. Loco's magic-link mail stays.
 - 2026-10-31: **A second security review,** as an attacker would: every
   route, the token flows, the logs, the configs, the app. Its 12 findings
   and their status in `docs/security.md`.

@@ -15,7 +15,6 @@ use crate::{
         _entities::users,
         users::{LoginParams, RegisterParams, name_or_email_problem, password_problem},
     },
-    settings::Settings,
     views::auth::{CurrentResponse, LoginResponse},
 };
 use loco_rs::prelude::*;
@@ -193,7 +192,8 @@ async fn current(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Respo
 ///    A registered user sends a POST request to `/magic-link` with their email.
 ///    If the email exists, a short-lived, one-time-use token is generated and sent to the user's email.
 ///    For security and to avoid exposing whether an email exists, the response always returns 200, even if the email is invalid.
-///    An address on a domain the config doesn't allow (`settings.magic_link`) is refused first, with a 400.
+///    Any address may ask: the template keeps no list of domains (the
+///    API is unmounted, app.rs; an app that mounts it narrows it here).
 ///
 /// 2. **Click the Magic Link**:
 ///    The user clicks the link (/magic-link/{token}), which validates the token and its expiration.
@@ -205,12 +205,6 @@ async fn magic_link(
     State(ctx): State<AppContext>,
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
-    let settings: Settings = stored(&ctx)?;
-    if !settings.magic_link.allows(&params.email) {
-        tracing::debug!("magic link: the address is not on settings.magic_link.allowed_domains");
-        return bad_request("invalid request");
-    }
-
     let Ok(user) = users::Model::find_by_email(&ctx.db, &params.email).await else {
         // we don't want to expose our users email. if the email is invalid we still
         // returning success to the caller

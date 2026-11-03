@@ -83,8 +83,6 @@ settings:
       frame-ancestors 'none'
   mail:
     from: TODO App <noreply@example.com>
-  magic_link:
-    allowed_domains: []
   nightly_restart:
     enable: false
     hour: 3

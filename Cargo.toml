@@ -284,8 +284,8 @@ insta = { version = "1.49.0", features = ["redactions", "yaml", "filters"] }
 tera = { version = "2.4.0" }
 serde_yaml = { version = "0.9.34" }
 # The links and llms.txt tests read addresses out of rendered pages. Loco's
-# starter declared it for the magic link's allowed domains, now a setting
-# (`settings.magic_link`), so the app itself no longer uses it.
+# starter declared it for the magic link's allowed domains; the app itself
+# no longer uses it.
 regex = { version = "1.13.1" }
 # The upload tests make their pictures (tests/requests/account.rs); the
 # app's own version and formats.
