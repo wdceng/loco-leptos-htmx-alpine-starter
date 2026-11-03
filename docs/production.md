@@ -41,7 +41,7 @@ grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs
 The secrets file's placeholders:
 
 ```bash
-test -s secrets.production.env && grep -n "replace-me" secrets.production.env
+test -s secrets.production.env && grep -n "replace_me" secrets.production.env
 ```
 
 The second prints nothing when the file is ready. If the file is missing it
@@ -60,7 +60,7 @@ LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
 
 ```bash
 cargo audit && ! grep -n "example\.com\|SaaS Starter" config/production.yaml src/views/layout.rs &&
-test -s secrets.production.env && ! grep -q "replace-me" secrets.production.env && tools/cargo-leptos/check.sh &&
+test -s secrets.production.env && ! grep -q "replace_me" secrets.production.env && tools/cargo-leptos/check.sh &&
 cargo clippy --all-targets && cargo test &&
 LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&
 CARGO_TARGET_DIR=target/zig cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.31 &&
@@ -83,7 +83,7 @@ ssh <server> "journalctl -u app-prod -f"
 
 - The first two lines are the production gates: `cargo audit`, no
   template placeholders, and a `secrets.production.env` that exists and
-  has no `replace-me` left. A placeholder mail account would boot fine and
+  has no `replace_me` left. A placeholder mail account would boot fine and
   only fail when the first mail is sent. A missing file would fail at the
   upload, after the service was already stopped.
 - **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
@@ -213,7 +213,7 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-prod"
   `MAILER_PASSWORD` and `MAILER_FROM`. A missing one stops the boot.
 
 Create the file once from its example, then put your real mail account in
-place of each `replace-me`:
+place of each `replace_me`:
 
 ```bash
 umask 077 && cp secrets.production.env.example secrets.production.env
@@ -397,7 +397,7 @@ ssh <server> "systemd-analyze security app-prod --no-pager | tail -1"
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
 | a `get_env` error naming `MAILER_*` | `secrets.env` missing or incomplete |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
-| `production won't start: MAILER_HOST, … empty or still replace-me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
+| `production won't start: MAILER_HOST, … empty or still replace_me` | a secret is set but not filled in (`src/deploy_checks.rs`) |
 | `invalid settings: block: failed to parse timezone` | `nightly_restart.zone` isn't an IANA name (`UTC`, `Europe/Zagreb`) |
 | `settings.nightly_restart.hour must be 0 to 23` | restart hour out of range |
 | `unable to open database file` | `StateDirectory=` or `DATABASE_URL=` missing |

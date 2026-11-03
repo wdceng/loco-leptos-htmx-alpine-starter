@@ -202,7 +202,7 @@ so the suite runs in about a second.
 - `src/views/mail.rs`: a mail is a whole HTML document with its link and no
   `<!>` hydration markers, and markup in a visitor's name arrives escaped.
 - `src/deploy_checks.rs`: real secret values pass, and empty, blank and
-  `replace-me` values are named. The boot itself (production refusing,
+  `replace_me` values are named. The boot itself (production refusing,
   the SMTP login warning) is a manual check below.
 - `src/views/error.rs`: server errors, the 405, the 408 and other client
   errors each have their own wording.
@@ -640,11 +640,11 @@ Production refuses a secret that is set but not filled in. Run it with a
 throwaway database so nothing lands in the repo:
 
 ```bash
-LOCO_ENV=production MAILER_HOST=replace-me MAILER_USER=u MAILER_PASSWORD= MAILER_FROM="App <a@example.com>" DATABASE_URL="sqlite:///tmp/prod-check.sqlite?mode=rwc" ./target/debug/app start
+LOCO_ENV=production MAILER_HOST=replace_me MAILER_USER=u MAILER_PASSWORD= MAILER_FROM="App <a@example.com>" DATABASE_URL="sqlite:///tmp/prod-check.sqlite?mode=rwc" ./target/debug/app start
 ```
 
 Expected: exit status 1 and
-`production won't start: MAILER_HOST, MAILER_PASSWORD empty or still replace-me`.
+`production won't start: MAILER_HOST, MAILER_PASSWORD empty or still replace_me`.
 
 The SMTP login only runs when deployed, so check it on staging after a
 deploy: `journalctl -u app-stg -b | grep 'smtp login check'`. A wrong host

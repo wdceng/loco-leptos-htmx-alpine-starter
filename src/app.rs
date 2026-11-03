@@ -90,7 +90,7 @@ impl Hooks for App {
         ctx.shared_store.insert(assets);
         ctx.shared_store.insert(Settings::from_config(&ctx.config)?);
         // A production mail secret that is set but empty or still
-        // `replace-me` refuses the boot; a missing one `get_env` refused
+        // `replace_me` refuses the boot; a missing one `get_env` refused
         // already.
         deploy_checks::refuse_placeholders(&ctx)?;
 

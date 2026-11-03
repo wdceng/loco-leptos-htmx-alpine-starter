@@ -204,7 +204,7 @@ ssh <server> "systemctl daemon-reload && systemctl restart app-dev"
   and mail fails to send. A missing file stops the unit.
 
 Create it once from its example, then put the mail account in place of
-each `replace-me` when the dev server should send real mail (details in
+each `replace_me` when the dev server should send real mail (details in
 `docs/production.md`):
 
 ```bash

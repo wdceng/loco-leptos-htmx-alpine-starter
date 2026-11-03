@@ -3,7 +3,7 @@
 //! but a variable that is set and still wrong goes through.
 //!
 //! - [`refuse_placeholders`], in production: an SMTP host, user or
-//!   password that is empty or still reads `replace-me` (the placeholder
+//!   password that is empty or still reads `replace_me` (the placeholder
 //!   `docs/production.md` writes into `secrets.production.env`) refuses the
 //!   boot, and so does `settings.security.contact` still at the template's
 //!   `example.com`: `security.txt` would send reports nowhere. Dev-server
@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// What `docs/production.md` writes for a value still to be filled in.
-pub const PLACEHOLDER: &str = "replace-me";
+pub const PLACEHOLDER: &str = "replace_me";
 
 /// The secrets a deployed boot reads, by the variable that sets them: the
 /// mail account's.
@@ -68,7 +68,7 @@ fn not_filled_in(values: &[(&'static str, String)]) -> Vec<&'static str> {
 }
 
 /// Refuses production's boot with a mail secret that is empty or still
-/// `replace-me`, or with the template's security contact. Every other
+/// `replace_me`, or with the template's security contact. Every other
 /// environment passes.
 ///
 /// # Errors
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn empty_and_placeholder_values_are_named() {
         let mixed = values(&[
-            ("MAILER_HOST", "replace-me"),
+            ("MAILER_HOST", "replace_me"),
             ("MAILER_USER", "   "),
             ("MAILER_PASSWORD", ""),
         ]);
@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn the_templates_security_contact_is_a_placeholder() {
         assert!(contact_is_a_placeholder("mailto:security@example.com"));
-        assert!(contact_is_a_placeholder("mailto:replace-me"));
+        assert!(contact_is_a_placeholder("mailto:replace_me"));
         assert!(!contact_is_a_placeholder("mailto:security@shop.hr"));
         assert!(!contact_is_a_placeholder("https://shop.hr/security"));
     }

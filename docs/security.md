@@ -66,7 +66,7 @@ configs, the app, the dependencies.
 | 3 | Live tokens in the journal: Loco's logger wrote the whole address, the reset link's query included | **Fixed:** `src/middleware/request_log.rs` logs the route's pattern or the path, never a query |
 | 4 | Addresses were case-sensitive: one mailbox, two accounts | **Fixed:** lowercase, stored and looked up |
 | 5 | The welcome mail's subject carried the visitor's name, to any address | **Fixed:** the app's name |
-| 6 | Staging and the dev server booted on a JWT secret in git when their secrets file had none | **Fixed:** no default, and refused empty or `replace-me` everywhere deployed; since 2026-11-02 no config has a JWT key at all |
+| 6 | Staging and the dev server booted on a JWT secret in git when their secrets file had none | **Fixed:** no default, and refused empty or `replace_me` everywhere deployed; since 2026-11-02 no config has a JWT key at all |
 | 7 | A verification link never expired | **Fixed:** a day; resending the mail gives a new one |
 | 8 | A password reset left a pending magic link open | **Fixed:** the reset clears it |
 | 9 | The app handed every unknown scheme to the system (`file:`, `intent:`) | **Fixed:** the schemes it names; the rest go nowhere |
