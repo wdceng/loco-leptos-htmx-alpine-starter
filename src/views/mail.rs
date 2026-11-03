@@ -52,6 +52,20 @@ pub fn ForgotPasswordMail(name: String, reset_link: String) -> impl IntoView {
     }
 }
 
+/// The code a sign-in's second step asks for (src/models/sign_ins.rs): six
+/// digits, how long they last, and what to do if the sign-in wasn't yours.
+#[component]
+pub fn SignInCodeMail(code: String, minutes: i64) -> impl IntoView {
+    view! {
+        <p>"Your sign-in code:"</p>
+        <p style="font-size: 1.5em; font-weight: bold; letter-spacing: 0.2em;">{code}</p>
+        <p>{format!("It works for {minutes} minutes, on the page that asked for it.")}</p>
+        <p>
+            "If you didn't just sign in, someone has your password: change it on your account page."
+        </p>
+    }
+}
+
 #[component]
 pub fn MagicLinkMail(login_link: String) -> impl IntoView {
     view! {

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE sign_ins SET tries = tries + 1, updated_at = ?\n               WHERE id = ? AND tries < ? AND expires_at > ?\n               RETURNING code_hash, tries AS \"tries!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "code_hash",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "code_hash"
+          }
+        }
+      },
+      {
+        "name": "tries!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "tries"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e61c118bca52f3158391a9dc090bed047fc59e34835c5fefd79215a450e3b7e1"
+}

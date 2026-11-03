@@ -7,10 +7,14 @@ use leptos::prelude::*;
 use crate::{
     controllers::{
         account, forgot,
-        login::{LOGOUT, PATH},
+        login::{CODE, CODE_AGAIN, LOGOUT, PATH},
         register, verify,
     },
-    views::layout::{BUTTON, FIELD, LEAD, NextSteps, PROBLEM, TITLE},
+    models::sign_ins::CODE_MINUTES,
+    views::{
+        layout::{BUTTON, FIELD, LEAD, NextSteps, PROBLEM, TITLE},
+        parts::QUIET_BUTTON,
+    },
 };
 
 /// The `id` of the line saying why the sign-in was refused.
@@ -80,6 +84,67 @@ pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
             (register::PATH, "No account yet? Sign up"),
             (verify::PATH, "No welcome mail? Send it again"),
         ] />
+    }
+}
+
+/// The `id` of the line under the code's heading: why a code was refused,
+/// or that a new one went.
+const CODE_PROBLEM: &str = "code-problem";
+
+/// The second step: the six digits mailed after the password, one field
+/// the phone fills from the mail (`one-time-code`), and a new code on
+/// request. `problem` is what the last post said.
+#[component]
+pub fn CodeForm(problem: Option<String>) -> impl IntoView {
+    let refused = problem.is_some();
+    view! {
+        <h1 class=TITLE>"Your sign-in code"</h1>
+        <p class=LEAD>
+            {format!(
+                "We mailed you six digits. They work for {CODE_MINUTES} minutes.",
+            )}
+        </p>
+        {problem
+            .map(|problem| {
+                view! {
+                    <p id=CODE_PROBLEM role="alert" class=PROBLEM>
+                        {problem}
+                    </p>
+                }
+            })}
+        // Alpine's CSP build takes one expression per attribute.
+        <form
+            method="post"
+            action=CODE
+            class="mt-8 max-w-sm"
+            hx-sync="this:drop"
+            x-data="{ sending: false }"
+            x-on:htmx:before:request="sending = true"
+            x-on:htmx:finally:request="sending = false"
+            x-bind:aria-busy="sending"
+        >
+            <label for="code" class="block font-semibold">"Code"</label>
+            <input
+                id="code"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                autofocus
+                required
+                aria-describedby=refused.then_some(CODE_PROBLEM)
+                class=FIELD
+            />
+            <button type="submit" class=BUTTON>
+                "Sign in"
+            </button>
+        </form>
+        <form method="post" action=CODE_AGAIN hx-sync="this:drop">
+            <button type="submit" class=QUIET_BUTTON>
+                "Mail me a new code"
+            </button>
+        </form>
     }
 }
 

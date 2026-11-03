@@ -15,7 +15,7 @@ use crate::{
     settings::Settings,
     views::{
         layout::APP_NAME,
-        mail::{self, ForgotPasswordMail, MagicLinkMail, WelcomeMail},
+        mail::{self, ForgotPasswordMail, MagicLinkMail, SignInCodeMail, WelcomeMail},
     },
 };
 
@@ -114,6 +114,27 @@ impl AuthMailer {
             "Your reset password link".to_string(),
             format!("Reset your password with this link:\n\n{link}\n"),
             view! { <ForgotPasswordMail name=user.name.clone() reset_link=link.clone() /> },
+        )
+        .await
+    }
+
+    /// The code a sign-in's second step asks for (src/models/sign_ins.rs).
+    /// Its subject says nothing but what it is: never the code, which an
+    /// inbox would show on a locked screen.
+    ///
+    /// # Errors
+    ///
+    /// When email sending is failed
+    pub async fn sign_in_code(ctx: &AppContext, user: &users::Model, code: &str) -> Result<()> {
+        let minutes = crate::models::sign_ins::CODE_MINUTES;
+        Self::send(
+            ctx,
+            user,
+            format!("Your sign-in code for {APP_NAME}"),
+            format!(
+                "Your sign-in code: {code}\n\nIt works for {minutes} minutes, on the page that asked for it.\n\nIf you didn't just sign in, someone has your password: change it on your account page.\n"
+            ),
+            view! { <SignInCodeMail code=code.to_string() minutes=minutes /> },
         )
         .await
     }

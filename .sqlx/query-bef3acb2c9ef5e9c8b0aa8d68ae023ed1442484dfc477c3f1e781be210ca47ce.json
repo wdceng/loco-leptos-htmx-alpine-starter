@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM sign_ins WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "bef3acb2c9ef5e9c8b0aa8d68ae023ed1442484dfc477c3f1e781be210ca47ce"
+}

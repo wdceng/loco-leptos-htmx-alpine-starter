@@ -273,6 +273,11 @@ change of mind gets a new line, and the old one moves to
   signed in isn't asked again, and the code, an app or a passkey can prove
   it later. A session's last use is written once in five minutes, not on
   every request. As an islands app on this stack has it.
+- 2026-11-04: **An admin signs in with a second step,** six digits by
+  mail after the password, as an islands app on this stack asks of its
+  staff; a member signs in with the password alone, unless they add an
+  authenticator app. The pending sign-in is no session (its own table and
+  cookie), so a stolen password alone opens nothing.
 - 2026-11-04: **Uploads as an islands app on this stack makes its photos:**
   the browser shrinks a photo before it goes (its shrink island, ported
   without its crop), and the server decodes it as its check, makes it with

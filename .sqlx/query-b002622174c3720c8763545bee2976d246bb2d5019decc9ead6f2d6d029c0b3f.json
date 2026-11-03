@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE sign_ins SET code_hash = ?, expires_at = ?, code_sent_at = ?, updated_at = ?\n             WHERE id = ? AND code_sent_at <= ? AND expires_at > ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "b002622174c3720c8763545bee2976d246bb2d5019decc9ead6f2d6d029c0b3f"
+}

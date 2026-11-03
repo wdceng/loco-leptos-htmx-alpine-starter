@@ -96,6 +96,9 @@ chrono = { version = "0.4.45", optional = true }
 # The digest a session's row keeps of its secret (src/secret.rs). The
 # version Loco's own dependencies already lock.
 sha2 = { version = "0.10.9", optional = true }
+# A mailed code's digits drawn evenly (src/secret.rs, `drawn`). The version
+# Loco's own `hash::random_string` uses.
+rand = { version = "0.9.5", optional = true }
 # An uploaded picture checked and made into what the pages show
 # (src/uploads.rs): decoded, turned to a square, resized and saved as a
 # JPEG with fixed settings, the encoders compiled in, nothing to install on
@@ -240,6 +243,7 @@ ssr = [
   "dep:sqlx",
   "dep:chrono",
   "dep:sha2",
+  "dep:rand",
   "dep:image",
   "dep:validator",
   "dep:uuid",

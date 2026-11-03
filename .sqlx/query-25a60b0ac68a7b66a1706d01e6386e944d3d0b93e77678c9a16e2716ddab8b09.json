@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sign_ins (user_id, token_hash, code_hash, expires_at, code_sent_at, method)\n               VALUES (?, ?, ?, ?, ?, ?)\n               RETURNING id AS \"id!\", user_id,\n                         expires_at AS \"expires_at: DateTime<Utc>\",\n                         code_sent_at AS \"code_sent_at: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "expires_at: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "name": "code_sent_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "code_sent_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "25a60b0ac68a7b66a1706d01e6386e944d3d0b93e77678c9a16e2716ddab8b09"
+}

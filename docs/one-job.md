@@ -47,6 +47,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Sign in, and who is signed in with the way out | `LoginForm`, `SignedIn`; the addresses `login::PATH`, `login::LOGOUT` | `src/views/login.rs`, `src/controllers/login.rs` |
 | The signed-in user's own page: their browsers, a new password, the account deleted | `AccountPage`, `AccountDeleted`; the addresses in `controllers::account` | `src/views/account.rs`, `src/controllers/account.rs` |
 | A browser's name, from its `User-Agent` | `label_of`, `label_from` | `src/models/sessions.rs` |
+| A sign-in's end, a session opened and its cookie handed over, after the password or its code | `open_session` | `src/controllers/login.rs` |
+| A second step after the password: the mailed code, its tries and a new one | `SignIn` (`sign_ins`, the `signin` cookie), `CodeForm`, `AuthMailer::sign_in_code` | `src/models/sign_ins.rs`, `src/controllers/login.rs`, `src/views/login.rs` |
+| A code drawn, two digests compared | `secret::drawn`, `secret::same` | `src/secret.rs` |
 | What a user may do; a page for one role. Another role's request is a 403, the error page's | `Role` (`users.role`, read by SQLx); the extractor `Admin`, one an app adds a role | `src/models/roles.rs`, `src/controllers/signed.rs` |
 | Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |
 | Sign up: the form, "check your mail" | `RegisterForm`, `RegisterSent`; the address `register::PATH` | `src/views/register.rs`, `src/controllers/register.rs` |

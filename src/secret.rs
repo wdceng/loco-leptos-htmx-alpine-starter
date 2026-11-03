@@ -34,9 +34,47 @@ pub fn is_secret(secret: &str) -> bool {
     secret.len() == LENGTH && secret.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }
 
+/// `length` characters drawn evenly from `alphabet`: a mailed code's six
+/// digits. The same generator as [`fresh`]'s, Loco's.
+#[must_use]
+pub fn drawn(alphabet: &[u8], length: usize) -> String {
+    use rand::Rng;
+
+    let mut rng = rand::rng();
+    (0..length)
+        .map(|_| char::from(alphabet[rng.random_range(0..alphabet.len())]))
+        .collect()
+}
+
+/// Whether two digests are the same, in a time that doesn't tell how much
+/// of them is: a code's digest compared.
+#[must_use]
+pub fn same(one: &str, other: &str) -> bool {
+    one.len() == other.len()
+        && one
+            .bytes()
+            .zip(other.bytes())
+            .fold(0, |differ, (a, b)| differ | (a ^ b))
+            == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_same_is_the_same() {
+        assert!(same("abc", "abc"));
+        assert!(!same("abc", "abd"));
+        assert!(!same("abc", "ab"));
+    }
+
+    #[test]
+    fn drawn_characters_come_from_the_alphabet() {
+        let code = drawn(b"0123456789", 6);
+        assert_eq!(code.len(), 6);
+        assert!(code.bytes().all(|byte| byte.is_ascii_digit()), "{code}");
+    }
 
     #[test]
     fn a_fresh_secret_has_the_shape_and_is_new_each_time() {

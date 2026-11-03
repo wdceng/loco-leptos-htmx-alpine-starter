@@ -6,6 +6,7 @@ mod m20261102_120000_sessions;
 mod m20261104_120000_session_browsers;
 mod m20261104_130000_user_roles;
 mod m20261104_140000_user_avatars;
+mod m20261104_150000_sign_ins;
 
 pub struct Migrator;
 
@@ -18,6 +19,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261104_120000_session_browsers::Migration),
             Box::new(m20261104_130000_user_roles::Migration),
             Box::new(m20261104_140000_user_avatars::Migration),
+            Box::new(m20261104_150000_sign_ins::Migration),
             // inject-above (do not remove this comment)
         ]
     }

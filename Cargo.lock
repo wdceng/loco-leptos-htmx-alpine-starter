@@ -154,6 +154,7 @@ dependencies = [
  "loco-rs",
  "migration",
  "nix",
+ "rand 0.9.5",
  "regex",
  "rstest",
  "sea-orm",

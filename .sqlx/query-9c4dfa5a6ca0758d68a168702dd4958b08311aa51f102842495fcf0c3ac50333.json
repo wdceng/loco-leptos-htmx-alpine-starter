@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", user_id,\n                      expires_at AS \"expires_at: DateTime<Utc>\",\n                      code_sent_at AS \"code_sent_at: DateTime<Utc>\"\n               FROM sign_ins WHERE token_hash = ? AND expires_at > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "expires_at: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "name": "code_sent_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sign_ins",
+            "name": "code_sent_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9c4dfa5a6ca0758d68a168702dd4958b08311aa51f102842495fcf0c3ac50333"
+}

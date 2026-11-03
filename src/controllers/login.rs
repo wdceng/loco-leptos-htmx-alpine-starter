@@ -24,21 +24,30 @@ use serde::Deserialize;
 use crate::{
     controllers::{cross_site, signed::signed_in},
     cookies, hashing,
+    mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::{
+        roles::Role,
         sessions::{Session, label_of},
+        sign_ins::{Checked, SignIn},
         users,
     },
     render::render_private_page,
     sql,
     views::{
         layout::PageMeta,
-        login::{LoginForm, SignedIn},
+        login::{CodeForm, LoginForm, SignedIn},
     },
 };
 
 /// The page's address and the form's target.
 pub const PATH: &str = "/login";
+
+/// The second step's page and form's target: the mailed code.
+pub const CODE: &str = "/login/code";
+
+/// The target that mails a new code.
+pub const CODE_AGAIN: &str = "/login/code/again";
 
 /// The sign-out's target.
 pub const LOGOUT: &str = "/logout";
@@ -122,13 +131,166 @@ async fn submit(
         )
         .await;
     };
-    let (secret, _) = Session::open(sql::pool(&ctx), user.id, &label_of(&parts.headers))
+    let pool = sql::pool(&ctx);
+    // An admin's second step: a code by mail, the session only once it is
+    // right (src/models/sign_ins.rs).
+    if Role::of(pool, user.id).await.map_err(Error::wrap)? == Role::Admin {
+        let (secret, code, _) = SignIn::open(pool, user.id).await.map_err(Error::wrap)?;
+        AuthMailer::sign_in_code(&ctx, &user, &code).await?;
+        tracing::info!(pid = user.pid.to_string(), "sign-in code mailed");
+        let mut res = (StatusCode::SEE_OTHER, [(LOCATION, CODE)]).into_response();
+        cookies::store(&mut res, &SignIn::cookie(&secret, cookies::secure(&ctx)))?;
+        return Ok(res);
+    }
+    open_session(&ctx, &user, &parts.headers).await
+}
+
+/// A session opened for `user`, who passed every step, in the browser that
+/// sent `headers`: its cookie handed over, then on to the home page. The
+/// one way a sign-in ends, after the password or after its code.
+async fn open_session(
+    ctx: &AppContext,
+    user: &users::Model,
+    headers: &HeaderMap,
+) -> Result<Response> {
+    let (secret, _) = Session::open(sql::pool(ctx), user.id, &label_of(headers))
         .await
         .map_err(Error::wrap)?;
     tracing::info!(pid = user.pid.to_string(), "signed in");
     let mut res = (StatusCode::SEE_OTHER, [(LOCATION, "/")]).into_response();
-    cookies::store(&mut res, &Session::cookie(&secret, cookies::secure(&ctx)))?;
+    cookies::store(&mut res, &Session::cookie(&secret, cookies::secure(ctx)))?;
     Ok(res)
+}
+
+/// The sign-in waiting for its code, by the `signin` cookie; none, the
+/// password again.
+async fn waiting(ctx: &AppContext, headers: &HeaderMap) -> Result<Option<(String, SignIn)>> {
+    let Some(secret) = SignIn::secret_from(headers) else {
+        return Ok(None);
+    };
+    Ok(SignIn::find(sql::pool(ctx), &secret)
+        .await
+        .map_err(Error::wrap)?
+        .map(|sign_in| (secret, sign_in)))
+}
+
+fn code_meta() -> PageMeta {
+    PageMeta {
+        title: "Your sign-in code".into(),
+        description: "The code we mailed you, to finish signing in.".into(),
+        ..meta()
+    }
+}
+
+/// Back to the password: no sign-in waits, or its tries are spent. The
+/// `signin` cookie taken away.
+fn to_password(ctx: &AppContext) -> Result<Response> {
+    let mut res = (StatusCode::SEE_OTHER, [(LOCATION, PATH)]).into_response();
+    cookies::store(&mut res, &SignIn::cookie_deleted(cookies::secure(ctx)))?;
+    Ok(res)
+}
+
+/// `GET /login/code`: the code's form, for the sign-in waiting.
+#[debug_handler]
+async fn code_page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
+    if waiting(&ctx, req.headers()).await?.is_none() {
+        return to_password(&ctx);
+    }
+    render_private_page(&ctx, req, code_meta(), StatusCode::OK, || {
+        view! { <CodeForm problem=None /> }
+    })
+    .await
+}
+
+/// What the code's form posts; empty when the field is missing.
+#[derive(Debug, Deserialize)]
+pub struct Code {
+    #[serde(default)]
+    pub code: String,
+}
+
+/// `POST /login/code`: the code right, the session opened and the sign-in
+/// closed; wrong, the form again with the tries left; spent, the password
+/// again.
+async fn code_submit(
+    State(ctx): State<AppContext>,
+    parts: Parts,
+    Form(form): Form<Code>,
+) -> Result<Response> {
+    if let Some(forbidden) = cross_site::refused(&parts.headers, "sign-in code") {
+        return Ok(forbidden);
+    }
+    let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
+        return to_password(&ctx);
+    };
+    let pool = sql::pool(&ctx);
+    match sign_in
+        .check(pool, &secret, &form.code)
+        .await
+        .map_err(Error::wrap)?
+    {
+        Checked::Right => {
+            sign_in.close(pool).await.map_err(Error::wrap)?;
+            let user = users::Entity::find_by_id(sign_in.user_id)
+                .one(&ctx.db)
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+            let mut res = open_session(&ctx, &user, &parts.headers).await?;
+            cookies::store(&mut res, &SignIn::cookie_deleted(cookies::secure(&ctx)))?;
+            Ok(res)
+        }
+        Checked::Wrong { left } => {
+            let req = Request::from_parts(parts, Body::empty());
+            let problem = format!(
+                "That code isn't right. {left} {} left.",
+                if left == 1 { "try" } else { "tries" }
+            );
+            render_private_page(
+                &ctx,
+                req,
+                code_meta().refused(),
+                StatusCode::BAD_REQUEST,
+                move || view! { <CodeForm problem=Some(problem.clone()) /> },
+            )
+            .await
+        }
+        Checked::Spent => {
+            sign_in.close(pool).await.map_err(Error::wrap)?;
+            tracing::info!("sign-in code tries spent");
+            to_password(&ctx)
+        }
+    }
+}
+
+/// `POST /login/code/again`: a new code mailed, unless one went within the
+/// last minute; the form again, saying which.
+async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Response> {
+    if let Some(forbidden) = cross_site::refused(&parts.headers, "sign-in code again") {
+        return Ok(forbidden);
+    }
+    let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
+        return to_password(&ctx);
+    };
+    let renewed = sign_in
+        .renew_code(sql::pool(&ctx), &secret)
+        .await
+        .map_err(Error::wrap)?;
+    let said = if let Some(code) = renewed {
+        let user = users::Entity::find_by_id(sign_in.user_id)
+            .one(&ctx.db)
+            .await?
+            .ok_or_else(|| Error::NotFound)?;
+        AuthMailer::sign_in_code(&ctx, &user, &code).await?;
+        "A new code is on its way; the one before no longer works.".to_string()
+    } else {
+        let wait = sign_in.code_wait().unwrap_or(1);
+        format!("A code went less than a minute ago. Ask again in {wait} seconds.")
+    };
+    let req = Request::from_parts(parts, Body::empty());
+    render_private_page(&ctx, req, code_meta(), StatusCode::OK, move || {
+        view! { <CodeForm problem=Some(said.clone()) /> }
+    })
+    .await
 }
 
 /// `POST /logout`: the session closed and the cookie taken away, then the
@@ -153,5 +315,10 @@ async fn logout(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Res
 pub fn routes(ctx: &AppContext) -> Routes {
     Routes::new()
         .add(PATH, get(page).merge(auth_limited(ctx, post(submit))))
+        .add(
+            CODE,
+            get(code_page).merge(auth_limited(ctx, post(code_submit))),
+        )
+        .add(CODE_AGAIN, auth_limited(ctx, post(code_again)))
         .add(LOGOUT, post(logout))
 }

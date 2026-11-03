@@ -32,6 +32,7 @@ use crate::{
     models::{
         avatars::{self, Avatars},
         sessions::Session,
+        sign_ins::SignIn,
         users::{self, password_problem},
     },
     render::render_private_page,
@@ -344,6 +345,9 @@ async fn delete(
     }
     let pool = sql::pool(&ctx);
     Session::close_all(pool, signed.user.id)
+        .await
+        .map_err(Error::wrap)?;
+    SignIn::close_all(pool, signed.user.id)
         .await
         .map_err(Error::wrap)?;
     let avatar = avatars::of(pool, signed.user.id)

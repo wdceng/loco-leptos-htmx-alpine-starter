@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM sign_ins WHERE expires_at <= ? OR user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a1a222838c93cc33242e743fa5118aedf84fd86fe673cea375678f07da47afb6"
+}

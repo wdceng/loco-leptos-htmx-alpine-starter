@@ -16,5 +16,6 @@ mod robots;
 mod roles;
 mod security_headers;
 mod security_txt;
+mod sign_in_code;
 mod up;
 mod verify;
