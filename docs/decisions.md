@@ -127,7 +127,9 @@ change of mind gets a new line, and the old one moves to
   and Back to that page came back at its top in Firefox and Safari (their
   Back goes through the state, Chrome's and Edge's through the Navigation
   API). `keep_scroll` now writes htmx's mark with the scroll (`HTMX_KEY`,
-  `src/islands.rs`). And its Back marks no element `htmx-request`, so a
+  `src/islands.rs`). Upstream: issue #4193, the fix in PR #4198 (merge the
+  mark into the state); once a release has it, the mark in `keep_scroll`
+  can go, the browser test in `e2e/tests/moves.rs` proving it. And its Back marks no element `htmx-request`, so a
   browser test waits for the page Back brings, not for htmx's requests.
 - 2026-10-18: **The `parseHTMLUnsafe` workaround** in
   `public/js/htmx-islands.js` (htmx #4147: Chrome drops the comments
