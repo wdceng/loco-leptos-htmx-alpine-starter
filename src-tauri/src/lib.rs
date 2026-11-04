@@ -115,8 +115,10 @@ fn to_system(handle: &AppHandle, url: &Url) {
 /// phones, where an outside one reaches `on_navigation` first): another
 /// site's to the system, as any other address; the site's own in a second
 /// window of the app's, its new tab, so the page it was followed from (a
-/// form half filled) stays where it was. That window is the first's, from
-/// its config, its hooks the same ([`watched`]); the webview's own new
+/// form half filled) stays where it was. The site has no such link of its
+/// own (`no_page_opens_a_new_tab`, tests/one_job.rs, a step beside a form
+/// being a dialog); the hook stays for one that comes. That window is the
+/// first's, from its config, its hooks the same ([`watched`]); the webview's own new
 /// window refused either way. Windows' webview did nothing with such a
 /// link without this hook, and Apple's opened no window for the site's own
 /// (an islands app on this stack, 2026-11-03). Untested here on Windows and

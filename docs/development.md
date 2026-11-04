@@ -53,7 +53,9 @@ port: `PORT=5151 cargo leptos watch --split -- start`.
   holds 3001, VS Code's Markdown Preview Enhanced for one. Close its
   preview, or put `LEPTOS_RELOAD_PORT=3002` on the command and the same
   port in `config/development.yaml`'s `connect-src`, or the CSP blocks the
-  reload.
+  reload. For that run alone, never committed: `tests/config.rs` pins the
+  CSP's port to `reload-port` in `Cargo.toml`, so a lasting move changes
+  both there.
 
 Find the running app:
 

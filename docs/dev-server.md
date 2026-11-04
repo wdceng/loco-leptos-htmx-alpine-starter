@@ -358,6 +358,7 @@ ssh <server> "systemd-analyze security app-dev --no-pager | tail -1"
 | Boot error | Cause |
 |---|---|
 | `the site folder ... is missing` | `site/` not uploaded next to the binary |
+| `two site folders` | `LEPTOS_SITE_ROOT=` in the unit and the config's `static.folder.path` name different folders |
 | `a hashed build must be deployed together with its hash file` | `hash.txt` missing |
 | `the hash file is stale` | `hash.txt` and `site/` from different builds |
 | `settings.mail.from is not a sender` | `MAILER_FROM` must read `Name <address>` |
