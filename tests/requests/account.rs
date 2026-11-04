@@ -188,7 +188,9 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         for wanted in [
             r#"popovertarget="delete-account""#,
             r#"id="delete-account" popover="auto" role="dialog""#,
-            r#"popovertargetaction="hide""#,
+            // Cancel with no form owner, so Safari 17 runs its popovertarget
+            // inside the dialog's form (views/parts.rs, `DialogCancel`).
+            r#"form="" popovertarget="delete-account" popovertargetaction="hide""#,
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }

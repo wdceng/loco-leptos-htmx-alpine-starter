@@ -285,6 +285,21 @@ fn every_form_refuses_a_cross_site_post_one_way() {
     );
 }
 
+/// No page of the site's own opens a new tab: a second window in the desktop
+/// app (src-tauri's `new_window` denies it) and nothing at all in the
+/// phones' apps. Adding from where one stands is a `Dialog` over the form
+/// (views/parts.rs). The template links to no other site; the first app
+/// that does gives those links one home with their `rel` and names it here
+/// (an islands app on this stack, 2026-11-04).
+#[test]
+fn no_page_opens_a_new_tab() {
+    assert_one_home(
+        "_blank",
+        &[],
+        "`Dialog` (src/views/parts.rs) for a step beside the form",
+    );
+}
+
 /// The check itself: a code line holding the pattern is found, a comment
 /// is not, and the home is left out.
 #[test]

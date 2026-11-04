@@ -45,13 +45,15 @@ cargo loco watch
 ```
 
 Run one loop at a time, they share port 5150, and the watch loops 3001 for
-the live reload (Leptos's default). The `lsof` above stops an old loop's
+the live reload (`reload-port` in `Cargo.toml`, Leptos's default). The `lsof` above stops an old loop's
 `app` and `cargo-leptos` alone, never another program on those ports. Another
 port: `PORT=5151 cargo leptos watch --split -- start`.
 
 - **"Reload TCP port 127.0.0.1:3001 already in use":** another program
   holds 3001, VS Code's Markdown Preview Enhanced for one. Close its
-  preview, or put `LEPTOS_RELOAD_PORT=3002` on the command.
+  preview, or put `LEPTOS_RELOAD_PORT=3002` on the command and the same
+  port in `config/development.yaml`'s `connect-src`, or the CSP blocks the
+  reload.
 
 Find the running app:
 

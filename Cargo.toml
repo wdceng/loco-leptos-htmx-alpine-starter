@@ -320,6 +320,10 @@ assets-dir = "public"
 watch-additional-files = ["public"]
 # Must match where Loco listens (config/development.yaml).
 site-addr = "127.0.0.1:5150"
+# The watch loop's live reload, Leptos's default written out: the CSP's
+# `connect-src` allows it (config/development.yaml, config/test.yaml), and
+# tests/config.rs reads it from here, so a change in one place alone fails.
+reload-port = 3001
 # Server half builds with `ssr`, browser half with `hydrate`, nothing else.
 bin-features = ["ssr"]
 lib-features = ["hydrate"]

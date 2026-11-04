@@ -58,10 +58,21 @@ pub fn Dialog(
 }
 
 /// The button that closes the dialog `target` without doing its step.
+///
+/// No form owner (`form=""`): it sits inside the dialog's form as a rule,
+/// and Safari 17 runs no `popovertarget` on a button inside a form, so
+/// Cancel did nothing on iOS 17.5, the low bar; the others follow the spec
+/// either way (an islands app on this stack, a probe, 2026-11-04).
 #[component]
 pub fn DialogCancel(#[prop(into)] target: String) -> impl IntoView {
     view! {
-        <button type="button" popovertarget=target popovertargetaction="hide" class=QUIET_BUTTON>
+        <button
+            type="button"
+            form=""
+            popovertarget=target
+            popovertargetaction="hide"
+            class=QUIET_BUTTON
+        >
             "Cancel"
         </button>
     }
@@ -84,7 +95,8 @@ pub fn Fold(#[prop(into)] summary: String, children: Children) -> impl IntoView 
 
 /// Every part on one page, for the browser tests (`/e2e/parts`,
 /// controllers/parts.rs): a badge, a dialog with its opening button, a
-/// fold.
+/// fold. The dialog's Cancel inside a form, as a real dialog's is (Safari
+/// 17, [`DialogCancel`]); the form is never sent.
 #[component]
 pub fn PartsPage() -> impl IntoView {
     const DIALOG_ID: &str = "parts-dialog";
@@ -95,8 +107,10 @@ pub fn PartsPage() -> impl IntoView {
             "Open the dialog"
         </button>
         <Dialog id=DIALOG_ID title="A dialog">
-            <p class="mt-4">"What it asks."</p>
-            <DialogCancel target=DIALOG_ID />
+            <form method="post" hx-sync="this:drop">
+                <p class="mt-4">"What it asks."</p>
+                <DialogCancel target=DIALOG_ID />
+            </form>
         </Dialog>
         <Fold summary="A fold">
             <p>"What it holds."</p>

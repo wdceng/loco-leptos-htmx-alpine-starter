@@ -554,13 +554,26 @@ fn local_environments_key_on_the_peer_and_allow_live_reload(#[case] env: Environ
         "{env}: no proxy locally, the TCP peer is the visitor"
     );
     let settings = Settings::from_config(&config).expect("settings");
+    let port = reload_port();
+    let csp = &settings.security.content_security_policy;
     assert!(
-        settings
-            .security
-            .content_security_policy
-            .contains("ws://localhost:3001"),
-        "{env}: CSP must allow the cargo-leptos reload socket"
+        csp.contains(&format!("ws://localhost:{port} ws://127.0.0.1:{port};")),
+        "{env}: CSP must allow the cargo-leptos reload socket on `reload-port` {port} (Cargo.toml): {csp}"
     );
+}
+
+/// The watch loop's live-reload port, `reload-port` in Cargo.toml's
+/// `[package.metadata.leptos]`, read where it is set, so the CSP above
+/// follows it and a change made in one place alone fails.
+fn reload_port() -> u16 {
+    let manifest =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
+            .expect("Cargo.toml");
+    manifest
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("reload-port = "))
+        .and_then(|port| port.trim().parse().ok())
+        .expect("reload-port in Cargo.toml's [package.metadata.leptos]")
 }
 
 /// No config carries a JWT key, nor asks for `JWT_SECRET`: the site signs

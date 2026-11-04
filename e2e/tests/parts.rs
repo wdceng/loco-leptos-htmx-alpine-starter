@@ -1,7 +1,8 @@
 //! The parts of `views/parts.rs` in a real browser, on their page
 //! (`/e2e/parts`, the browser tests' environment alone): a dialog opens
 //! from its button, and Escape and its Cancel each close it, the browser's
-//! own popover with no script of the site's; a fold opens from its heading.
+//! own popover with no script of the site's, Cancel inside a form as a real
+//! dialog's is; a fold opens from its heading.
 
 use app_e2e::{Key, browse};
 use serde_json::Value;
@@ -21,6 +22,14 @@ async fn a_dialog_opens_and_escape_or_cancel_closes_it() {
             "closed at first"
         );
 
+        // Cancel inside the dialog's form, owned by none: Safari 17 runs no
+        // popovertarget on a button a form owns (views/parts.rs).
+        assert_eq!(
+            page.eval("return document.querySelector('#parts-dialog button[popovertargetaction=hide]').form")
+                .await?,
+            Value::Null,
+            "Cancel owned by no form"
+        );
         page.press("button[popovertarget=parts-dialog]").await?;
         page.until("the dialog open", OPEN).await?;
         page.press("#parts-dialog button[popovertargetaction=hide]")

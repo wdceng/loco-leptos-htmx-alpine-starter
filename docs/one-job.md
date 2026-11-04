@@ -29,7 +29,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
 | A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers, "check your mail"). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
-| A dialog over the page, and the step it asks; its Cancel | `Dialog`, `DialogCancel` (a native popover), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs` |
+| A dialog over the page, and the step it asks; its Cancel; a step beside a form, never a new tab (`no_page_opens_a_new_tab`) | `Dialog`, `DialogCancel` (a native popover, Cancel owned by no form for Safari 17), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs` |
 | A part folded under its heading | `Fold` (`<details>`) | `src/views/parts.rs` |
 | A count beside what it counts | `Badge` | `src/views/parts.rs` |
 | What floats over what: every `z-` | the scale in `docs/look.md` | `docs/look.md` |
