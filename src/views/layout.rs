@@ -160,6 +160,71 @@ pub const FIELD: &str = "mt-2 block min-h-11 w-full rounded-md border border-ink
 /// the field's `aria-describedby` points at its `id`.
 pub const PROBLEM: &str = "mt-6 font-semibold text-danger";
 
+/// The line saying what was just done, above the form: read out politely,
+/// never in the refusal's red.
+pub const SAID: &str = "mt-6 font-semibold";
+
+/// The line saying why a form was refused ([`PROBLEM`]), an alert: its
+/// refused field is `aria-invalid` and points at `id` (`aria-describedby`).
+/// Nothing where nothing was refused.
+#[component]
+pub fn ProblemLine(id: &'static str, problem: Option<String>) -> impl IntoView {
+    problem.map(|problem| {
+        view! {
+            <p id=id role="alert" class=PROBLEM>
+                {problem}
+            </p>
+        }
+    })
+}
+
+/// The line saying what was just done ([`SAID`]), a status; nothing where
+/// nothing was.
+#[component]
+pub fn SaidLine(said: Option<&'static str>) -> impl IntoView {
+    said.map(|said| {
+        view! {
+            <p role="status" class=SAID>
+                {said}
+            </p>
+        }
+    })
+}
+
+/// A form posting to `action`, the one way every form is sent: a second
+/// press sends nothing (`hx-sync`; htmx's default would queue one more
+/// post), the form is `aria-busy` while on its way, and its button takes
+/// the `busy:` look after 200 ms, so a fast answer never shows it. Never
+/// `disabled`, which drops the button's name and value from the post.
+/// Alpine's CSP build takes one expression per attribute. `class` its
+/// place on the page; `enctype` for a file; `described_by` a line about
+/// the whole form.
+#[component]
+pub fn BusyForm(
+    #[prop(into)] action: String,
+    #[prop(default = "mt-8 max-w-sm")] class: &'static str,
+    #[prop(optional)] enctype: Option<&'static str>,
+    #[prop(optional_no_strip)] described_by: Option<&'static str>,
+    children: Children,
+) -> impl IntoView {
+    view! {
+        <form
+            method="post"
+            action=action
+            enctype=enctype
+            class=class
+            aria-describedby=described_by
+            hx-sync="this:drop"
+            x-data="{ sending: false }"
+            x-on:htmx:before:request="sending = true"
+            x-on:htmx:finally:request="sending = false"
+            x-bind:aria-busy="sending"
+        >
+            {children()}
+        </form>
+    }
+}
+
 /// A form's submit button: a finger's height (`min-h-11`), and while htmx
 /// sends the form (`aria-busy` on the form, through Alpine) the `busy:`
 /// look after 200 ms, so a fast answer never shows it. Never `disabled`,
@@ -169,7 +234,8 @@ pub const BUTTON: &str = "mt-6 min-h-11 rounded-md bg-primary px-4 py-2 font-sem
 /// A link standing on its own line, the next step from a page: the way
 /// home under a notice, the sign-in page's ways to sign up or start over.
 /// Never in running text, where a link is told by more than its colour.
-pub const LINK: &str = "font-semibold text-primary";
+/// A finger's height (`min-h-11`), as every control standing on its own.
+pub const LINK: &str = "inline-flex min-h-11 items-center font-semibold text-primary";
 
 /// The ways on from an auth form, under it: one link a line.
 #[component]
@@ -411,7 +477,9 @@ pub fn shell(
                     // Below a status bar lying over the page, the app's
                     // webview on a phone (`--safe-area-top`).
                     <header class=format!("{COLUMN} pt-[calc(1.5rem+var(--safe-area-top))] pb-6")>
-                        <a href="/" class="font-semibold">{APP_NAME}</a>
+                        <a href="/" class="inline-flex min-h-11 items-center font-semibold">
+                            {APP_NAME}
+                        </a>
                     </header>
                     <main id="content" tabindex="-1" class=format!("{COLUMN} py-16 outline-hidden")>
                         {page}

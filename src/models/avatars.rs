@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 use sqlx::SqlitePool;
 
+use crate::sql;
+
 /// The avatars' folder (`uploads::avatars_folder`), made at boot and
 /// parked in the shared store.
 #[derive(Clone, Debug)]
@@ -15,17 +17,22 @@ pub struct Avatars(pub PathBuf);
 ///
 /// # Errors
 /// The database could not be read.
-pub async fn of(pool: &SqlitePool, user_id: i64) -> sqlx::Result<Option<String>> {
+pub async fn of<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    user_id: i64,
+) -> sqlx::Result<Option<String>> {
     Ok(
         sqlx::query_scalar!("SELECT avatar FROM users WHERE id = ?", user_id)
-            .fetch_optional(pool)
+            .fetch_optional(db)
             .await?
             .flatten(),
     )
 }
 
 /// The user whose row is `user_id` given the avatar `name`, or none: the
-/// one they had before.
+/// one they had before. Read and written in one write, so two pictures
+/// sent at once each hand back the one they replaced, and no file is left
+/// that nobody shows.
 ///
 /// # Errors
 /// The database refused the write.
@@ -34,10 +41,12 @@ pub async fn set(
     user_id: i64,
     name: Option<&str>,
 ) -> sqlx::Result<Option<String>> {
-    let before = of(pool, user_id).await?;
+    let mut tx = sql::write(pool).await?;
+    let before = of(&mut *tx, user_id).await?;
     sqlx::query!("UPDATE users SET avatar = ? WHERE id = ?", name, user_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     Ok(before)
 }
 

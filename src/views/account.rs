@@ -15,7 +15,7 @@ use crate::{
     },
     uploads::{SHRINK_SIDE, SHRINK_UNDER},
     views::{
-        layout::{BUTTON, FIELD, LEAD, Notice, PROBLEM, TITLE},
+        layout::{BUTTON, BusyForm, FIELD, LEAD, Notice, ProblemLine, SaidLine, TITLE},
         parts::{DANGER_BUTTON, Dialog, DialogCancel},
     },
 };
@@ -35,11 +35,17 @@ const DELETE_PROBLEM: &str = "delete-problem";
 /// The `id` of the dialog that asks before the account is deleted.
 const DELETE_DIALOG: &str = "delete-account";
 
-/// What a form on the page refused, by the form.
+/// A form's place on the page.
+const FORM: &str = "mt-6 max-w-sm";
+
+/// What a form on the page refused, by the field: that field is marked.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Problem {
     Avatar(String),
-    Password(String),
+    /// The current password, which the new one's form asks first.
+    Current(String),
+    /// The new password's rule.
+    New(String),
     Delete(String),
 }
 
@@ -68,42 +74,9 @@ fn when(at: DateTime<Utc>) -> String {
     at.format("%-d %b %Y, %H:%M UTC").to_string()
 }
 
-/// While a form is on its way, as `ResetForm`: a second press sends
-/// nothing (`hx-sync`), the form is `aria-busy`, and the button takes the
-/// `busy:` look after 200 ms. Alpine's CSP build takes one expression per
-/// attribute.
-#[component]
-fn BusyForm(action: String, children: Children) -> impl IntoView {
-    view! {
-        <form
-            method="post"
-            action=action
-            class="mt-6 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
-            {children()}
-        </form>
-    }
-}
-
-/// The line saying why a form was refused, an alert its field points at.
-#[component]
-fn ProblemLine(id: &'static str, said: Option<String>) -> impl IntoView {
-    said.map(|said| {
-        view! {
-            <p id=id role="alert" class=PROBLEM>
-                {said}
-            </p>
-        }
-    })
-}
-
 /// The page: who, the browsers, a new password, the deletion. `problem` is
-/// what a form refused last, `said` what was just done.
+/// what a form refused last, `said` what was just done. Every form is sent
+/// as every form is (`BusyForm`).
 #[component]
 pub fn AccountPage(
     name: String,
@@ -116,22 +89,27 @@ pub fn AccountPage(
     said: Option<&'static str>,
 ) -> impl IntoView {
     let avatar_problem = match &problem {
-        Some(Problem::Avatar(said)) => Some(said.clone()),
+        Some(Problem::Avatar(line)) => Some(line.clone()),
         _ => None,
     };
+    let (current_refused, new_refused) = (
+        matches!(problem, Some(Problem::Current(_))),
+        matches!(problem, Some(Problem::New(_))),
+    );
     let password_problem = match &problem {
-        Some(Problem::Password(said)) => Some(said.clone()),
+        Some(Problem::Current(line) | Problem::New(line)) => Some(line.clone()),
         _ => None,
     };
     let delete_problem = match &problem {
-        Some(Problem::Delete(said)) => Some(said.clone()),
+        Some(Problem::Delete(line)) => Some(line.clone()),
         _ => None,
     };
+    let (avatar_refused, delete_refused) = (avatar_problem.is_some(), delete_problem.is_some());
     let others = browsers.0.iter().filter(|(_, here)| !here).count();
     view! {
         <h1 class=TITLE>"Your account"</h1>
         <p class=LEAD>{format!("{name}, {email}.")}</p>
-        {said.map(|said| view! { <p role="status" class="mt-6 font-semibold">{said}</p> })}
+        <SaidLine said />
 
         <h2 class=HEADING>"Your picture"</h2>
         {avatar
@@ -146,21 +124,11 @@ pub fn AccountPage(
                     />
                 }
             })}
-        <ProblemLine id=AVATAR_PROBLEM said=avatar_problem.clone() />
+        <ProblemLine id=AVATAR_PROBLEM problem=avatar_problem />
         // A photo shrunk in the browser before it goes (`data-shrink`, the
         // `shrink` in islands.rs), so a phone's photo doesn't go up whole
         // over mobile data; the server makes the avatar either way.
-        <form
-            method="post"
-            action=AVATAR
-            enctype="multipart/form-data"
-            class="mt-6 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <BusyForm action=AVATAR class=FORM enctype="multipart/form-data">
             <label for="avatar" class="block font-semibold">
                 "A photo, JPEG, PNG or WebP"
             </label>
@@ -172,13 +140,14 @@ pub fn AccountPage(
                 required
                 data-shrink=SHRINK_SIDE.to_string()
                 data-shrink-under=SHRINK_UNDER.to_string()
-                aria-describedby=avatar_problem.is_some().then_some(AVATAR_PROBLEM)
+                aria-invalid=avatar_refused.then_some("true")
+                aria-describedby=avatar_refused.then_some(AVATAR_PROBLEM)
                 class=FIELD
             />
             <button type="submit" class=BUTTON>
                 "Save the picture"
             </button>
-        </form>
+        </BusyForm>
 
         <h2 class=HEADING>"Where you're signed in"</h2>
         <ul class="mt-6 space-y-4">
@@ -206,7 +175,7 @@ pub fn AccountPage(
                             </p>
                             {if here {
                                 view! {
-                                    <BusyForm action=LOGOUT.to_string()>
+                                    <BusyForm action=LOGOUT class=FORM>
                                         <button type="submit" class=BUTTON>
                                             "Sign out"
                                         </button>
@@ -215,7 +184,7 @@ pub fn AccountPage(
                                     .into_any()
                             } else {
                                 view! {
-                                    <BusyForm action=close_one(browser.id)>
+                                    <BusyForm action=close_one(browser.id) class=FORM>
                                         <button type="submit" class=BUTTON>
                                             "Sign it out"
                                         </button>
@@ -231,7 +200,7 @@ pub fn AccountPage(
         {(others > 1)
             .then(|| {
                 view! {
-                    <BusyForm action=CLOSE_OTHERS.to_string()>
+                    <BusyForm action=CLOSE_OTHERS class=FORM>
                         <button type="submit" class=BUTTON>
                             "Sign out every other browser"
                         </button>
@@ -245,8 +214,8 @@ pub fn AccountPage(
                 "{PASSWORD_MIN} to {PASSWORD_MAX} characters. Every other browser is signed out.",
             )}
         </p>
-        <ProblemLine id=PASSWORD_PROBLEM said=password_problem.clone() />
-        <BusyForm action=PASSWORD.to_string()>
+        <ProblemLine id=PASSWORD_PROBLEM problem=password_problem />
+        <BusyForm action=PASSWORD class=FORM>
             <label for="current" class="block font-semibold">
                 "Current password"
             </label>
@@ -256,7 +225,8 @@ pub fn AccountPage(
                 type="password"
                 autocomplete="current-password"
                 required
-                aria-describedby=password_problem.is_some().then_some(PASSWORD_PROBLEM)
+                aria-invalid=current_refused.then_some("true")
+                aria-describedby=current_refused.then_some(PASSWORD_PROBLEM)
                 class=FIELD
             />
             <label for="password" class="mt-6 block font-semibold">
@@ -270,6 +240,8 @@ pub fn AccountPage(
                 required
                 minlength=PASSWORD_MIN
                 maxlength=PASSWORD_MAX
+                aria-invalid=new_refused.then_some("true")
+                aria-describedby=new_refused.then_some(PASSWORD_PROBLEM)
                 class=FIELD
             />
             <button type="submit" class=BUTTON>
@@ -281,12 +253,12 @@ pub fn AccountPage(
         <p class=LEAD>
             "Your account and everything signed in with it are gone, at once and for good."
         </p>
-        <ProblemLine id=DELETE_PROBLEM said=delete_problem.clone() />
+        <ProblemLine id=DELETE_PROBLEM problem=delete_problem />
         <button type="button" popovertarget=DELETE_DIALOG class=DANGER_BUTTON>
             "Delete my account"
         </button>
         <Dialog id=DELETE_DIALOG title="Delete your account?">
-        <BusyForm action=DELETE.to_string()>
+        <BusyForm action=DELETE class=FORM>
             {(!proven)
                 .then(|| {
                     view! {
@@ -298,10 +270,10 @@ pub fn AccountPage(
                             name="password"
                             type="password"
                             autocomplete="current-password"
+                            autofocus
                             required
-                            aria-describedby=delete_problem
-                                .is_some()
-                                .then_some(DELETE_PROBLEM)
+                            aria-invalid=delete_refused.then_some("true")
+                            aria-describedby=delete_refused.then_some(DELETE_PROBLEM)
                             class=FIELD
                         />
                     }
@@ -320,7 +292,9 @@ pub fn AccountPage(
                 <button type="submit" class=DANGER_BUTTON>
                     "Delete it for good"
                 </button>
-                <DialogCancel target=DELETE_DIALOG />
+                // The focus on Cancel where no password is asked, never on
+                // the step that can't be undone.
+                <DialogCancel target=DELETE_DIALOG autofocus=proven />
             </div>
         </BusyForm>
         </Dialog>

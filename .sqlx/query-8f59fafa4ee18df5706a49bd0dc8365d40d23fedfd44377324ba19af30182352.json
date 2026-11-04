@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT count(*) AS \"failures!: i64\", max(at) AS \"last: DateTime<Utc>\"\n           FROM auth_events\n           WHERE user_id = ? AND event IN (?, ?) AND id > COALESCE((\n               SELECT max(id) FROM auth_events\n               WHERE user_id = ? AND event IN (?, ?, ?)), 0)",
+  "describe": {
+    "columns": [
+      {
+        "name": "failures!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "last: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "8f59fafa4ee18df5706a49bd0dc8365d40d23fedfd44377324ba19af30182352"
+}

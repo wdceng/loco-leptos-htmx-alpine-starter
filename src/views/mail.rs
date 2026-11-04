@@ -66,6 +66,21 @@ pub fn SignInCodeMail(code: String, minutes: i64) -> impl IntoView {
     }
 }
 
+/// Wrong sign-in codes in a row after a right password
+/// (`AuthMailer::code_failures`): how many, in which browser, and what to do
+/// if it wasn't the person.
+#[component]
+pub fn CodeFailuresMail(tries: i64, browser: String) -> impl IntoView {
+    view! {
+        <p>
+            {format!(
+                "{tries} wrong sign-in codes in a row were typed for your account, in {browser}. The password was right each time.",
+            )}
+        </p>
+        <p>"If that wasn't you, someone has your password: change it on your account page."</p>
+    }
+}
+
 #[component]
 pub fn MagicLinkMail(login_link: String) -> impl IntoView {
     view! {

@@ -11,16 +11,13 @@ use crate::{
         verify::{PATH, RESEND},
     },
     models::users::EMAIL_VERIFICATION_EXPIRATION_HOURS,
-    views::layout::{APP_NAME, BUTTON, FIELD, LEAD, NextSteps, Notice, TITLE},
+    views::layout::{APP_NAME, BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
 };
 
 /// The button: the token from the mail's link in a hidden field. Opening
 /// the page verifies nothing; the press does, so a mail scanner that opens
-/// the link leaves the account as it was.
-///
-/// While it's on its way, as `ResetForm`: a second press sends nothing
-/// (`hx-sync`), the form is `aria-busy`, and the button takes the `busy:`
-/// look after 200 ms.
+/// the link leaves the account as it was. Sent as every form is
+/// (`BusyForm`).
 #[component]
 pub fn VerifyForm(token: String) -> impl IntoView {
     view! {
@@ -30,46 +27,23 @@ pub fn VerifyForm(token: String) -> impl IntoView {
                 "Press the button to finish signing up to {APP_NAME}. If you didn't sign up, close this page: nothing happens.",
             )}
         </p>
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=PATH
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <BusyForm action=PATH class="">
             <input type="hidden" name="token" value=token />
             <button type="submit" class=BUTTON>
                 "Verify my email"
             </button>
-        </form>
+        </BusyForm>
     }
 }
 
 /// `/verify` without a token: the form that sends the welcome mail again,
-/// the account's email its one field.
-///
-/// While it's on its way, as `ResetForm`: a second press sends nothing
-/// (`hx-sync`), the form is `aria-busy`, and the button takes the `busy:`
-/// look after 200 ms.
+/// the account's email its one field. Sent as every form is (`BusyForm`).
 #[component]
 pub fn ResendForm() -> impl IntoView {
     view! {
         <h1 class=TITLE>"Send the welcome mail again"</h1>
         <p class=LEAD>"Its link verifies your email, so you can sign in."</p>
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=RESEND
-            class="mt-8 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <BusyForm action=RESEND>
             <label for="email" class="block font-semibold">"Email"</label>
             <input
                 id="email"
@@ -82,7 +56,7 @@ pub fn ResendForm() -> impl IntoView {
             <button type="submit" class=BUTTON>
                 "Send it again"
             </button>
-        </form>
+        </BusyForm>
         <NextSteps links=vec![(login::PATH, "Verified already? Sign in")] />
     }
 }

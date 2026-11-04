@@ -5,7 +5,7 @@
 use app::{
     app::App,
     models::{sessions::Session, users},
-    sql,
+    sql, uploads,
 };
 use chrono::{Duration, Utc};
 use loco_rs::testing::prelude::*;
@@ -17,6 +17,17 @@ const EMAIL: &str = "account@example.com";
 const MAC: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0";
 const IPHONE: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
+/// Whether the field `id` on `page` is marked refused: `aria-invalid`, and
+/// pointing at the reason.
+fn marked(page: &str, id: &str) -> bool {
+    page.split(&format!(r#"<input id="{id}""#))
+        .nth(1)
+        .and_then(|rest| rest.split('>').next())
+        .is_some_and(|tag| {
+            tag.contains(r#"aria-invalid="true""#) && tag.contains("aria-describedby=")
+        })
+}
 
 /// The session id behind `cookie` (`session=…`).
 async fn session_id(ctx: &loco_rs::app::AppContext, cookie: &str) -> i64 {
@@ -136,6 +147,10 @@ async fn a_new_password_needs_the_current_one_and_signs_out_the_rest() {
         let body = wrong.text();
         assert!(body.contains("<title>Error: Your account | "), "{body}");
         assert!(body.contains("That isn't your current password."), "{body}");
+        // The field refused is the one marked, and the one pointing at the
+        // reason.
+        assert!(marked(&body, "current"), "{body}");
+        assert!(!marked(&body, "password"), "{body}");
 
         let short = request
             .post("/account/password")
@@ -143,7 +158,10 @@ async fn a_new_password_needs_the_current_one_and_signs_out_the_rest() {
             .form(&serde_json::json!({ "current": PASSWORD, "password": "short" }))
             .await;
         assert_eq!(short.status_code(), 400);
-        assert!(short.text().contains("must be 8 to 128 characters"));
+        let body = short.text();
+        assert!(body.contains("must be 8 to 128 characters"));
+        assert!(marked(&body, "password"), "{body}");
+        assert!(!marked(&body, "current"), "{body}");
 
         let done = request
             .post("/account/password")
@@ -389,6 +407,32 @@ async fn the_avatar_is_made_served_replaced_and_taken_away() {
             request.get(&second).await.status_code(),
             404,
             "gone with the account"
+        );
+    })
+    .await;
+}
+
+/// A body over the route's limit is told so, not "choose a picture": the
+/// multipart's error was once read as no field at all.
+#[tokio::test]
+#[serial]
+async fn a_picture_over_the_limit_is_told_so() {
+    request::<App, _, _>(|request, ctx| async move {
+        user(&ctx, EMAIL, true).await;
+        let here = session_cookie(&request, EMAIL, MAC).await;
+        let (kind, body) = avatar_form(&vec![0; uploads::MAX_BYTES + 1_000_000]);
+        let refused = request
+            .post("/account/avatar")
+            .add_header("cookie", here)
+            .bytes(body)
+            .content_type(&kind)
+            .await;
+        assert_eq!(refused.status_code(), 400);
+        let page = refused.text();
+        assert!(page.contains(uploads::TOO_LARGE), "{page}");
+        assert!(
+            page.contains(r#"aria-invalid="true""#),
+            "the field marked: {page}"
         );
     })
     .await;

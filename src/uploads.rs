@@ -20,6 +20,7 @@
 use std::{
     io::Cursor,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use image::{
@@ -59,6 +60,13 @@ pub const PREFIX: &str = "/uploads/avatars/";
 /// What an upload that isn't taken is told.
 pub const NOT_A_PICTURE: &str =
     "That isn't a picture we can use. Send a JPEG, PNG or WebP photo, at most 6000 pixels a side.";
+
+/// The writes so far, each file's own number while it is written ([`keep`]).
+static PARTS: AtomicU64 = AtomicU64::new(0);
+
+/// What an upload over [`MAX_BYTES`] is told: one the browser couldn't
+/// shrink, or sent where no WASM runs.
+pub const TOO_LARGE: &str = "That picture is over 10 MB. Send a smaller one.";
 
 /// The avatars' folder, made when missing: at boot, so a server that may
 /// not write there says so at once.
@@ -143,7 +151,11 @@ pub fn is_name(name: &str) -> bool {
 }
 
 /// `jpeg` kept in `folder` by its name, unless it is there already: its
-/// name.
+/// name. Written under a name of its own first, then renamed, so a file by
+/// its hash is always whole: one cut short by a full disk or a crash would
+/// otherwise stay, found there the next time, and be cached for a year.
+/// Each write's own name ([`PARTS`]), so two sending the same picture at
+/// once never write into one file.
 ///
 /// # Errors
 /// The file can't be written.
@@ -151,7 +163,10 @@ pub async fn keep(folder: &Path, jpeg: &[u8]) -> std::io::Result<String> {
     let name = name_of(jpeg);
     let path = folder.join(&name);
     if !tokio::fs::try_exists(&path).await? {
-        tokio::fs::write(&path, jpeg).await?;
+        let number = PARTS.fetch_add(1, Ordering::Relaxed);
+        let part = folder.join(format!(".{name}.{number}.part"));
+        tokio::fs::write(&part, jpeg).await?;
+        tokio::fs::rename(&part, &path).await?;
     }
     Ok(name)
 }
@@ -201,6 +216,13 @@ mod tests {
     fn what_isnt_a_picture_or_is_too_large_is_refused() {
         assert_eq!(avatar(b"not a picture"), Err(NOT_A_PICTURE));
         assert_eq!(avatar(&png(MAX_SIDE + 1, 10)), Err(NOT_A_PICTURE));
+    }
+
+    /// The refusals name the limits they say.
+    #[test]
+    fn the_refusals_name_the_limits() {
+        assert!(TOO_LARGE.contains(&format!("{} MB", MAX_BYTES / 1_000_000)));
+        assert!(NOT_A_PICTURE.contains(&format!("{MAX_SIDE} pixels")));
     }
 
     #[test]

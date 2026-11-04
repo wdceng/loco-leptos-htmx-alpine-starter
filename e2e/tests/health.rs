@@ -208,15 +208,17 @@ async fn no_page_scrolls_sideways_at_five_widths() {
 
 /// Every control on the page under 44px tall, as `height tag text`: links,
 /// buttons and fields a finger taps. A link inside a sentence is left out
-/// (WCAG's inline exception), and a field counts its label's box when the
-/// label holds it.
+/// (WCAG's inline exception): inline, with text of its own beside it; a
+/// link alone on its line is a control, inline or not. A field counts its
+/// label's box when the label holds it.
 async fn small_targets(page: &Page) -> WebDriverResult<Vec<String>> {
     let small = page
         .eval(
             "const small = [];
              for (const e of document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea')) {
                if (!e.checkVisibility({ visibilityProperty: true, checkVisibilityCSS: true, opacityProperty: true, checkOpacity: true })) continue;
-               if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') continue;
+               if (e.tagName === 'A' && getComputedStyle(e).display === 'inline'
+                   && e.parentElement.textContent.trim() !== e.textContent.trim()) continue;
                let r = e.getBoundingClientRect();
                if (r.width <= 1 || r.height <= 1) continue;
                if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName)) r = (e.closest('label') ?? e).getBoundingClientRect();

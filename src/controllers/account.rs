@@ -15,7 +15,7 @@
 use axum::{
     Form,
     body::Body,
-    extract::{DefaultBodyLimit, Multipart, Path, Request},
+    extract::{DefaultBodyLimit, Multipart, Path, Request, multipart::MultipartError},
     http::{StatusCode, header::LOCATION, request::Parts},
 };
 // Named import on purpose: `leptos::prelude::*` also exports an `Error`
@@ -30,8 +30,9 @@ use crate::{
     cookies,
     middleware::rate_limit::auth_limited,
     models::{
+        auth_events,
         avatars::{self, Avatars},
-        sessions::Session,
+        sessions::{self, Session},
         sign_ins::SignIn,
         users::{self, password_problem},
     },
@@ -166,22 +167,12 @@ async fn avatar(
         return Ok(forbidden);
     }
     let req = Request::from_parts(parts, Body::empty());
-    let mut upload = Vec::new();
-    while let Ok(Some(field)) = form.next_field().await {
-        if field.name() == Some("avatar") {
-            upload = field
-                .bytes()
-                .await
-                .map(|bytes| bytes.to_vec())
-                .unwrap_or_default();
-        }
-    }
-    let made = if upload.is_empty() {
-        Err("Choose a picture first.")
-    } else {
-        tokio::task::spawn_blocking(move || uploads::avatar(&upload))
+    let made = match avatar_field(&mut form).await {
+        Ok(upload) if upload.is_empty() => Err("Choose a picture first."),
+        Ok(upload) => tokio::task::spawn_blocking(move || uploads::avatar(&upload))
             .await
-            .map_err(Error::wrap)?
+            .map_err(Error::wrap)?,
+        Err(reason) => Err(reason),
     };
     let jpeg = match made {
         Ok(jpeg) => jpeg,
@@ -210,6 +201,26 @@ async fn avatar(
     tracing::info!(pid = signed.user.pid.to_string(), "avatar changed");
     let said = "Your picture is changed.";
     answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
+}
+
+/// The bytes of the form's `avatar` field, empty where none came. Refused
+/// where the body ran over the route's limit ([`uploads::TOO_LARGE`]) or
+/// broke off ([`uploads::NOT_A_PICTURE`]), never read as no picture.
+async fn avatar_field(form: &mut Multipart) -> std::result::Result<Vec<u8>, &'static str> {
+    let refusal = |e: MultipartError| {
+        if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
+            uploads::TOO_LARGE
+        } else {
+            uploads::NOT_A_PICTURE
+        }
+    };
+    let mut upload = Vec::new();
+    while let Some(field) = form.next_field().await.map_err(refusal)? {
+        if field.name() == Some("avatar") {
+            upload = field.bytes().await.map_err(refusal)?.to_vec();
+        }
+    }
+    Ok(upload)
 }
 
 /// The avatar `name` taken away from `folder` once no user shows it.
@@ -278,12 +289,11 @@ async fn password(
     }
     let req = Request::from_parts(parts, Body::empty());
     let refused = if signed.user.verify_password(&form.current).await {
-        password_problem(&form.password)
+        password_problem(&form.password).map(Problem::New)
     } else {
-        Some(WRONG_PASSWORD.to_string())
+        Some(Problem::Current(WRONG_PASSWORD.to_string()))
     };
-    if let Some(reason) = refused {
-        let problem = Problem::Password(reason);
+    if let Some(problem) = refused {
         return answer(
             &ctx,
             req,
@@ -301,7 +311,8 @@ async fn password(
         .into_active_model()
         .reset_password(&ctx.db, &form.password)
         .await?;
-    Session::close_others(pool, user.id, signed.session.id)
+    let kept = signed.session.id;
+    Session::after_new_password(pool, user.id, sessions::NewPassword::Changed { kept })
         .await
         .map_err(Error::wrap)?;
     Session::prove(pool, signed.session.id)
@@ -348,6 +359,9 @@ async fn delete(
         .await
         .map_err(Error::wrap)?;
     SignIn::close_all(pool, signed.user.id)
+        .await
+        .map_err(Error::wrap)?;
+    auth_events::forget(pool, signed.user.id)
         .await
         .map_err(Error::wrap)?;
     let avatar = avatars::of(pool, signed.user.id)

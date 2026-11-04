@@ -17,11 +17,10 @@ delete Document.parseHTMLUnsafe;
 
 // In blocks, so these consts stay out of the page's global scope.
 {
-  // 2. Wake islands htmx swaps in, as Leptos's own router does.
-  //    Islands already on the page are Leptos's first pass: mark them.
-  for (const el of document.querySelectorAll("leptos-island")) {
-    el.$$hydrated = true;
-  }
+  // 2. Wake islands htmx swaps in, as Leptos's own router does. The
+  //    islands the page loads with are Leptos's first pass: this script
+  //    runs in <head>, before any is parsed, so the observer below marks
+  //    them as the parser adds them, the wasm not yet there to wake them.
   const wake = () => {
     const hydrate = window.__hydrateIsland;
     for (const el of document.querySelectorAll("leptos-island")) {

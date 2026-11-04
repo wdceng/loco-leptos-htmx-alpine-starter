@@ -85,9 +85,9 @@ shut_down() {
     sleep 2
     xcrun simctl shutdown "$own_sim" 2>/dev/null || true
   fi
-  [[ -n $own_emulator ]] && "$adb" -s "$own_emulator" emu kill >/dev/null 2>&1
+  [[ -n $own_emulator ]] && { "$adb" -s "$own_emulator" emu kill >/dev/null 2>&1 || true; }
   [[ -n $own_emulator_pid ]] && { kill "$own_emulator_pid" 2>/dev/null || true; }
-  [[ -n $own_mac ]] && kill "$own_mac" 2>/dev/null
+  [[ -n $own_mac ]] && { kill "$own_mac" 2>/dev/null || true; }
   own_sim=
   own_emulator=
   own_emulator_pid=

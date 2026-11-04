@@ -30,8 +30,13 @@ pub const DANGER_BUTTON: &str = "mt-6 min-h-11 rounded-md bg-danger px-4 py-2 fo
 /// A small dialog, `id` what its opening button's `popovertarget` names and
 /// `title` its heading, `children` what it holds, a form as a rule, its
 /// buttons ending with [`DialogCancel`]. A native popover (`popover="auto"`):
-/// the browser centres it over a veil, puts the focus in it, and closes it
-/// on Escape, a tap outside or the cancel button, no script of the site's.
+/// the browser centres it over a veil and closes it on Escape, a tap
+/// outside or the cancel button, no script of the site's. The focus goes in
+/// only to an `autofocus` element inside, so one is always marked: the
+/// first field, or Cancel where there is none, never the step that can't be
+/// undone. Without it the focus stayed on the opening button, outside what
+/// `aria-modal` lets a screen reader reach (Chrome, Firefox, Edge, the
+/// browser tests, 2026-11-04).
 #[component]
 pub fn Dialog(
     #[prop(into)] id: String,
@@ -63,14 +68,19 @@ pub fn Dialog(
 /// and Safari 17 runs no `popovertarget` on a button inside a form, so
 /// Cancel did nothing on iOS 17.5, the low bar; the others follow the spec
 /// either way (an islands app on this stack, a probe, 2026-11-04).
+/// `autofocus` where the dialog has no field to take the focus ([`Dialog`]).
 #[component]
-pub fn DialogCancel(#[prop(into)] target: String) -> impl IntoView {
+pub fn DialogCancel(
+    #[prop(into)] target: String,
+    #[prop(optional)] autofocus: bool,
+) -> impl IntoView {
     view! {
         <button
             type="button"
             form=""
             popovertarget=target
             popovertargetaction="hide"
+            autofocus=autofocus
             class=QUIET_BUTTON
         >
             "Cancel"
@@ -109,7 +119,7 @@ pub fn PartsPage() -> impl IntoView {
         <Dialog id=DIALOG_ID title="A dialog">
             <form method="post" hx-sync="this:drop">
                 <p class="mt-4">"What it asks."</p>
-                <DialogCancel target=DIALOG_ID />
+                <DialogCancel target=DIALOG_ID autofocus=true />
             </form>
         </Dialog>
         <Fold summary="A fold">

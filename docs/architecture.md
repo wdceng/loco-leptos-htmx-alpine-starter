@@ -70,7 +70,7 @@ template carries no one's brand. Four role tokens in `style/tailwind.css`
 only the tokens, never a scale step like `gray-600`, so a new look changes
 those four lines, not the views.
 
-**Hashed asset names** - `LEPTOS_HASH_FILES=true cargo leptos build --release`
+**Hashed asset names** - `LEPTOS_HASH_FILES=true cargo leptos build --release --split`
 names the bundle and stylesheet by content hash and writes `hash.txt`, which
 `src/assets.rs` reads at boot to link them. Production's one-year cache
 depends on it, so every release is built this way. `Cargo.toml` leaves

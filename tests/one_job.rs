@@ -126,7 +126,25 @@ fn every_form_is_sent_in_the_one_sending_state() {
     assert_one_home(
         "x-bind:disabled=\"sending\"",
         &[],
-        "the form's `aria-busy` and the `busy:` variant, as `ResetForm` (views/reset.rs)",
+        "the form's `aria-busy` and the `busy:` variant, `BusyForm` (views/layout.rs)",
+    );
+}
+
+/// Every form is sent through `BusyForm`, and every refusal said by
+/// `ProblemLine` (views/layout.rs): the sending state was written out in
+/// ten forms and the refusal's line in five, the account page's own pair
+/// private beside them, until 2026-11-04.
+#[test]
+fn every_form_is_sent_and_refused_through_the_one_component() {
+    assert_one_home(
+        "sending = true",
+        &["views/layout.rs"],
+        "`BusyForm` (views/layout.rs)",
+    );
+    assert_one_home(
+        "role=\"alert\"",
+        &["views/layout.rs"],
+        "`ProblemLine` (views/layout.rs)",
     );
 }
 
@@ -199,7 +217,7 @@ fn every_grid_column_can_shrink() {
     );
 }
 
-/// Every form names its `hx-sync`, as `ResetForm` does (`this:drop`). The
+/// Every form names its `hx-sync`, as `BusyForm` does (`this:drop`). The
 /// shell's region sends every form through htmx, and htmx 4's default
 /// queues a second submit, which Enter in a field sends whatever the button
 /// shows: a second post, with a reset token the first one used up. A
@@ -219,7 +237,7 @@ fn every_form_names_its_hx_sync() {
             forms += 1;
         }
     }
-    assert!(forms > 0, "no <form> found: has ResetForm moved?");
+    assert!(forms > 0, "no <form> found: has BusyForm moved?");
 }
 
 /// Whether a request asks for a page is read in one place: the not-found

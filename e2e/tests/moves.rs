@@ -170,6 +170,18 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
         .await?;
         page.settled().await?;
         assert!(page.in_place().await?, "Back in place");
+        // Arrived as a link's page does: Back's swap keeps the region, so
+        // only the restore's own step gives the focus and the title.
+        page.until(
+            "the focus on <main> after Back",
+            "return document.activeElement?.id === 'content'",
+        )
+        .await?;
+        page.until(
+            "Back's title read out",
+            "return document.getElementById('page-announce').textContent === document.title",
+        )
+        .await?;
         page.until(
             "the scroll put back",
             &format!("return Math.abs(window.scrollY - {before}) < 2"),
@@ -222,6 +234,39 @@ async fn a_404_and_a_500_are_shown_in_the_region() {
         )
         .await?;
         assert!(page.in_place().await?, "the 500 in place");
+        Ok(())
+    })
+    .await;
+}
+
+/// Back to a page that answers with an error loads it plainly: htmx sends
+/// Back's request from `<body>`, out of the region's `hx-status`, and left
+/// the later page showing under the earlier address.
+#[tokio::test]
+async fn back_to_a_page_that_fails_loads_it_plainly() {
+    browse(|page| async move {
+        page.allow_failed_load(404, "/no-such-page");
+        page.open("/").await?;
+        page.mark().await?;
+        page.add_link("/no-such-page").await?;
+        page.press("#e2e-link").await?;
+        page.until(
+            "the not-found page in the region",
+            "return document.body.innerText.includes('Page not found')",
+        )
+        .await?;
+        page.move_to(HOME_LINK, "/").await?;
+        page.eval("history.back()").await?;
+        page.until(
+            "the not-found page back, loaded plainly",
+            "return location.pathname === '/no-such-page'
+                 && document.body.innerText.includes('Page not found')",
+        )
+        .await?;
+        assert!(
+            !page.in_place().await?,
+            "loaded plainly, not left as it was"
+        );
         Ok(())
     })
     .await;

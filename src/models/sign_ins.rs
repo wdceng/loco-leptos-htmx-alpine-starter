@@ -220,9 +220,12 @@ impl SignIn {
     ///
     /// # Errors
     /// The database refused the write.
-    pub async fn close_all(pool: &SqlitePool, user_id: i64) -> sqlx::Result<()> {
+    pub async fn close_all<'e>(
+        db: impl sqlx::SqliteExecutor<'e>,
+        user_id: i64,
+    ) -> sqlx::Result<()> {
         sqlx::query!("DELETE FROM sign_ins WHERE user_id = ?", user_id)
-            .execute(pool)
+            .execute(db)
             .await?;
         Ok(())
     }

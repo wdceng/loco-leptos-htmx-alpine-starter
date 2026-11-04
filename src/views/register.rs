@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use crate::{
     controllers::{login, register::PATH},
     models::users::{EMAIL_VERIFICATION_EXPIRATION_HOURS, PASSWORD_MAX, PASSWORD_MIN},
-    views::layout::{BUTTON, FIELD, LEAD, NextSteps, Notice, PROBLEM, TITLE},
+    views::layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, ProblemLine, TITLE},
 };
 
 /// The `id` of the line saying why the sign-up was refused.
@@ -16,11 +16,8 @@ const SIGN_UP_PROBLEM: &str = "sign-up-problem";
 /// The form: the name, the email and the password. `problem` is what the
 /// server refused last time, if anything; then the name and email typed
 /// come back and the line is above the form, an alert. Which field it
-/// names is in its words: the rules are checked one after another.
-///
-/// While it's on its way, as `ResetForm`: a second press sends nothing
-/// (`hx-sync`), the form is `aria-busy`, and the button takes the `busy:`
-/// look after 200 ms.
+/// names is in its words: the rules are checked one after another, so the
+/// line is the whole form's. Sent as every form is (`BusyForm`).
 #[component]
 pub fn RegisterForm(name: String, email: String, problem: Option<String>) -> impl IntoView {
     let refused = problem.is_some();
@@ -29,26 +26,8 @@ pub fn RegisterForm(name: String, email: String, problem: Option<String>) -> imp
         <p class=LEAD>
             {format!("A password of {PASSWORD_MIN} to {PASSWORD_MAX} characters. Any characters work.")}
         </p>
-        {problem
-            .map(|problem| {
-                view! {
-                    <p id=SIGN_UP_PROBLEM role="alert" class=PROBLEM>
-                        {problem}
-                    </p>
-                }
-            })}
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=PATH
-            class="mt-8 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-            aria-describedby=refused.then_some(SIGN_UP_PROBLEM)
-        >
+        <ProblemLine id=SIGN_UP_PROBLEM problem />
+        <BusyForm action=PATH described_by=refused.then_some(SIGN_UP_PROBLEM)>
             <label for="name" class="block font-semibold">"Name"</label>
             <input
                 id="name"
@@ -84,7 +63,7 @@ pub fn RegisterForm(name: String, email: String, problem: Option<String>) -> imp
             <button type="submit" class=BUTTON>
                 "Sign up"
             </button>
-        </form>
+        </BusyForm>
         <NextSteps links=vec![(login::PATH, "Have an account? Sign in")] />
     }
 }

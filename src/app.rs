@@ -2,6 +2,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use axum::Router;
+use chrono::Utc;
 use leptos::config::get_configuration;
 use loco_rs::{
     Error, Result,
@@ -26,9 +27,9 @@ use crate::{
         rate_limit::{self, RateLimit},
         request_log::RequestLog,
     },
-    models::{_entities::users, avatars::Avatars},
+    models::{_entities::users, auth_events, avatars::Avatars},
     settings::Settings,
-    tasks, uploads,
+    sql, tasks, uploads,
     workers::downloader::DownloadWorker,
 };
 
@@ -133,6 +134,11 @@ impl Hooks for App {
         // One SMTP login in the background when deployed: a wrong mail
         // account shows in the journal at boot, not at the first mail.
         deploy_checks::spawn_smtp_login(ctx);
+        // The sign-in's events past their half year (src/models/auth_events.rs).
+        match auth_events::purge(sql::pool(ctx), Utc::now()).await {
+            Ok(gone) => tracing::info!(gone, "auth events past their days deleted"),
+            Err(e) => tracing::warn!(error = %e, "auth events could not be purged"),
+        }
         Ok(router)
     }
 

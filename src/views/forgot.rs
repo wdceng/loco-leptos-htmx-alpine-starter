@@ -7,30 +7,16 @@ use leptos::prelude::*;
 use crate::{
     controllers::{forgot::PATH, login},
     models::users::RESET_TOKEN_EXPIRATION_MIN,
-    views::layout::{BUTTON, FIELD, LEAD, NextSteps, Notice, TITLE},
+    views::layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
 };
 
-/// The form: the account's email.
-///
-/// While it's on its way, as `ResetForm`: a second press sends nothing
-/// (`hx-sync`), the form is `aria-busy`, and the button takes the `busy:`
-/// look after 200 ms.
+/// The form: the account's email. Sent as every form is (`BusyForm`).
 #[component]
 pub fn ForgotForm() -> impl IntoView {
     view! {
         <h1 class=TITLE>"Forgot your password?"</h1>
         <p class=LEAD>"We'll mail you a link to choose a new one."</p>
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=PATH
-            class="mt-8 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <BusyForm action=PATH>
             <label for="email" class="block font-semibold">"Email"</label>
             <input
                 id="email"
@@ -43,7 +29,7 @@ pub fn ForgotForm() -> impl IntoView {
             <button type="submit" class=BUTTON>
                 "Send the link"
             </button>
-        </form>
+        </BusyForm>
         <NextSteps links=vec![(login::PATH, "Remembered it? Sign in")] />
     }
 }

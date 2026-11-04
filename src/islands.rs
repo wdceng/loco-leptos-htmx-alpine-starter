@@ -93,7 +93,7 @@ const SCROLL_REST: Duration = Duration::from_millis(150);
 
 thread_local! {
     /// Where the page Back or Forward is bringing back was scrolled, until
-    /// htmx has swapped it in.
+    /// htmx has swapped it in, or its request failed.
     static RESTORING: RefCell<Option<f64>> = const { RefCell::new(None) };
     /// The page's region as the last look found it: a different element
     /// after a swap is a move between pages.
@@ -112,7 +112,8 @@ thread_local! {
 ///   screen reader. Nothing keeps the focus into the swap, so htmx brings
 ///   none back; once the new region is in, the focus goes to `<main>` (or
 ///   stays on a field the new page focuses, `autofocus`), and the new title
-///   is read out by a live region ([`PAGE_ANNOUNCE`]).
+///   is read out by a live region ([`PAGE_ANNOUNCE`]); the page Back or
+///   Forward brings too.
 /// - **The scroll on Back and Forward.** htmx 4 swaps the earlier page back
 ///   with no scroll of its own, and the browser's restoration ran on the
 ///   page still showing. So the browser's is off, each history entry keeps
@@ -123,7 +124,8 @@ thread_local! {
 ///   against a new page's islands.
 /// - **An answer the app never sends as a page** (a gateway's 502, the 429)
 ///   loads plainly, so the browser shows what came instead of a click doing
-///   nothing.
+///   nothing; so does any error answering Back or Forward, whose request
+///   htmx sends from `<body>`, out of the region's `hx-status`.
 ///
 /// The listeners are removed with the island's owner.
 #[island]
@@ -186,6 +188,11 @@ pub fn Navigation() -> impl IntoView {
             }
         });
         let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
+        // No answer at all to Back's request: the page Back went to, loaded
+        // plainly, says why.
+        let failed = window_event_listener_untyped("htmx:error", |_| {
+            restore_failed();
+        });
         // A picture chosen in a field marked `data-shrink` shrunk before
         // its form goes (shrink.rs): on every page, as this island is.
         let chosen = window_event_listener_untyped("change", |ev| {
@@ -207,6 +214,7 @@ pub fn Navigation() -> impl IntoView {
             scrolled.remove();
             unfocused.remove();
             refused.remove();
+            failed.remove();
             if let Some(queued) = resting.get_value() {
                 queued.clear();
             }
@@ -274,11 +282,28 @@ fn keep_scroll() {
 }
 
 /// After a move, the page Back or Forward brought scrolled where its entry
-/// kept it; a move by a link starts at the top, as its swap put it.
+/// kept it, then arrived as a link's page does: the focus on `<main>`, its
+/// title read out. Back's swap keeps the region's element, so `moved` never
+/// sees it, and the focus went with the page it replaced. A move by a link
+/// starts at the top, as its swap put it.
 fn restored() {
     if let Some(top) = RESTORING.take() {
         scroll_to(top);
+        arrive();
     }
+}
+
+/// Back or Forward whose page didn't come: an error's status, which htmx
+/// leaves unswapped there (its request comes from `<body>`, above the
+/// region's `hx-status`), or no answer at all. The address is the entry's
+/// already, so the page is loaded plainly there and the browser shows what
+/// answered; the scroll kept for it is let go. Whether it was such a move.
+fn restore_failed() -> bool {
+    if RESTORING.take().is_none() {
+        return false;
+    }
+    let _ = window().location().reload();
+    true
 }
 
 /// A move's new page, which htmx's swap puts at its top (`show:top`, the
@@ -341,8 +366,12 @@ fn arrive() {
 /// [`PAGE_STATUSES`], loaded plainly: the link's own address, so the
 /// browser shows whatever answered. A link alone (a GET): a form's post is
 /// never sent twice, and an element with its own request keeps its own
-/// handling.
+/// handling. Back's answer with any error loads plainly too
+/// ([`restore_failed`]).
 fn load_plainly(ev: web_sys::Event) {
+    if restore_failed() {
+        return;
+    }
     let detail = Reflect::get(&ev, &JsValue::from_str("detail")).unwrap_or(JsValue::UNDEFINED);
     let ctx = Reflect::get(&detail, &JsValue::from_str("ctx")).unwrap_or(JsValue::UNDEFINED);
     let status = Reflect::get(&ctx, &JsValue::from_str("response"))
@@ -452,39 +481,64 @@ pub fn IslandsCheck() -> impl IntoView {
 mod tests {
     use std::{fs, path::Path};
 
+    /// The islands module's files: `src/islands.rs` and every file under
+    /// `src/islands/`, where an island would compile in both halves too.
+    fn sources() -> Vec<std::path::PathBuf> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = vec![root.join("islands.rs")];
+        let mut folders = vec![root.join("islands")];
+        while let Some(folder) = folders.pop() {
+            let Ok(entries) = fs::read_dir(&folder) else {
+                continue;
+            };
+            for path in entries.filter_map(|entry| entry.ok().map(|entry| entry.path())) {
+                if path.is_dir() {
+                    folders.push(path);
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    found.push(path);
+                }
+            }
+        }
+        found
+    }
+
     /// Every island's body runs through `collected` (src/collect.rs): its
     /// first statement is the call. One that doesn't would stay in the
     /// tab's memory after htmx swaps it out, which no other test sees.
+    /// Read in every file of the module, `src/islands/` too.
     #[test]
     fn every_island_runs_through_collected() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/islands.rs");
-        let source = fs::read_to_string(&path).expect("src/islands.rs");
-        let lines: Vec<&str> = source.lines().collect();
         let mut islands = 0;
-        for (at, line) in lines.iter().enumerate() {
-            if !line.starts_with("pub fn ") {
-                continue;
+        for path in sources() {
+            let source =
+                fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let lines: Vec<&str> = source.lines().collect();
+            for (at, line) in lines.iter().enumerate() {
+                if !line.trim_start().starts_with("pub fn ") {
+                    continue;
+                }
+                // An island: an attribute right above it names `island`,
+                // plain or inside a `cfg_attr`.
+                let island = lines[..at]
+                    .iter()
+                    .rev()
+                    .take_while(|above| above.trim_start().starts_with("#["))
+                    .any(|attribute| attribute.contains("island"));
+                if !island {
+                    continue;
+                }
+                islands += 1;
+                let first = lines[at + 1..]
+                    .iter()
+                    .map(|line| line.trim())
+                    .find(|line| !line.is_empty() && !line.starts_with("//"))
+                    .expect("the island's first statement");
+                assert!(
+                    first.starts_with("collected("),
+                    "{}: {line}\n  its body must go through `collected`, starts with: {first}",
+                    path.display()
+                );
             }
-            // An island: an attribute right above it names `island`, plain or
-            // inside a `cfg_attr`.
-            let island = lines[..at]
-                .iter()
-                .rev()
-                .take_while(|above| above.starts_with("#["))
-                .any(|attribute| attribute.contains("island"));
-            if !island {
-                continue;
-            }
-            islands += 1;
-            let first = lines[at + 1..]
-                .iter()
-                .map(|line| line.trim())
-                .find(|line| !line.is_empty() && !line.starts_with("//"))
-                .expect("the island's first statement");
-            assert!(
-                first.starts_with("collected("),
-                "{line}\n  its body must go through `collected`, starts with: {first}"
-            );
         }
         assert_eq!(
             islands, 2,

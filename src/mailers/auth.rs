@@ -15,7 +15,9 @@ use crate::{
     settings::Settings,
     views::{
         layout::APP_NAME,
-        mail::{self, ForgotPasswordMail, MagicLinkMail, SignInCodeMail, WelcomeMail},
+        mail::{
+            self, CodeFailuresMail, ForgotPasswordMail, MagicLinkMail, SignInCodeMail, WelcomeMail,
+        },
     },
 };
 
@@ -135,6 +137,32 @@ impl AuthMailer {
                 "Your sign-in code: {code}\n\nIt works for {minutes} minutes, on the page that asked for it.\n\nIf you didn't just sign in, someone has your password: change it on your account page.\n"
             ),
             view! { <SignInCodeMail code=code.to_string() minutes=minutes /> },
+        )
+        .await
+    }
+
+    /// The person told that `tries` wrong sign-in codes were typed for
+    /// their account in a row, in `browser` (`label_of`), after a right
+    /// password each time: someone may have it (controllers/login.rs, at
+    /// `auth_events::FREE_TRIES`).
+    ///
+    /// # Errors
+    ///
+    /// When email sending is failed
+    pub async fn code_failures(
+        ctx: &AppContext,
+        user: &users::Model,
+        tries: i64,
+        browser: &str,
+    ) -> Result<()> {
+        Self::send(
+            ctx,
+            user,
+            format!("Wrong sign-in codes on your {APP_NAME} account"),
+            format!(
+                "{tries} wrong sign-in codes in a row were typed for your account, in {browser}. The password was right each time.\n\nIf that wasn't you, someone has your password: change it on your account page.\n"
+            ),
+            view! { <CodeFailuresMail tries=tries browser=browser.to_string() /> },
         )
         .await
     }

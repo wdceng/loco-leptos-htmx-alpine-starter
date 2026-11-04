@@ -32,6 +32,13 @@ async fn a_dialog_opens_and_escape_or_cancel_closes_it() {
         );
         page.press("button[popovertarget=parts-dialog]").await?;
         page.until("the dialog open", OPEN).await?;
+        // The focus in the dialog: the opening button, left with it, is
+        // outside what `aria-modal` lets a screen reader reach.
+        page.until(
+            "the focus in the dialog",
+            "return document.getElementById('parts-dialog').contains(document.activeElement)",
+        )
+        .await?;
         page.press("#parts-dialog button[popovertargetaction=hide]")
             .await?;
         page.until(

@@ -49,6 +49,8 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A browser's name, from its `User-Agent` | `label_of`, `label_from` | `src/models/sessions.rs` |
 | A sign-in's end, a session opened and its cookie handed over, after the password or its code | `open_session` | `src/controllers/login.rs` |
 | A second step after the password: the mailed code, its tries and a new one | `SignIn` (`sign_ins`, the `signin` cookie), `CodeForm`, `AuthMailer::sign_in_code` | `src/models/sign_ins.rs`, `src/controllers/login.rs`, `src/views/login.rs` |
+| What happened at the sign-in, and the account's wait after wrong codes; the person told at the fifth | `auth_events` (`record`, `code_waiting`, `code_failures`, `purge` at start), `AuthMailer::code_failures` | `src/models/auth_events.rs`, `src/controllers/login.rs` |
+| What a new password ends: the other sessions, a sign-in waiting for its code, the count of wrong codes | `Session::after_new_password` (`NewPassword::Set` from the mail's link, `Changed` on the account page) | `src/models/sessions.rs` |
 | A code drawn, two digests compared | `secret::drawn`, `secret::same` | `src/secret.rs` |
 | What a user may do; a page for one role. Another role's request is a 403, the error page's | `Role` (`users.role`, read by SQLx); the extractor `Admin`, one an app adds a role | `src/models/roles.rs`, `src/controllers/signed.rs` |
 | Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |
@@ -68,10 +70,11 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 |---|---|---|
 | A colour in a view | the role tokens `primary`, `surface`, `ink`, `ink-muted`, `danger`, never a scale step | `style/tailwind.css` |
 | A text field, and its refused look. Guarded | `FIELD`, red from its own `aria-invalid` | `src/views/layout.rs` |
-| A refused form: its title, its line, the field marked as it's left. Guarded | `PageMeta::refused`, `PROBLEM`, `aria-describedby`, Alpine's `x-on:change`, as `ResetForm` | `src/views/layout.rs`, `src/views/reset.rs` |
+| A refused form: its title, its line, the refused field `aria-invalid` and pointing at the line, marked as it's left. Guarded | `PageMeta::refused`, `ProblemLine` (`PROBLEM`), `aria-invalid` and `aria-describedby` on that field, Alpine's `x-on:change` as `ResetForm` | `src/views/layout.rs`, `src/views/reset.rs` |
+| A step just done, said above the form | `SaidLine` (`SAID`, `role="status"`), never the refusal's line, as the account page and the code's "a new code" | `src/views/layout.rs` |
 | A grid's columns. Guarded | `grid-cols-N` or `minmax(0,1fr)`, never a plain `1fr` | `tests/one_job.rs` |
 | A colour where CSS can't reach (`theme-color`, the manifest). The Android app reads the `theme-color` tag for its status bar, never a copy of its own | `SURFACE_HEX`, `BRAND_HEX` | `src/views/layout.rs` |
-| A form's submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`) | `BUTTON`: the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled`; the form `hx-sync="this:drop"` and `aria-busy` through Alpine, as `ResetForm` | `src/views/layout.rs`, `style/tailwind.css`, `src/views/reset.rs` |
+| A form, and its submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`, the sending state in `BusyForm` alone) | `BusyForm`: `hx-sync="this:drop"` and `aria-busy` through Alpine; `BUTTON`: the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled` | `src/views/layout.rs`, `style/tailwind.css` |
 | A click on what loads a page sets Alpine's state, never flips it. Guarded | `open = true`, never `open = !open` | `tests/requests/races.rs` |
 | A tap outside closes at its end. Guarded | `pointerup`, never `pointerdown` | `tests/one_job.rs` |
 | Less motion when the visitor asks | the one Reduce Motion rule, never `motion-reduce:` per class | `style/tailwind.css` |

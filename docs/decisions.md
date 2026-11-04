@@ -280,6 +280,16 @@ change of mind gets a new line, and the old one moves to
   staff; a member signs in with the password alone, unless they add an
   authenticator app. The pending sign-in is no session (its own table and
   cookie), so a stolen password alone opens nothing.
+- 2026-11-04: **Wrong codes counted per account, in an events table,** as
+  an islands app on this stack counts them (`auth_events`): a right
+  password opened a new sign-in with five fresh tries, so the password
+  alone bought guesses without end. After five the account waits, a second
+  doubling to five minutes, and the person is mailed at the fifth. Wrong
+  passwords are not counted per account here: that app lets a browser the
+  account signed in from skip the wait, and without such browsers a
+  stranger could hold up the person's own sign-in. The table keeps the
+  trail (sign-ins, new passwords) for half a year; a later per-account
+  password wait reads it.
 - 2026-11-04: **Uploads as an islands app on this stack makes its photos:**
   the browser shrinks a photo before it goes (its shrink island, ported
   without its crop), and the server decodes it as its check, makes it with

@@ -15,6 +15,7 @@ use axum::{
     extract::Request,
     http::{HeaderMap, StatusCode, header::LOCATION, request::Parts},
 };
+use chrono::Utc;
 // Named import on purpose: `leptos::prelude::*` also exports an `Error`
 // type that would shadow Loco's.
 use leptos::view;
@@ -27,6 +28,7 @@ use crate::{
     mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::{
+        auth_events::{self, Event},
         roles::Role,
         sessions::{Session, label_of},
         sign_ins::{Checked, SignIn},
@@ -36,7 +38,7 @@ use crate::{
     sql,
     views::{
         layout::PageMeta,
-        login::{CodeForm, LoginForm, SignedIn},
+        login::{CodeForm, CodeProblem, LoginForm, SignedIn},
     },
 };
 
@@ -133,11 +135,18 @@ async fn submit(
     };
     let pool = sql::pool(&ctx);
     // An admin's second step: a code by mail, the session only once it is
-    // right (src/models/sign_ins.rs).
+    // right (src/models/sign_ins.rs). Within the wait after wrong codes no
+    // code goes: the code's page says how long (src/models/auth_events.rs).
     if Role::of(pool, user.id).await.map_err(Error::wrap)? == Role::Admin {
         let (secret, code, _) = SignIn::open(pool, user.id).await.map_err(Error::wrap)?;
-        AuthMailer::sign_in_code(&ctx, &user, &code).await?;
-        tracing::info!(pid = user.pid.to_string(), "sign-in code mailed");
+        if auth_events::code_waiting(pool, user.id, Utc::now())
+            .await
+            .map_err(Error::wrap)?
+            .is_none()
+        {
+            AuthMailer::sign_in_code(&ctx, &user, &code).await?;
+            tracing::info!(pid = user.pid.to_string(), "sign-in code mailed");
+        }
         let mut res = (StatusCode::SEE_OTHER, [(LOCATION, CODE)]).into_response();
         cookies::store(&mut res, &SignIn::cookie(&secret, cookies::secure(&ctx)))?;
         return Ok(res);
@@ -147,13 +156,18 @@ async fn submit(
 
 /// A session opened for `user`, who passed every step, in the browser that
 /// sent `headers`: its cookie handed over, then on to the home page. The
-/// one way a sign-in ends, after the password or after its code.
+/// one way a sign-in ends, after the password or after its code; the count
+/// of wrong codes starts again from it.
 async fn open_session(
     ctx: &AppContext,
     user: &users::Model,
     headers: &HeaderMap,
 ) -> Result<Response> {
-    let (secret, _) = Session::open(sql::pool(ctx), user.id, &label_of(headers))
+    let pool = sql::pool(ctx);
+    let (secret, _) = Session::open(pool, user.id, &label_of(headers))
+        .await
+        .map_err(Error::wrap)?;
+    auth_events::record(pool, user.id, Event::SignedIn)
         .await
         .map_err(Error::wrap)?;
     tracing::info!(pid = user.pid.to_string(), "signed in");
@@ -190,16 +204,51 @@ fn to_password(ctx: &AppContext) -> Result<Response> {
     Ok(res)
 }
 
-/// `GET /login/code`: the code's form, for the sign-in waiting.
-#[debug_handler]
-async fn code_page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
-    if waiting(&ctx, req.headers()).await?.is_none() {
-        return to_password(&ctx);
-    }
-    render_private_page(&ctx, req, code_meta(), StatusCode::OK, || {
-        view! { <CodeForm problem=None /> }
+/// The code's page: `problem` what was refused, `said` what was done.
+async fn show_code(
+    ctx: &AppContext,
+    req: Request,
+    status: StatusCode,
+    problem: Option<CodeProblem>,
+    said: Option<&'static str>,
+) -> Result<Response> {
+    let meta = if problem.is_some() {
+        code_meta().refused()
+    } else {
+        code_meta()
+    };
+    render_private_page(ctx, req, meta, status, move || {
+        view! { <CodeForm problem=problem.clone() said=said /> }
     })
     .await
+}
+
+/// What the code's page says while the account waits after wrong codes.
+fn wait_line(seconds: i64) -> CodeProblem {
+    let unit = if seconds == 1 { "second" } else { "seconds" };
+    CodeProblem::NotNow(format!(
+        "Too many wrong codes. Try again in {seconds} {unit}."
+    ))
+}
+
+/// The seconds the account of `sign_in` waits before a code is checked or
+/// mailed (src/models/auth_events.rs); none where it doesn't.
+async fn code_wait(ctx: &AppContext, sign_in: &SignIn) -> Result<Option<i64>> {
+    auth_events::code_waiting(sql::pool(ctx), sign_in.user_id, Utc::now())
+        .await
+        .map_err(Error::wrap)
+}
+
+/// `GET /login/code`: the code's form, for the sign-in waiting, saying at
+/// once how long the account waits, if it does: the password reached it
+/// with no code mailed.
+#[debug_handler]
+async fn code_page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
+    let Some((_, sign_in)) = waiting(&ctx, req.headers()).await? else {
+        return to_password(&ctx);
+    };
+    let problem = code_wait(&ctx, &sign_in).await?.map(wait_line);
+    show_code(&ctx, req, StatusCode::OK, problem, None).await
 }
 
 /// What the code's form posts; empty when the field is missing.
@@ -209,9 +258,18 @@ pub struct Code {
     pub code: String,
 }
 
-/// `POST /login/code`: the code right, the session opened and the sign-in
-/// closed; wrong, the form again with the tries left; spent, the password
-/// again.
+/// The user a sign-in is for.
+async fn user_of(ctx: &AppContext, sign_in: &SignIn) -> Result<users::Model> {
+    users::Entity::find_by_id(sign_in.user_id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(|| Error::NotFound)
+}
+
+/// `POST /login/code`: within the account's wait, nothing checked; the code
+/// right, the session opened and the sign-in closed; wrong, the form again
+/// with the tries left; spent, the password again. A wrong or spent one
+/// counts toward the account's wait.
 async fn code_submit(
     State(ctx): State<AppContext>,
     parts: Parts,
@@ -223,7 +281,14 @@ async fn code_submit(
     let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
         return to_password(&ctx);
     };
+    if let Some(seconds) = code_wait(&ctx, &sign_in).await? {
+        tracing::info!(seconds, "sign-in code within the wait");
+        let req = Request::from_parts(parts, Body::empty());
+        let problem = Some(wait_line(seconds));
+        return show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None).await;
+    }
     let pool = sql::pool(&ctx);
+    let user = user_of(&ctx, &sign_in).await?;
     match sign_in
         .check(pool, &secret, &form.code)
         .await
@@ -231,30 +296,28 @@ async fn code_submit(
     {
         Checked::Right => {
             sign_in.close(pool).await.map_err(Error::wrap)?;
-            let user = users::Entity::find_by_id(sign_in.user_id)
-                .one(&ctx.db)
-                .await?
-                .ok_or_else(|| Error::NotFound)?;
             let mut res = open_session(&ctx, &user, &parts.headers).await?;
             cookies::store(&mut res, &SignIn::cookie_deleted(cookies::secure(&ctx)))?;
             Ok(res)
         }
         Checked::Wrong { left } => {
+            auth_events::record(pool, user.id, Event::CodeWrong)
+                .await
+                .map_err(Error::wrap)?;
+            tell_of_failures(&ctx, &user, &parts.headers).await?;
             let req = Request::from_parts(parts, Body::empty());
             let problem = format!(
                 "That code isn't right. {left} {} left.",
                 if left == 1 { "try" } else { "tries" }
             );
-            render_private_page(
-                &ctx,
-                req,
-                code_meta().refused(),
-                StatusCode::BAD_REQUEST,
-                move || view! { <CodeForm problem=Some(problem.clone()) /> },
-            )
-            .await
+            let problem = Some(CodeProblem::Wrong(problem));
+            show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None).await
         }
         Checked::Spent => {
+            auth_events::record(pool, user.id, Event::CodeSpent)
+                .await
+                .map_err(Error::wrap)?;
+            tell_of_failures(&ctx, &user, &parts.headers).await?;
             sign_in.close(pool).await.map_err(Error::wrap)?;
             tracing::info!("sign-in code tries spent");
             to_password(&ctx)
@@ -262,8 +325,31 @@ async fn code_submit(
     }
 }
 
-/// `POST /login/code/again`: a new code mailed, unless one went within the
-/// last minute; the form again, saying which.
+/// The person told by mail at the [`auth_events::FREE_TRIES`]th wrong code
+/// in a row, once a streak: a second step failing after a right password
+/// means the password is known (OWASP). The browser named in the mail.
+async fn tell_of_failures(
+    ctx: &AppContext,
+    user: &users::Model,
+    headers: &HeaderMap,
+) -> Result<()> {
+    let failures = auth_events::code_failures(sql::pool(ctx), user.id)
+        .await
+        .map_err(Error::wrap)?;
+    if failures == auth_events::FREE_TRIES {
+        tracing::info!(
+            pid = user.pid.to_string(),
+            failures,
+            "wrong sign-in codes, the person told"
+        );
+        AuthMailer::code_failures(ctx, user, failures, &label_of(headers)).await?;
+    }
+    Ok(())
+}
+
+/// `POST /login/code/again`: a new code mailed, unless the account waits
+/// after wrong codes or one went within the last minute; the form again,
+/// saying which.
 async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Response> {
     if let Some(forbidden) = cross_site::refused(&parts.headers, "sign-in code again") {
         return Ok(forbidden);
@@ -271,26 +357,26 @@ async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Respo
     let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
         return to_password(&ctx);
     };
+    let req = Request::from_parts(parts, Body::empty());
+    if let Some(seconds) = code_wait(&ctx, &sign_in).await? {
+        let problem = Some(wait_line(seconds));
+        return show_code(&ctx, req, StatusCode::OK, problem, None).await;
+    }
     let renewed = sign_in
         .renew_code(sql::pool(&ctx), &secret)
         .await
         .map_err(Error::wrap)?;
-    let said = if let Some(code) = renewed {
-        let user = users::Entity::find_by_id(sign_in.user_id)
-            .one(&ctx.db)
-            .await?
-            .ok_or_else(|| Error::NotFound)?;
+    if let Some(code) = renewed {
+        let user = user_of(&ctx, &sign_in).await?;
         AuthMailer::sign_in_code(&ctx, &user, &code).await?;
-        "A new code is on its way; the one before no longer works.".to_string()
-    } else {
-        let wait = sign_in.code_wait().unwrap_or(1);
-        format!("A code went less than a minute ago. Ask again in {wait} seconds.")
-    };
-    let req = Request::from_parts(parts, Body::empty());
-    render_private_page(&ctx, req, code_meta(), StatusCode::OK, move || {
-        view! { <CodeForm problem=Some(said.clone()) /> }
-    })
-    .await
+        let said = Some("A new code is on its way; the one before no longer works.");
+        return show_code(&ctx, req, StatusCode::OK, None, said).await;
+    }
+    let wait = sign_in.code_wait().unwrap_or(1);
+    let problem = Some(CodeProblem::NotNow(format!(
+        "You can ask for a new code in {wait} seconds."
+    )));
+    show_code(&ctx, req, StatusCode::OK, problem, None).await
 }
 
 /// `POST /logout`: the session closed and the cookie taken away, then the

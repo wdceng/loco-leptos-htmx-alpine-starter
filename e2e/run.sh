@@ -211,6 +211,10 @@ family() {
   for each in "${browsers[@]}"; do rm -f "$e2e/$each/boot.txt"; done
   watch_boots "${browsers[@]}" &
   local watching=$!
+  # Ctrl-C stops the lanes too: started with `&` in a script, they ignore
+  # SIGINT, and would boot their devices and run on with nobody waiting.
+  # TERM runs each lane's own `stop`.
+  trap 'kill -TERM "${lanes[@]}" "$watching" 2>/dev/null; wait; exit 130' INT TERM
   # The gap after each device's lane, one a device in their order, growing
   # as each later device boots beside more already running.
   local device_gaps=(${E2E_DEVICE_GAPS:-$default_gaps})
@@ -238,6 +242,7 @@ family() {
   for _ in 1 2 3 4 5; do kill -0 "$watching" 2>/dev/null || break; sleep 1; done
   kill "$watching" 2>/dev/null || true
   wait "$watching" 2>/dev/null || true
+  trap - INT TERM
 }
 
 if [[ $browser =~ ^(desktop|phones|tablets|main|all|low|beta)$ ]]; then

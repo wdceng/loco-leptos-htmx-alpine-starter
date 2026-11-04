@@ -12,7 +12,7 @@ use crate::{
     },
     models::sign_ins::CODE_MINUTES,
     views::{
-        layout::{BUTTON, FIELD, LEAD, NextSteps, PROBLEM, TITLE},
+        layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, ProblemLine, SaidLine, TITLE},
         parts::QUIET_BUTTON,
     },
 };
@@ -23,36 +23,16 @@ const SIGN_IN_PROBLEM: &str = "sign-in-problem";
 /// The form: the email and the password. `problem` is what the server
 /// refused last time, if anything; then the email typed comes back, the
 /// password field is `aria-invalid` and `autofocus`, so the focus is in it
-/// for the next try (`Navigation` leaves an `autofocus` field alone).
-///
-/// While it's on its way, as `ResetForm`: a second press sends nothing
-/// (`hx-sync`), the form is `aria-busy`, and the button takes the `busy:`
-/// look after 200 ms.
+/// for the next try (`Navigation` leaves an `autofocus` field alone). Sent
+/// as every form is (`BusyForm`).
 #[component]
 pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
     let refused = problem.is_some();
     view! {
         <h1 class=TITLE>"Sign in"</h1>
         <p class=LEAD>"With the email and password you signed up with."</p>
-        {problem
-            .map(|problem| {
-                view! {
-                    <p id=SIGN_IN_PROBLEM role="alert" class=PROBLEM>
-                        {problem}
-                    </p>
-                }
-            })}
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=PATH
-            class="mt-8 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <ProblemLine id=SIGN_IN_PROBLEM problem />
+        <BusyForm action=PATH>
             <label for="email" class="block font-semibold">"Email"</label>
             <input
                 id="email"
@@ -78,7 +58,7 @@ pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
             <button type="submit" class=BUTTON>
                 "Sign in"
             </button>
-        </form>
+        </BusyForm>
         <NextSteps links=vec![
             (forgot::PATH, "Forgot your password?"),
             (register::PATH, "No account yet? Sign up"),
@@ -87,16 +67,28 @@ pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
     }
 }
 
-/// The `id` of the line under the code's heading: why a code was refused,
-/// or that a new one went.
+/// The `id` of the line under the code's heading: why a code was refused.
 const CODE_PROBLEM: &str = "code-problem";
+
+/// What the code's page refused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CodeProblem {
+    /// The code typed was wrong: its field is marked.
+    Wrong(String),
+    /// Nothing checked or mailed for now: the wait after wrong codes, or
+    /// the minute between two codes. The field is not at fault.
+    NotNow(String),
+}
 
 /// The second step: the six digits mailed after the password, one field
 /// the phone fills from the mail (`one-time-code`), and a new code on
-/// request. `problem` is what the last post said.
+/// request. `problem` is what the last post refused, `said` what it did.
 #[component]
-pub fn CodeForm(problem: Option<String>) -> impl IntoView {
-    let refused = problem.is_some();
+pub fn CodeForm(problem: Option<CodeProblem>, said: Option<&'static str>) -> impl IntoView {
+    let wrong = matches!(problem, Some(CodeProblem::Wrong(_)));
+    let problem = problem.map(|problem| match problem {
+        CodeProblem::Wrong(line) | CodeProblem::NotNow(line) => line,
+    });
     view! {
         <h1 class=TITLE>"Your sign-in code"</h1>
         <p class=LEAD>
@@ -104,25 +96,9 @@ pub fn CodeForm(problem: Option<String>) -> impl IntoView {
                 "We mailed you six digits. They work for {CODE_MINUTES} minutes.",
             )}
         </p>
-        {problem
-            .map(|problem| {
-                view! {
-                    <p id=CODE_PROBLEM role="alert" class=PROBLEM>
-                        {problem}
-                    </p>
-                }
-            })}
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=CODE
-            class="mt-8 max-w-sm"
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <ProblemLine id=CODE_PROBLEM problem />
+        <SaidLine said />
+        <BusyForm action=CODE>
             <label for="code" class="block font-semibold">"Code"</label>
             <input
                 id="code"
@@ -133,18 +109,19 @@ pub fn CodeForm(problem: Option<String>) -> impl IntoView {
                 maxlength="6"
                 autofocus
                 required
-                aria-describedby=refused.then_some(CODE_PROBLEM)
+                aria-invalid=wrong.then_some("true")
+                aria-describedby=wrong.then_some(CODE_PROBLEM)
                 class=FIELD
             />
             <button type="submit" class=BUTTON>
                 "Sign in"
             </button>
-        </form>
-        <form method="post" action=CODE_AGAIN hx-sync="this:drop">
+        </BusyForm>
+        <BusyForm action=CODE_AGAIN class="">
             <button type="submit" class=QUIET_BUTTON>
                 "Mail me a new code"
             </button>
-        </form>
+        </BusyForm>
     }
 }
 
@@ -154,20 +131,11 @@ pub fn SignedIn(name: String) -> impl IntoView {
     view! {
         <h1 class=TITLE>"You're signed in"</h1>
         <p class=LEAD>{format!("As {name}.")}</p>
-        // Alpine's CSP build takes one expression per attribute.
-        <form
-            method="post"
-            action=LOGOUT
-            hx-sync="this:drop"
-            x-data="{ sending: false }"
-            x-on:htmx:before:request="sending = true"
-            x-on:htmx:finally:request="sending = false"
-            x-bind:aria-busy="sending"
-        >
+        <BusyForm action=LOGOUT class="">
             <button type="submit" class=BUTTON>
                 "Sign out"
             </button>
-        </form>
+        </BusyForm>
         <NextSteps links=vec![(account::PATH, "Your account")] />
     }
 }

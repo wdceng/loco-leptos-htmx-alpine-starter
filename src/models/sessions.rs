@@ -26,7 +26,24 @@ use axum::http::{HeaderMap, header::USER_AGENT};
 use chrono::{DateTime, Duration, Utc};
 use sqlx::SqlitePool;
 
-use crate::{cookies, secret, sql};
+use crate::{
+    cookies,
+    models::{
+        auth_events::{self, Event},
+        sign_ins::SignIn,
+    },
+    secret, sql,
+};
+
+/// Where a new password came from, and so which sessions it ends
+/// ([`Session::after_new_password`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NewPassword {
+    /// Through the mailed link (`/reset`): every session ends.
+    Set,
+    /// On the account page, in session `kept`, which stays.
+    Changed { kept: i64 },
+}
 
 /// The cookie's name.
 pub const COOKIE: &str = "session";
@@ -214,26 +231,61 @@ impl Session {
     ///
     /// # Errors
     /// The database refused the delete.
-    pub async fn close_others(pool: &SqlitePool, user_id: i64, kept: i64) -> sqlx::Result<()> {
+    pub async fn close_others<'e>(
+        db: impl sqlx::SqliteExecutor<'e>,
+        user_id: i64,
+        kept: i64,
+    ) -> sqlx::Result<()> {
         sqlx::query!(
             "DELETE FROM sessions WHERE user_id = ? AND id != ?",
             user_id,
             kept
         )
-        .execute(pool)
+        .execute(db)
         .await?;
         Ok(())
     }
 
-    /// Every session of the user closed: a password reset.
+    /// Every session of the user closed: a password reset, the account gone.
     ///
     /// # Errors
     /// The database refused the delete.
-    pub async fn close_all(pool: &SqlitePool, user_id: i64) -> sqlx::Result<()> {
+    pub async fn close_all<'e>(
+        db: impl sqlx::SqliteExecutor<'e>,
+        user_id: i64,
+    ) -> sqlx::Result<()> {
         sqlx::query!("DELETE FROM sessions WHERE user_id = ?", user_id)
-            .execute(pool)
+            .execute(db)
             .await?;
         Ok(())
+    }
+
+    /// What a new password ends, in one write: whoever knew the old one
+    /// keeps no session and no sign-in waiting for its code, and the count
+    /// of wrong codes starts again (src/models/auth_events.rs). The one way
+    /// for both places a password is set.
+    ///
+    /// # Errors
+    /// The database refused the write.
+    pub async fn after_new_password(
+        pool: &SqlitePool,
+        user_id: i64,
+        how: NewPassword,
+    ) -> sqlx::Result<()> {
+        let mut tx = sql::write(pool).await?;
+        let event = match how {
+            NewPassword::Set => {
+                Self::close_all(&mut *tx, user_id).await?;
+                Event::PasswordSet
+            }
+            NewPassword::Changed { kept } => {
+                Self::close_others(&mut *tx, user_id, kept).await?;
+                Event::PasswordChanged
+            }
+        };
+        SignIn::close_all(&mut *tx, user_id).await?;
+        auth_events::record(&mut *tx, user_id, event).await?;
+        tx.commit().await
     }
 
     /// How many sessions the user has: the tests' check that a change

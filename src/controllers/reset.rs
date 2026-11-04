@@ -22,8 +22,7 @@ use serde::Deserialize;
 use crate::{
     controllers::cross_site,
     models::{
-        sessions::Session,
-        sign_ins::SignIn,
+        sessions::{NewPassword, Session},
         users::{self, password_problem},
     },
     render::render_token_page,
@@ -117,11 +116,7 @@ async fn submit(
         .into_active_model()
         .reset_password(&ctx.db, &form.password)
         .await?;
-    Session::close_all(sql::pool(&ctx), user.id)
-        .await
-        .map_err(Error::wrap)?;
-    // A sign-in waiting for its code was made with the old password.
-    SignIn::close_all(sql::pool(&ctx), user.id)
+    Session::after_new_password(sql::pool(&ctx), user.id, NewPassword::Set)
         .await
         .map_err(Error::wrap)?;
     tracing::info!(
