@@ -131,7 +131,8 @@ Each of these brings its own risks. The template has none of them yet.
   - the WebView's passkeys switched on in `MainActivity.kt`
     (`WEB_AUTHENTICATION_SUPPORT_FOR_APP`);
   - `/.well-known/assetlinks.json` naming the package and each key the
-    builds are signed with, with **both** relations,
+    builds are signed with, Play's app signing key for an app installed
+    from Google Play among them, with **both** relations,
     `common.handle_all_urls` and `common.get_login_creds`: the second alone
     is refused, "RP ID cannot be validated" (50152);
   - the relying party accepting the app's own origin beside the site's,

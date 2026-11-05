@@ -1,3 +1,4 @@
+import java.io.FileInputStream
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -25,6 +26,26 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+    // The release signed with the upload key for Google Play, Tauri's way
+    // (v2.tauri.app/distribute/sign/android), only where keystore.properties
+    // exists: the Mac that uploads (docs/development.md, The app). Elsewhere a
+    // release build comes out unsigned, which Play refuses, and the debug
+    // builds, the emulators' and a phone's on USB, never read it. The file and
+    // the keystore stay out of the repo (gen/android/.gitignore). As an
+    // islands app on this stack signs its own.
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    if (keystorePropertiesFile.exists()) {
+        val keystoreProperties = Properties()
+        FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+        signingConfigs {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["password"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["password"] as String
+            }
+        }
+    }
     buildTypes {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
@@ -39,6 +60,7 @@ android {
             }
         }
         getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             optimization {
                enable = true
             }

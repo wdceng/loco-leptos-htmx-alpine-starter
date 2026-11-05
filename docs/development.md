@@ -491,10 +491,34 @@ The App Store build; needs your Apple team (below):
 cd src-tauri && cargo tauri ios build
 ```
 
-The Play Store bundle; needs your signing key:
+The upload key for Google Play, once, on the Mac that uploads; it asks
+for a password, kept in a password manager, and the file is backed up:
 
 ```bash
-cd src-tauri && cargo tauri android build --aab
+keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+
+`src-tauri/gen/android/keystore.properties`, written by hand and never
+committed (`gen/android/.gitignore`); the release is signed only where it
+exists:
+
+```properties
+password=<the upload key's password>
+keyAlias=upload
+storeFile=/Users/<you>/upload-keystore.jks
+```
+
+The Play Store bundle, the phones' two architectures, in
+`src-tauri/gen/android/app/build/outputs/bundle/universalRelease/`:
+
+```bash
+cd src-tauri && JAVA_HOME=$(/usr/libexec/java_home -v 21) cargo tauri android build --aab --target aarch64 --target armv7
+```
+
+The bundle signed, "jar verified.":
+
+```bash
+jarsigner -verify src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab
 ```
 
 The desktop icons again, after the site's icon changes, into a folder of
@@ -605,6 +629,16 @@ The phones:
   and `links.sh` set it (`devices.sh`); without the profile line
   (`prerequisites.md`), put
   `JAVA_HOME=$(/usr/libexec/java_home -v 21)` on `cargo tauri android`.
+- **Play signs what it hands out with its own key** (Play App Signing):
+  the upload key only proves the upload is yours. An app installed from
+  Play carries Play's key, so its SHA-256 (Play Console, App signing) goes
+  into `assetlinks.json` beside the debug keys, for the passkeys.
+- **A new build for Play raises `version`** in `src-tauri/tauri.conf.json`:
+  Tauri makes Android's `versionCode` from it (major × 1 000 000 + minor ×
+  1 000 + patch), and Play refuses a code it has seen.
+- **A Play install and a USB debug build share the id, not the key:**
+  Android installs one over the other only after the first is
+  uninstalled, its data with it.
 - **The start page waits with the site up?** Read the webview's console:
   "No 'Access-Control-Allow-Origin' header" means `/up` got something
   other than the site's own answer, a challenge or an error page. Safari,
