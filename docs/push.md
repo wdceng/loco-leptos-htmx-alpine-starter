@@ -97,5 +97,21 @@ with the mistakes it made on the way.
   a key in the developer's shell must never reach the tests.
 - **An iPhone or iPad takes pushes only in the home-screen app,** iOS 16.4
   and up. In Safari the switch says how to add the app.
-- **The app's webviews likely have no push, no `Notification` and no
-  badge** (the Tauri app, unverified): there the switch stays hidden.
+- **The app's webviews have no Push API and no service worker** (the Tauri
+  app, as an islands app on this stack found on both phones): Web Push
+  can't reach it. Where the app is to be rung too:
+  - Firebase Cloud Messaging's HTTP v1 API beside Web Push, one sender
+    and one list of devices with a transport column;
+  - `tauri-plugin-fcm`, which hands over a Firebase token on both phones,
+    Firebase passing the iPhone's on to Apple's service. Plugins that hand
+    over the iPhone's raw APNs token need a second sender and a key;
+  - the push carries its words: no service worker asks the site for them;
+  - the site may call only the plugin's commands, through one capability
+    naming the site's origin, called from one place in its WASM;
+  - the iPhone's: `aps-environment`, `UIBackgroundModes`
+    `remote-notification`, and the team's APNs key uploaded to Firebase;
+    Android's compiles against the app's own Android SDK;
+  - the Simulator takes no push: the plugin won't register there;
+  - a tapped push opens its page on Android through `MainActivity.kt`; on
+    the iPhone the plugin hands the tap to nobody, so the app opens at its
+    start until it gets a Swift hook of its own.

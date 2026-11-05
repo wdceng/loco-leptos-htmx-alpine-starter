@@ -643,6 +643,12 @@ The phones:
   "No 'Access-Control-Allow-Origin' header" means `/up` got something
   other than the site's own answer, a challenge or an error page. Safari,
   Develop, the Simulator, for iOS; `chrome://inspect` for Android.
+- **The iPhone app's name in ASCII:** with a letter such as "Š" in it,
+  iOS could not match the app and refused it notifications ("UNErrorDomain
+  error 1", an islands app on this stack). An ASCII `productName` in
+  `tauri.conf.json`, or one for the iPhone alone in a
+  `tauri.ios.conf.json` beside it, the Xcode project's `PRODUCT_NAME` the
+  same; the desktops may keep the full name.
 - **Apple may turn down an app that only shows a website** (its review
   guideline 4.2): a store app should do something the site can't, such as
   push.

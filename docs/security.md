@@ -140,7 +140,15 @@ Each of these brings its own risks. The template has none of them yet.
     per key: the WebView signs with it, "origin does not match" otherwise;
   - a Google account on the phone, an emulator's too.
 
-  The iPhone's need the Apple team and an associated domain.
+  The iPhone's, passkeys and Password AutoFill both, need (Apple's
+  "Supporting passkeys", as that app found on a real iPhone):
+  - a paid Apple team: a free one has no associated domains;
+  - the app's entitlement naming the site, `webcredentials:<host>`;
+  - the site naming the app in `/.well-known/apple-app-site-association`,
+    `<team id>.<bundle id>`, both read from `tauri.conf.json` alone, so it
+    names the app that is built. Served on every environment: it names the
+    app, not a signing key. Apple's CDN reads it when the app is
+    installed.
 - **Web push:** on the sessions (`src/models/sessions.rs`), then `push.md`, the steps
   and the mistakes an islands app on this stack made adding it.
 - **Your own htmx and Alpine attributes:** the libraries are in the
