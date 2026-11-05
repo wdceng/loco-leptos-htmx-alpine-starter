@@ -369,4 +369,92 @@ mod tests {
             "new_window lets the webview's own window through"
         );
     }
+
+    /// The iPhone's app declares no encryption of its own, so App Store
+    /// Connect asks nothing at an upload: the key in `Info.ios.plist`, and
+    /// in the `Info.plist` an iOS build merges it into, committed as the
+    /// build writes it.
+    #[test]
+    fn the_iphones_app_declares_no_encryption_of_its_own() {
+        let key = "<key>ITSAppUsesNonExemptEncryption</key>";
+        for (file, plist) in [
+            ("Info.ios.plist", include_str!("../Info.ios.plist")),
+            (
+                "gen/apple/app-native_iOS/Info.plist (an iOS build merges it)",
+                include_str!("../gen/apple/app-native_iOS/Info.plist"),
+            ),
+        ] {
+            let after = plist
+                .split_once(key)
+                .map(|(_, after)| after.trim_start())
+                .unwrap_or_default();
+            assert!(after.starts_with("<false/>"), "{file}: {key} false");
+        }
+    }
+
+    /// The iPhone's app tells App Store Connect why it uses the APIs Apple
+    /// asks a reason for: each category with its one reason in the app's
+    /// privacy manifest, and the manifest among the Xcode target's
+    /// resources, so the upload is not refused.
+    #[test]
+    fn the_iphones_app_declares_the_apis_apple_asks_reasons_for() {
+        let manifest = include_str!("../gen/apple/app-native_iOS/PrivacyInfo.xcprivacy");
+        for (category, reason) in [
+            ("FileTimestamp", "C617.1"),
+            ("SystemBootTime", "35F9.1"),
+            ("ActiveKeyboards", "54BD.1"),
+        ] {
+            let category = format!("<string>NSPrivacyAccessedAPICategory{category}</string>");
+            let reasons = manifest
+                .split_once(&category)
+                .and_then(|(_, after)| after.split_once("</array>"))
+                .map(|(reasons, _)| reasons)
+                .unwrap_or_default();
+            assert_eq!(manifest.matches(&category).count(), 1, "{category}");
+            assert_eq!(
+                reasons.matches("<string>").count(),
+                1,
+                "{category}: one reason"
+            );
+            assert!(
+                reasons.contains(&format!("<string>{reason}</string>")),
+                "{category}: {reason}"
+            );
+        }
+        let xcode = include_str!("../gen/apple/app-native.xcodeproj/project.pbxproj");
+        assert!(
+            xcode.contains("/* PrivacyInfo.xcprivacy in Resources */"),
+            "the app's manifest a resource"
+        );
+    }
+
+    /// Every iPhone icon is a PNG without an alpha channel: App Store
+    /// Connect refuses an App Store icon that has one, and Tauri's icon tool
+    /// writes them with one (`opaque.swift`, docs/development.md, Icons).
+    #[test]
+    fn the_iphones_icons_have_no_alpha_channel() {
+        let icons = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("gen/apple/Assets.xcassets/AppIcon.appiconset");
+        let mut seen = 0;
+        for entry in std::fs::read_dir(&icons)
+            .expect("the iPhone's icons")
+            .flatten()
+        {
+            let path = entry.path();
+            if path.extension().is_none_or(|extension| extension != "png") {
+                continue;
+            }
+            let bytes = std::fs::read(&path).expect("an icon");
+            // The PNG header's colour type, IHDR's tenth byte: 2 is red,
+            // green and blue alone, 6 the same with alpha.
+            assert_eq!(
+                bytes.get(25),
+                Some(&2),
+                "{} has no alpha channel",
+                path.display()
+            );
+            seen += 1;
+        }
+        assert!(seen > 0, "the iPhone's icons");
+    }
 }

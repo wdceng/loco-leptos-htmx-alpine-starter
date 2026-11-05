@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The iPhone's own Info.plist keys, which Tauri merges into
+  gen/apple/app-native_iOS/Info.plist at every iOS build.
+  ITSAppUsesNonExemptEncryption false: the app's only encryption is the
+  system's HTTPS, so App Store Connect stops asking at every upload. As an
+  islands app on this stack declares it.
+-->
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>

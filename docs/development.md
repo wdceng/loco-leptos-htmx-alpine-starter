@@ -485,10 +485,13 @@ to its own app, the app staying (`testing.md`, "The app on the phones"):
 src-tauri/links.sh
 ```
 
-The App Store build; needs your Apple team (below):
+The build for TestFlight and the App Store, `version` raised first
+(below), signed for App Store Connect; it ends with the `.ipa`'s path,
+which Apple's Transporter app uploads, dragged in. Needs your Apple team
+(below):
 
 ```bash
-cd src-tauri && cargo tauri ios build
+cd src-tauri && cargo tauri ios build --export-method app-store-connect
 ```
 
 The upload key for Google Play, once, on the Mac that uploads; it asks
@@ -633,9 +636,37 @@ The phones:
   the upload key only proves the upload is yours. An app installed from
   Play carries Play's key, so its SHA-256 (Play Console, App signing) goes
   into `assetlinks.json` beside the debug keys, for the passkeys.
-- **A new build for Play raises `version`** in `src-tauri/tauri.conf.json`:
-  Tauri makes Android's `versionCode` from it (major × 1 000 000 + minor ×
-  1 000 + patch), and Play refuses a code it has seen.
+- **A new build for Play or TestFlight raises `version`** in
+  `src-tauri/tauri.conf.json`: Tauri makes Android's `versionCode` from it
+  (major × 1 000 000 + minor × 1 000 + patch) and the iPhone's
+  `CFBundleVersion` the same string; Play refuses a code it has seen, App
+  Store Connect a build number it has seen for the version.
+- **Test installs through TestFlight,** not an unlisted App Store app:
+  Apple keeps that for an app ready for final distribution (guideline 2.2
+  sends betas to TestFlight). Up to 100 internal testers, users of your
+  App Store Connect account, with no review; a build lasts 90 days.
+- **App Store Connect checks an upload before it takes it:** the app's
+  privacy manifest (`gen/apple/app-native_iOS/PrivacyInfo.xcprivacy`, the
+  reason for each API its binary uses that Apple asks one for), icons
+  without an alpha channel (Icons, below), and `ITSAppUsesNonExemptEncryption`
+  false (`src-tauri/Info.ios.plist`, which Tauri merges into `Info.plist`
+  at every build); tests in `src-tauri/src/lib.rs` hold the three. A new
+  API in the binary's symbols (`nm -u` on the built app's `.debug.dylib`)
+  needs its reason in the manifest, or Apple mails an ITMS error. The
+  manifest's three are an islands app's on this stack, unchecked on this
+  app's binary. A plugin's own manifests ship beside it.
+- **The site's links opening in the app,** a mail's link signed in rather
+  than in the browser, as an islands app on this stack does it: Android's
+  App Links (a `VIEW` filter with `autoVerify` and the site's host in
+  `AndroidManifest.xml`, verified against `assetlinks.json`'s
+  `handle_all_urls`) and the iPhone's universal links (`applinks:<host>`
+  in the entitlements, `applinks` in `apple-app-site-association`). No
+  `deep-link` plugin: Tauri hands the iPhone's link to Rust
+  (`RunEvent::Opened`), Android's is the main activity's intent. A link
+  opens the browser until the phone trusts the site (Android verifies at
+  install, the iPhone reads Apple's CDN's copy, fetched within 24 hours of
+  a deploy), and one that starts the iPhone app from cold is lost (tao
+  #1248, its fix #1376 open).
 - **A Play install and a USB debug build share the id, not the key:**
   Android installs one over the other only after the first is
   uninstalled, its data with it.
@@ -684,6 +715,13 @@ iPhone:
 - **Never `cargo tauri icon` in place:** it writes into `icons/` and `gen/`
   itself. Run each drawing into `target/<name>-icons` with `-o`, and copy
   only that drawing's files over.
+- **The iPhone's icons without an alpha channel,** which App Store Connect
+  asks of the App Store icon: Tauri's icon tool keeps the channel, so
+  redraw them after each copy (a test holds it):
+
+```bash
+swift src-tauri/opaque.swift src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/*.png
+```
 - **An installed Chrome site keeps its icon,** baked in at install:
   uninstall it, then Install again, to see a change.
 - **A gated host lets the icon and the manifest past its challenge**

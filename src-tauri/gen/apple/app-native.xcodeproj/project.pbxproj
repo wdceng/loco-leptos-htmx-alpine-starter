@@ -11,6 +11,7 @@
 		727B29FCEB64841DDFFC46D0 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF9403D7235D97EA479561FC /* CoreGraphics.framework */; };
 		7A263FEBA4181B18B27EB796 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = A54EA3D17A2F70F00849DF54 /* assets */; };
 		8E8527F8283C5E7A12248096 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 45ECCCDD0FB931FDBA533AA1 /* QuartzCore.framework */; };
+		6C2F3D8EAB405F7C9D1E2B3A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5B1E2C7D9A3F4E6B8C0D1A2F /* PrivacyInfo.xcprivacy */; };
 		951A44C83B7AA51F2C3B5F0F /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 82EA851CA5EAABB3DF72B94E /* Metal.framework */; };
 		B63514332418B942AFC1B0EE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C950C773264A2843178F04A4 /* Assets.xcassets */; };
 		C9F2047CFB43E69D830FCF87 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DFE89B10E0E6AC40C9736EB /* MetalKit.framework */; };
@@ -28,6 +29,7 @@
 		3DFE89B10E0E6AC40C9736EB /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		4358E7664C7A53CF06387E71 /* app-native_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "app-native_iOS.entitlements"; sourceTree = "<group>"; };
 		43948C8A4D1A4EC7E77D727F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5B1E2C7D9A3F4E6B8C0D1A2F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		45ECCCDD0FB931FDBA533AA1 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		523883888D694AD5C54D5FFD /* app-native_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "app-native_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D08A6CD51156B243B7A4A85 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 			children = (
 				4358E7664C7A53CF06387E71 /* app-native_iOS.entitlements */,
 				43948C8A4D1A4EC7E77D727F /* Info.plist */,
+				5B1E2C7D9A3F4E6B8C0D1A2F /* PrivacyInfo.xcprivacy */,
 			);
 			path = "app-native_iOS";
 			sourceTree = "<group>";
@@ -211,6 +214,7 @@
 				B63514332418B942AFC1B0EE /* Assets.xcassets in Resources */,
 				E6476DAA06BFACE4D58F5120 /* LaunchScreen.storyboard in Resources */,
 				7A263FEBA4181B18B27EB796 /* assets in Resources */,
+				6C2F3D8EAB405F7C9D1E2B3A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
