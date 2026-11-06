@@ -633,6 +633,13 @@ The phones:
   - the app stops opening after 7 days: install it again;
   - no associated domains on a free team, so no passkeys, autofill or push
     in the app.
+- **Android hands a recreated activity its first intent again:** an app
+  that acts on the intent it was started with (a link, a push's tap, a
+  quick action) does it a second time when Android restores it from
+  Recents after ending it in the background; an islands app on this stack
+  dialed twice. Act only on a first start: `savedInstanceState` null and
+  no `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY` on the intent, in
+  `MainActivity.kt`. The template's acts on none.
 - **Android's `adb install` puts the app in the drawer only,** not on the
   home screen.
 - **Android builds with Java 21, not a Mac's default 27:** Gradle 9.6.1
@@ -674,7 +681,10 @@ The phones:
   opens the browser until the phone trusts the site (Android verifies at
   install, the iPhone reads Apple's CDN's copy, fetched within 24 hours of
   a deploy), and one that starts the iPhone app from cold is lost (tao
-  #1248, its fix #1376 open).
+  #1248, its fix #1376 approved, not merged): that app runs tao 0.37.2
+  with the PR's two commits, a fork pinned by its commit in
+  `src-tauri/Cargo.toml`'s `[patch.crates-io]`, dropped once a tao release
+  has the fix.
 - **A Play install and a USB debug build share the id, not the key:**
   Android installs one over the other only after the first is
   uninstalled, its data with it.
@@ -747,8 +757,11 @@ on this stack found its way to the stores:
 
 - **More than its website** (Apple's guideline 4.2, the likeliest
   refusal): native parts a site can't have, push, the phone's own
-  gestures, native navigation, a first-launch screen. The template's app
-  is the site in a window.
+  gestures, native navigation, a first-launch screen, quick actions on the
+  icon's long press (the iPhone's `UIApplicationShortcutItems` in
+  `src-tauri/Info.ios.plist`, Android's `res/xml/shortcuts.xml`, the same
+  ones on both, each opening its page). The template's app is the site in
+  a window.
 - **A privacy policy page,** its address in both stores' listings. The
   template has none.
 - **The privacy answers:** Apple's App Privacy label and Google's Data
