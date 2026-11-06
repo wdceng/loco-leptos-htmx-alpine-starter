@@ -44,6 +44,8 @@ async fn a_visitor_signs_up_and_signs_in_in_place() {
 async fn a_wrong_password_is_refused_in_the_region() {
     browse(|page| async move {
         let email = mailbox("refused");
+        // The refusal's 400, which Chrome logs.
+        page.allow_failed_load(400, "/login");
         page.sign_up("Ana", &email).await?;
         page.open("/login").await?;
         page.mark().await?;
