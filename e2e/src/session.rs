@@ -75,6 +75,30 @@ pub(crate) fn skipped(dir: &str, test: &str, browser: Browser, reason: &str) {
     }
 }
 
+/// An app test (e2e/tests/app.rs): in the app's lane the app started
+/// afresh, as a person opens it, then [`browse`] attached to its webview;
+/// skipped in every other lane.
+pub async fn browse_app<F, Fut>(test: F)
+where
+    F: FnOnce(Page) -> Fut,
+    Fut: Future<Output = WebDriverResult<()>> + Send + 'static,
+{
+    let run = Run::from_env();
+    if run.browser != Browser::App {
+        skipped(
+            &run.dir,
+            &test_name(),
+            run.browser,
+            "the app's test, this lane a browser's",
+        );
+        return;
+    }
+    if let Err(why) = crate::device::launch(&run).await {
+        panic!("the app did not start: {why}");
+    }
+    browse(test).await;
+}
+
 /// Open a session in the run's browser, run `test` with its page, and close
 /// the session whatever happened: a failure or a panic is passed on after
 /// the session is gone. A test that passed still fails when its page logged
@@ -134,7 +158,11 @@ where
         // An emulator's Chrome gone after a long run of pages ("chrome not
         // reachable"). Chrome stopped on the device starts afresh with the
         // next session.
-        Err(e) if run.browser.is_android() && e.to_string().contains("chrome not reachable") => {
+        Err(e)
+            if run.browser.is_android()
+                && run.browser != Browser::App
+                && e.to_string().contains("chrome not reachable") =>
+        {
             eprintln!(
                 "{:?}: Chrome not reachable, stopped and asked again",
                 run.browser

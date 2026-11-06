@@ -110,6 +110,7 @@ impl Page {
             browser: run.browser,
             cdp,
             base: run.base.clone(),
+            device: run.device.clone(),
             dir: run.dir.clone(),
             test: test.to_owned(),
             heard,

@@ -191,7 +191,8 @@ M=145 && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/la
 ```
 
 - `e2e/run.sh` reads the emulator's Chrome version as it boots and names
-  the chromedriver it misses: fetch that `M`.
+  the chromedriver it misses: fetch that `M`. The app's lane reads the
+  webview's (`com.google.android.webview`), the same folder.
 - **Emulator 37.2.13 crashes, 37.2.12 holds.** 37.2.13 crashed every lane
   in its own OpenGL layer, on the GPU and in software alike (2026-10-30);
   `e2e/run.sh` refuses it. `sdkmanager --update` brings it back: update the

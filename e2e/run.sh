@@ -7,6 +7,7 @@
 #   e2e/run.sh desktop|phones|tablets|main|all [cargo nextest's filter and flags]
 #   e2e/run.sh chrome-low|firefox-low|iphone-low|ipad-low|ipad-air-low|android-low|android-tablet-low|low [...]
 #   e2e/run.sh chrome-beta|edge-beta|firefox-beta|safari-beta|beta [...]
+#   e2e/run.sh app [cargo nextest's filter and flags]
 #
 # Builds the site into target/e2e (its own target folder and site, so the
 # watch loop's binary and target/site are never touched) and runs the tests
@@ -54,6 +55,17 @@
 #   edge-beta           5177  9532  Edge Beta
 #   firefox-beta        5178  9533  Firefox Developer Edition
 #   safari-beta         5179  9534  Safari Technology Preview
+#
+# The app's lane: the Android app itself, a debug build for the lane's
+# site (src-tauri/app-for.sh), on the Play image's emulator, its webview
+# driven by the chromedriver of the webview's own version, which attaches
+# to the running app; the system's side (what Android shows on top, its
+# Back) through adb. It runs the boot test and the app's own tests alone
+# (e2e/tests/app.rs), which every other lane leaves out; in no family, run
+# when the app changes. As an islands app on this stack tests its own. Its
+# AVD is that app's lane's too: never the two at once.
+#
+#   app                 5180  9535  the app, android-phone-full, emulator 5570
 #
 # Chrome for Testing and the drivers in E2E_BETA (~/Library/Caches/e2e-beta):
 # the highest chrome-<N> there with its chromedriver-<N>, Edge Beta with the
@@ -142,7 +154,7 @@ fi
 # Whether a lane starts a device, a Simulator or an emulator.
 is_device() {
   local twin=${1%-low}
-  [[ $twin == iphone || $twin == ipad || $twin == ipad-air || $twin == android || $twin == android-tablet ]]
+  [[ $twin == iphone || $twin == ipad || $twin == ipad-air || $twin == android || $twin == android-tablet || $twin == app ]]
 }
 
 # A lane's line from nextest's summary in its output: a skipped test is a
@@ -309,8 +321,9 @@ case $browser in
   edge-beta) n=17 ;;
   firefox-beta) n=18 ;;
   safari-beta) n=19 ;;
+  app) n=20 ;;
   *)
-    echo "unknown browser: $browser (chrome, edge, firefox, safari, iphone, ipad, ipad-air, android, android-tablet, desktop, phones, tablets, main or all; chrome, firefox and the devices also with -low, or low; the four desktop browsers also with -beta, or beta)" >&2
+    echo "unknown browser: $browser (chrome, edge, firefox, safari, iphone, ipad, ipad-air, android, android-tablet, desktop, phones, tablets, main or all; chrome, firefox and the devices also with -low, or low; the four desktop browsers also with -beta, or beta; app, the Android app)" >&2
     exit 2
     ;;
 esac
@@ -338,9 +351,9 @@ case $kind in
   edge) driver=(msedgedriver --port="$driver_port") ;;
   firefox) driver=(geckodriver --port "$driver_port") ;;
   safari | iphone | ipad | ipad-air) driver=(safaridriver -p "$driver_port") ;;
-  # The emulator's Chrome's own version, known once it has booted
-  # (`start_device`).
-  android | android-tablet) driver=() ;;
+  # The emulator's Chrome's own version, or its webview's for the app,
+  # known once it has booted (`start_device`).
+  android | android-tablet | app) driver=() ;;
 esac
 # The low bar's desktop browsers, the binaries downloaded for them
 # (docs/testing.md, "The Low Bar"), and Chrome's own driver of its
@@ -405,8 +418,14 @@ case $browser in
   ipad-air-low) device_name=${E2E_IPAD_AIR_LOW:-iPad Air 11-inch (M2)} ;;
   android-low) avd=android-phone-low emulator_port=5564 ;;
   android-tablet-low) avd=android-tablet-low emulator_port=5566 ;;
+  # The Play image's, as links.sh's: `android-phone` stays the browser
+  # lane's, the two side by side.
+  app) avd=android-phone-full emulator_port=5570 ;;
 esac
 device=
+# The app's id, Android's package (src-tauri/tauri.conf.json), which the
+# app lane's driver attaches to (e2e/src/browser.rs) and adb starts.
+app_id=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["identifier"])' "$root/src-tauri/tauri.conf.json")
 
 # Boot the lane's device and set `device` to its id, the Simulator's UDID or
 # the emulator's adb serial; for Android, the chromedriver of its Chrome's
@@ -449,12 +468,26 @@ print(found[0] if found else "")' "$runtime" "$device_name")
         fi
       fi
       ;;
-    android | android-tablet)
+    android | android-tablet | app)
       if [[ ! -d $HOME/.android/avd/$avd.avd ]]; then
         echo "no Android emulator $avd (docs/prerequisites.md, the devices)" >&2
         exit 1
       fi
       device=emulator-$emulator_port
+      # The app built for the lane's site first, while nothing waits on it
+      # (src-tauri/app-for.sh, 2 to 3 minutes; its log in src-tauri/target).
+      local apk= gpu=${E2E_EMULATOR_GPU:-host}
+      if [[ $kind == app ]]; then
+        apk=$("$root/src-tauri/app-for.sh" android "http://localhost:$site") || {
+          echo "the app's build failed (src-tauri/target/app-build-android.log)" >&2
+          exit 1
+        }
+        # In software: on the Mac's GPU with no window the app's webview
+        # found no OpenGL ES context and the app died at its first page
+        # ("Chrome runs only on top of OpenGL ES", an islands app on this
+        # stack, 2026-11-06), where the browser lanes' Chrome draws there.
+        gpu=${E2E_EMULATOR_GPU:-swiftshader_indirect}
+      fi
       # Emulator 37.2.13 crashed every lane in its own OpenGL layer
       # (`libgfxstream_backend`, an islands app on this stack, 2026-10-30),
       # on the GPU and in software alike; 37.2.12 holds. Refused before it
@@ -474,7 +507,7 @@ print(found[0] if found else "")' "$runtime" "$device_name")
       # the state the lane before left, Chrome came back on the day before's
       # clock and lost its connection.
       "$android_sdk/emulator/emulator" -avd "$avd" -port "$emulator_port" \
-        -no-window -no-audio -no-boot-anim -no-snapshot -gpu "${E2E_EMULATOR_GPU:-host}" -feature -Vulkan >"$lane/emulator.log" 2>&1 &
+        -no-window -no-audio -no-boot-anim -no-snapshot -gpu "$gpu" -feature -Vulkan >"$lane/emulator.log" 2>&1 &
       emulator_pid=$!
       pids+=($!)
       local waited=0
@@ -490,8 +523,36 @@ print(found[0] if found else "")' "$runtime" "$device_name")
       # The emulator's localhost is its own: the lane's port reversed to
       # the Mac's, so its Chrome reaches the site at the same address.
       "$adb" -s "$device" reverse "tcp:$site" "tcp:$site" >/dev/null
+      # Chrome's version, or the webview's, whose Chromium the app's driver
+      # must match.
+      local engine=com.android.chrome
+      [[ $kind == app ]] && engine=com.google.android.webview
       local chrome
-      chrome=$("$adb" -s "$device" shell dumpsys package com.android.chrome | grep -m1 -o 'versionName=[0-9]*' | cut -d= -f2)
+      chrome=$("$adb" -s "$device" shell dumpsys package "$engine" | grep -m1 -o 'versionName=[0-9]*' | cut -d= -f2)
+      if [[ $kind == app ]]; then
+        # A fresh boot says it is done a moment before its package manager
+        # takes an install (devices.sh's lesson): its answer waited for,
+        # the install tried five times. The app taken off first: one signed
+        # by another Mac's debug key refuses an install over it, and every
+        # run starts with the app's data fresh. The app started on its
+        # start page, which waits for the site.
+        for _ in $(seq 1 30); do
+          "$adb" -s "$device" shell pm path android 2>/dev/null | grep -q '^package:' && break
+          sleep 2
+        done
+        "$adb" -s "$device" uninstall "$app_id" >/dev/null 2>&1 || true
+        local try said
+        for try in 1 2 3 4 5; do
+          said=$("$adb" -s "$device" install -r "$apk" 2>&1) && break
+          if ((try == 5)); then
+            echo "the app would not install on $avd: $(tail -1 <<<"$said")" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        "$adb" -s "$device" shell svc power stayon true
+        "$adb" -s "$device" shell am start -W -n "$app_id/.MainActivity" >/dev/null
+      fi
       # The low bar's Chrome is the image's own 124, the Play Store off: on
       # 2026-10-29 it had moved both low emulators to 156, and the lanes ran
       # on 156's driver without a word (docs/testing.md, The Low Bar).
@@ -501,7 +562,7 @@ print(found[0] if found else "")' "$runtime" "$device_name")
       fi
       local chromedriver=${CHROMEDRIVER_ANDROID:-$HOME/Library/Caches/chromedriver-android/$chrome/chromedriver-mac-arm64/chromedriver}
       if [[ ! -x $chromedriver ]]; then
-        echo "chromedriver $chrome for the emulator's Chrome is missing: $chromedriver (docs/prerequisites.md, the devices)" >&2
+        echo "chromedriver $chrome for the emulator's $engine is missing: $chromedriver (docs/prerequisites.md, the devices)" >&2
         exit 1
       fi
       driver=("$chromedriver" --port="$driver_port")
@@ -562,7 +623,7 @@ stop_device() {
     # one adb server for an hour, and the lanes beside it lost their
     # devices, adb's connection reset under chromedriver (an islands app on
     # this stack, 2026-10-30).
-    android | android-tablet)
+    android | android-tablet | app)
       [[ -n $device ]] || return 0
       "$adb" -s "$device" emu kill >/dev/null 2>&1 &
       local asking=$!
@@ -653,7 +714,7 @@ wait_up() {
 wait_up
 
 export E2E_BROWSER=$browser E2E_BASE="http://localhost:$site" E2E_DRIVER="http://localhost:$driver_port" \
-  E2E_DIR=$lane E2E_DEVICE=$device E2E_ADB=$adb
+  E2E_DIR=$lane E2E_DEVICE=$device E2E_ADB=$adb E2E_APP=$app_id
 
 # The boot test alone (e2e/tests/boot.rs), its output into `$1`, nextest's
 # flags after it (`--retries 0`).
@@ -720,9 +781,17 @@ fi
 
 # The tests, the boot not again where no arguments were given. Given any,
 # it runs once more: nextest joins several `-E` with "or", so "not the
-# boot" can't be added beside a filter of the caller's.
+# boot" can't be added beside a filter of the caller's. The app's lane runs
+# the app's tests alone, every other lane all but them (e2e/tests/app.rs,
+# which skip there anyway).
 filter=()
-(($#)) || filter=(-E 'not test(/^boot::/)')
+if (($# == 0)); then
+  if [[ $kind == app ]]; then
+    filter=(-E 'test(/^app::/)')
+  else
+    filter=(-E 'not test(/^boot::/) and not test(/^app::/)')
+  fi
+fi
 cargo nextest run --manifest-path e2e/Cargo.toml --profile "$browser" "${filter[@]}" "$@" 2>&1 |
   tee "$lane/nextest.txt" || failed=1
 emulator_crash

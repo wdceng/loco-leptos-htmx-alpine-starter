@@ -371,6 +371,14 @@ One lane:
 e2e/run.sh chrome
 ```
 
+The Android app's own lane, after a change of the app: the app built for
+the lane's site, the boot and the app's tests, about 10 minutes with the
+builds:
+
+```bash
+e2e/run.sh app
+```
+
 One lane, its memory tests only (nextest's filter):
 
 ```bash
@@ -410,9 +418,29 @@ cargo test --manifest-path e2e/Cargo.toml --lib
 | `edge-beta` | 5177 | 9532 | Edge Beta |
 | `firefox-beta` | 5178 | 9533 | Firefox Developer Edition |
 | `safari-beta` | 5179 | 9534 | Safari Technology Preview |
+| `app` | 5180 | 9535 | the Android app, `android-phone-full` emulator on 5570 |
 
 Never two families at once, nor beside another project's lanes: they
 share the Simulators and the emulators.
+
+**The app's lane:** the Android app itself, which no browser lane opens.
+The debug build for the lane's site (`src-tauri/app-for.sh android
+http://localhost:5180`), installed on the Play image's emulator and
+started; the chromedriver of the webview's own version
+(`com.google.android.webview`) attaches to the running app
+(`androidUseRunningApp`, `Browser::App`), and the system's side goes
+through adb (`e2e/src/device.rs`). It runs the boot test and
+`e2e/tests/app.rs` alone, which every other lane leaves out; in no family.
+As an islands app on this stack tests its own.
+
+- **The emulator draws in software there** (`-gpu swiftshader_indirect`):
+  on the Mac's GPU with no window the app's webview found no OpenGL ES
+  context and the app died at its first page ("Chrome runs only on top of
+  OpenGL ES"), where the browser lanes' Chrome draws on it.
+- **Its AVD is `links.sh`'s and `screens.sh`'s, and an islands app's on
+  this stack's own app lane:** never two of them at once.
+- **What it doesn't test:** the iPhone's app, and the links to other apps
+  (`tel:`, `mailto:`), which `links.sh` taps by hand.
 
 The script builds the site into `target/e2e` with `--split`, once. Each
 lane then starts its own site (`LOCO_ENV=e2e`, `config/e2e.yaml`, a fresh
@@ -818,7 +846,9 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
   socket with Node, the stylesheet lint's.
 - **`devices.sh` is what both scripts share:** the site and its `/up`, the
   builds with the run's site, an emulator started and the app opened on
-  it, the devices shut down again. Sourced, never run.
+  it, the devices shut down again. Sourced, never run. The builds are
+  `src-tauri/app-for.sh`'s, which the browser tests' app lane builds with
+  too.
 - **The site is the run's alone:** the app is built with its address (a
   copy of the start page and the CSP's `connect-src`, merged by the CLI's
   `--config`); `offline/index.html` and `tauri.conf.json` stay as they
@@ -837,8 +867,9 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
 - The pictures land in `src-tauri/target/screens/`, emptied first: each
   device's `<device>-upright.png` and `<device>-sideways.png` at the page's
   top, each emulator's `<device>-bottom.png` at the page's foot too. The
-  builds' output goes to `src-tauri/target/app-build.log` (`devices.sh`,
-  both scripts'), printed only when a build fails.
+  app's builds' output goes to `src-tauri/target/app-build-ios.log` and
+  `app-build-android.log` (`app-for.sh`), the Mac's to `app-build.log`,
+  each printed only when a build fails.
 - A device this Mac lacks is skipped with a line. One another project has
   up is used as it is and left running.
 - An emulator turns by itself. A Simulator has no command to turn or

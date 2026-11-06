@@ -56,6 +56,9 @@ pub struct Page {
     /// The DevTools socket, Chrome's and Edge's alone.
     pub(crate) cdp: Option<CdpSession>,
     pub(crate) base: String,
+    /// The lane's device (`E2E_DEVICE`): the emulator's adb serial for
+    /// the app's adb (src/device.rs); empty for a desktop browser.
+    pub(crate) device: String,
     /// The lane's folder (`target/e2e/<browser>/`).
     pub(crate) dir: String,
     /// The running test's name, for its skip.
@@ -219,7 +222,7 @@ impl Page {
                 tokio::time::sleep(PRESS_HELD).await;
                 self.let_go(at).await
             }
-            Browser::Android | Browser::AndroidTablet => {
+            Browser::Android | Browser::AndroidTablet | Browser::App => {
                 self.still().await?;
                 let (x, y) = self.centre(css).await?;
                 self.pointer(

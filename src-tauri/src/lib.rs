@@ -370,6 +370,24 @@ mod tests {
         );
     }
 
+    /// The phones' release library is stripped by Cargo's profile, before
+    /// Gradle sees it: Tauri's Android template strips nothing itself, its
+    /// `keepDebugSymbols` reaching every build type (tauri#15884) and
+    /// Gradle given no NDK (tauri#16173), so without this line the symbols
+    /// would ship in the store's bundle.
+    #[test]
+    fn the_phones_release_library_is_stripped_by_cargo() {
+        let manifest = include_str!("../Cargo.toml");
+        let release = manifest
+            .split_once("[profile.release]")
+            .map(|(_, rest)| rest.split("\n[").next().unwrap_or_default())
+            .expect("a release profile");
+        assert!(
+            release.lines().any(|line| line.trim() == "strip = true"),
+            "strip = true in [profile.release]:\n{release}"
+        );
+    }
+
     /// The iPhone's app declares no encryption of its own, so App Store
     /// Connect asks nothing at an upload: the key in `Info.ios.plist`, and
     /// in the `Info.plist` an iOS build merges it into, committed as the

@@ -25,6 +25,10 @@ pub enum Browser {
     Android,
     /// Chrome on an Android tablet emulator, through chromedriver and adb.
     AndroidTablet,
+    /// The Android app itself, its webview attached to by the chromedriver
+    /// of the webview's version, the system's side through adb: the app
+    /// lane's alone (e2e/tests/app.rs).
+    App,
 }
 
 /// A device's screen, which no window resizes.
@@ -59,6 +63,7 @@ impl Browser {
             "ipad-air" => Self::IpadAir,
             "android" => Self::Android,
             "android-tablet" => Self::AndroidTablet,
+            "app" => Self::App,
             other => panic!("unknown browser {other}: run the browser tests with e2e/run.sh"),
         }
     }
@@ -86,10 +91,11 @@ impl Browser {
         matches!(self, Self::Iphone | Self::Ipad | Self::IpadAir)
     }
 
-    /// Whether it is Chrome on an Android emulator.
+    /// Whether it is Chrome on an Android emulator, or the app's webview
+    /// there.
     #[must_use]
     pub fn is_android(self) -> bool {
-        matches!(self, Self::Android | Self::AndroidTablet)
+        matches!(self, Self::Android | Self::AndroidTablet | Self::App)
     }
 
     /// The screen a device has, which no window resizes; none for a
@@ -97,7 +103,7 @@ impl Browser {
     #[must_use]
     pub fn screen(self) -> Option<Screen> {
         match self {
-            Self::Iphone | Self::Android => Some(Screen::Phone),
+            Self::Iphone | Self::Android | Self::App => Some(Screen::Phone),
             Self::Ipad | Self::AndroidTablet => Some(Screen::Tablet),
             Self::IpadAir => Some(Screen::Middle),
             _ => None,
@@ -163,6 +169,20 @@ impl Browser {
                 "browserName": "chrome",
                 "goog:chromeOptions": {
                     "androidPackage": "com.android.chrome",
+                    "androidDeviceSerial": device,
+                },
+            }),
+            // The app `run.sh` installed and started (`E2E_APP`, its id),
+            // attached to as it runs rather than started afresh with its
+            // data wiped (chromedriver's `androidUseRunningApp`, as an
+            // islands app on this stack found). Its webview's debugging is
+            // on in a debug build.
+            Self::App => serde_json::json!({
+                "browserName": "chrome",
+                "goog:chromeOptions": {
+                    "androidPackage": crate::device::app_package(),
+                    "androidActivity": ".MainActivity",
+                    "androidUseRunningApp": true,
                     "androidDeviceSerial": device,
                 },
             }),

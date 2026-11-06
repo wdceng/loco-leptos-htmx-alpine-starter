@@ -72,3 +72,6 @@ inherits = "default"
 inherits = "default"
 [profile.safari-beta]
 inherits = "default"
+# The app's lane (e2e/run.sh).
+[profile.app]
+inherits = "default"

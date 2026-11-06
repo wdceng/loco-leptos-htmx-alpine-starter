@@ -524,6 +524,14 @@ The bundle signed, "jar verified.":
 jarsigner -verify src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab
 ```
 
+The bundle's library stripped, "stripped" at the line's end (Cargo's
+release profile does it, `strip = true`; Tauri's Gradle template strips
+nothing itself, tauri#15884 and #16173):
+
+```bash
+unzip -p src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab base/lib/arm64-v8a/libapp_native_lib.so | file -
+```
+
 The desktop icons again, after the site's icon changes, into a folder of
 their own (Icons, below):
 
@@ -628,8 +636,8 @@ The phones:
 - **Android's `adb install` puts the app in the drawer only,** not on the
   home screen.
 - **Android builds with Java 21, not a Mac's default 27:** Gradle 9.6.1
-  fails on 27 ("Unsupported class file major version 71"). `screens.sh`
-  and `links.sh` set it (`devices.sh`); without the profile line
+  fails on 27 ("Unsupported class file major version 71"). `screens.sh`,
+  `links.sh` and the app's browser-test lane set it (`app-for.sh`); without the profile line
   (`prerequisites.md`), put
   `JAVA_HOME=$(/usr/libexec/java_home -v 21)` on `cargo tauri android`.
 - **Play signs what it hands out with its own key** (Play App Signing):

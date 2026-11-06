@@ -30,7 +30,12 @@ tauri = { version = "2.12.5", features = [] }
 tauri-plugin-opener = "2.7.2"
 
 [profile.release]
-# A small app that only opens a window: size over link time.
+# A small app that only opens a window: size over link time. The strip is
+# also what keeps the phones' library small on Android: Tauri's Gradle
+# template strips nothing itself, its `keepDebugSymbols` reaching every
+# build type (tauri#15884) and Gradle given no NDK (tauri#16173), so the
+# symbols would ship with the app. A test in src/lib.rs holds it. As an
+# islands app on this stack found.
 opt-level = 3
 lto = true
 codegen-units = 1

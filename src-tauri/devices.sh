@@ -54,12 +54,11 @@ echo "== the site: $site"
 
 wait_for_site=${SCREENS_WAIT:-60}
 
-# The app's id and name, tauri.conf.json's alone.
+# The app's id, tauri.conf.json's alone.
 conf() {
   python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' tauri.conf.json "$1"
 }
 id=$(conf identifier)
-name=$(conf productName)
 
 android_sdk=${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}
 adb="$android_sdk/platform-tools/adb"
@@ -131,56 +130,21 @@ built() {
 mkdir -p "$here/target"
 : >"$build_log"
 
-# The run's site in an app: a copy of the start page with its SITE, and
-# tauri.conf.json's CSP with its connect-src, both merged over the config
-# for these builds alone (the CLI's `--config`); one for Apple's (the
-# Simulators and the Mac) and one for Android's, their addresses differing
-# for a `.local` name (above). Prints the config's path.
-site_config() {
-  local address=$1 platform=$2
-  local start="$here/target/app-start-$platform" config="$here/target/app-config-$platform.json"
-  rm -rf "$start"
-  cp -R offline "$start"
-  sed -i '' -E "s#const SITE = \"[^\"]*\";#const SITE = \"$address\";#" "$start/index.html"
-  grep -q "const SITE = \"$address\";" "$start/index.html" || {
-    echo "the start page's SITE not found in offline/index.html" >&2
-    exit 1
-  }
-  python3 -I -c '
-import json, re, sys
-conf, start, site, out = sys.argv[1:]
-csp = json.load(open(conf))["app"]["security"]["csp"]
-csp = re.sub(r"connect-src [^;]+", "connect-src " + site, csp)
-json.dump({"build": {"frontendDist": start}, "app": {"security": {"csp": csp}}}, open(out, "w"))
-' tauri.conf.json "$start" "$address" "$config"
-  echo "$config"
-}
-config=$(site_config "$site" apple)
-android_config=$(site_config "$android_site" android)
+# The run's site in an app (app-for.sh, the browser tests' app lane's
+# too): Apple's config for the Mac's build (screens.sh); the Simulators'
+# and Android's builds each with their own address, differing for a
+# `.local` name (above).
+config=$("$here/app-for.sh" config apple "$site")
 
-# The iOS app for the Simulators of Apple silicon, through the Tauri CLI:
-# the Xcode project's build phase asks the CLI for the Rust side, so
-# xcodebuild alone fails ("the `tauri ios dev` or `tauri ios build` command
-# must be running"). Sets `app`.
+# The iOS app for the Simulators of Apple silicon (app-for.sh). Sets `app`.
 build_ios() {
-  echo "== building the iOS app"
-  built cargo tauri ios build --debug --target aarch64-sim --config "$config"
-  app="gen/apple/build/arm64-sim/$name.app"
-  [[ -d $app ]] || { echo "no app at $app" >&2; exit 1; }
+  app=$("$here/app-for.sh" ios "$site") || exit 1
 }
 
-# The Android app, a debug APK for the emulators' arm64, built with Java 21:
-# the project's Gradle (9.6.1) runs on Java up to 26, and a Mac's default
-# Java 27 failed it ("Unsupported class file major version 71", an islands
-# app on this stack, 2026-10-29). A JAVA_HOME already set is kept. Sets
+# The Android app, a debug APK for the emulators' arm64 (app-for.sh). Sets
 # `apk`.
 build_android() {
-  echo "== building the Android app"
-  JAVA_HOME=${JAVA_HOME:-$(/usr/libexec/java_home -v 21 2>/dev/null || true)}
-  export JAVA_HOME
-  built cargo tauri android build --debug --apk --target aarch64 --config "$android_config"
-  apk=$(find gen/android/app/build/outputs/apk -name '*-debug.apk' -print0 | xargs -0 ls -t | head -1)
-  [[ -f $apk ]] || { echo "no APK under gen/android/app/build/outputs/apk" >&2; exit 1; }
+  apk=$("$here/app-for.sh" android "$android_site") || exit 1
 }
 
 # Waits until the emulator's webview shows the site, asked over the

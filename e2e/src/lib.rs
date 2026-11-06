@@ -10,19 +10,21 @@
 //!
 //! One file a job: the browsers (`browser`), a test's session (`session`),
 //! the page and what any test does with it (`page`), the browsers' own
-//! tools (`devtools`).
+//! tools (`devtools`), the Android app's side through adb (`device`).
 
 use std::time::Duration;
 
 mod browser;
+mod device;
 mod devtools;
 mod page;
 mod session;
 
 pub use browser::{Browser, Screen};
+pub use device::app_package;
 pub use devtools::Held;
 pub use page::Page;
-pub use session::browse;
+pub use session::{browse, browse_app};
 pub use thirtyfour::prelude::*;
 
 /// How long a wait waits: the debug build's WASM is several megabytes.
