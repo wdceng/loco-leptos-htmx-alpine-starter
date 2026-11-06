@@ -10,16 +10,20 @@
 //!
 //! One file a job: the browsers (`browser`), a test's session (`session`),
 //! the page and what any test does with it (`page`), the browsers' own
-//! tools (`devtools`), the Android app's side through adb (`device`).
+//! tools (`devtools`), the Android app's side through adb (`device`), the
+//! lane's mails (`mail`) and the accounts the tests sign in as (`accounts`).
 
 use std::time::Duration;
 
+mod accounts;
 mod browser;
 mod device;
 mod devtools;
+mod mail;
 mod page;
 mod session;
 
+pub use accounts::{PASSWORD, mailbox};
 pub use browser::{Browser, Screen};
 pub use device::app_package;
 pub use devtools::Held;

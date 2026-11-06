@@ -12,9 +12,20 @@ use app_e2e::{Browser, Key, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
 
 /// One page of each kind: the home page with its lazy island, a form, a
-/// notice (the not-found page), and the parts' page (`/e2e/parts`, the
-/// browser tests' environment alone: src/controllers/parts.rs).
-const PAGES: [&str; 4] = ["/", RESET, MISSING, PARTS];
+/// notice (the not-found page), the parts' page (`/e2e/parts`, the
+/// browser tests' environment alone: src/controllers/parts.rs), and the
+/// auth pages a visitor reaches signed out. The account page and the
+/// code's are e2e/tests/accounts.rs's, behind a sign-in.
+const PAGES: [&str; 8] = [
+    "/",
+    RESET,
+    MISSING,
+    PARTS,
+    "/login",
+    "/register",
+    "/forgot",
+    "/verify",
+];
 
 /// Every part of `views/parts.rs` on one page.
 const PARTS: &str = "/e2e/parts";

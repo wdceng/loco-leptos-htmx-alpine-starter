@@ -81,6 +81,39 @@ async fn the_task_gives_the_role_it_is_told() {
     );
 }
 
+/// Each of the three arguments is asked for by name, and none missing
+/// creates anybody or sends a mail.
+#[tokio::test]
+#[serial]
+async fn a_missing_argument_is_named_and_creates_nobody() {
+    let boot = boot_test::<App>().await.unwrap();
+    let ctx = &boot.app_context;
+    let all = [
+        ("email", "missing@example.com"),
+        ("name", "Missing"),
+        ("password", "securepassword"),
+    ];
+    for left_out in ["email", "name", "password"] {
+        let vars = task::Vars::from_cli_args(
+            all.iter()
+                .filter(|(key, _)| *key != left_out)
+                .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                .collect(),
+        );
+        let err = run_task::<App>(ctx, Some(&"user:create".to_string()), &vars)
+            .await
+            .expect_err("refused");
+        assert_eq!(err.to_string(), format!("{left_out} is mandatory"));
+    }
+    assert!(
+        users::Model::find_by_email(&ctx.db, "missing@example.com")
+            .await
+            .is_err()
+    );
+    let deliveries = ctx.mailer.as_ref().expect("stub mailer").deliveries();
+    assert_eq!(deliveries.count, 0, "no mail");
+}
+
 #[tokio::test]
 #[serial]
 async fn test_user_email_already_exists() {

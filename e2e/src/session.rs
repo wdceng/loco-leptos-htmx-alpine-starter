@@ -30,6 +30,8 @@ pub(crate) struct Run {
     /// The browser a low-bar or beta lane starts instead of the installed
     /// one (`E2E_BINARY`), none for every other lane.
     pub(crate) binary: Option<String>,
+    /// The lane's Mailpit's web side (`E2E_MAILPIT`), its API the mails'.
+    pub(crate) mailpit: String,
 }
 
 impl Run {
@@ -51,6 +53,7 @@ impl Run {
             binary: std::env::var("E2E_BINARY")
                 .ok()
                 .filter(|binary| !binary.is_empty()),
+            mailpit: var("E2E_MAILPIT"),
         }
     }
 }

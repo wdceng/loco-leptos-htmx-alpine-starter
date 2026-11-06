@@ -329,6 +329,10 @@ case $browser in
 esac
 site=$((5160 + n))
 driver_port=$((9515 + n))
+# The lane's Mailpit: its SMTP the site sends to (config/e2e.yaml), its web
+# side the tests read the mails from (e2e/src/mail.rs).
+smtp=$((1100 + n))
+web=$((8100 + n))
 lane="$e2e/$browser"
 # The lane's boot, timed from here and said in its boot.txt (`watch_boots`,
 # above): "booted" once its boot test passed, else "did not boot",
@@ -650,7 +654,7 @@ if [[ -n $safari_app ]] && pgrep -xq "$safari_app"; then
   exit 1
 fi
 
-for port in "$site" "$driver_port"; do
+for port in "$site" "$driver_port" "$smtp" "$web"; do
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "port $port is taken: a run still going, or something else on it" >&2
     exit 1
@@ -690,7 +694,17 @@ stop() {
 }
 trap stop EXIT
 
-E2E_PORT=$site E2E_LANE_DIR="target/e2e/$browser" "$e2e/debug/app" start >"$lane/server.log" 2>&1 &
+# The lane's Mailpit, a database of its own, fresh each run: Mailpits
+# started in the same second without one shared a temporary file, and a
+# lane stopped at "database is locked" (an islands app on this stack).
+if ! command -v mailpit >/dev/null; then
+  echo "no mailpit on this Mac: the lanes read the site's mails from it (docs/prerequisites.md)" >&2
+  exit 1
+fi
+rm -f "$lane/mailpit.db"*
+mailpit --database "$lane/mailpit.db" --smtp "127.0.0.1:$smtp" --listen "127.0.0.1:$web" --quiet &
+pids+=($!)
+E2E_PORT=$site E2E_LANE_DIR="target/e2e/$browser" E2E_SMTP_PORT=$smtp "$e2e/debug/app" start >"$lane/server.log" 2>&1 &
 pids+=($!)
 start_device
 "${driver[@]}" >"$lane/driver.log" 2>&1 &
@@ -701,7 +715,8 @@ pids+=($!)
 # last words.
 wait_up() {
   local waited=0
-  until curl -sf "http://localhost:$site/_ping" >/dev/null && curl -sf "http://localhost:$driver_port/status" >/dev/null; do
+  until curl -sf "http://localhost:$site/_ping" >/dev/null && curl -sf "http://localhost:$driver_port/status" >/dev/null &&
+    curl -sf "http://localhost:$web/livez" >/dev/null; do
     if ((waited >= 60)); then
       echo "the site or the driver did not start; $lane/server.log and driver.log:" >&2
       tail -20 "$lane/server.log" "$lane/driver.log" >&2
@@ -714,7 +729,8 @@ wait_up() {
 wait_up
 
 export E2E_BROWSER=$browser E2E_BASE="http://localhost:$site" E2E_DRIVER="http://localhost:$driver_port" \
-  E2E_DIR=$lane E2E_DEVICE=$device E2E_ADB=$adb E2E_APP=$app_id
+  E2E_DIR=$lane E2E_DEVICE=$device E2E_ADB=$adb E2E_APP=$app_id \
+  E2E_MAILPIT="http://localhost:$web"
 
 # The boot test alone (e2e/tests/boot.rs), its output into `$1`, nextest's
 # flags after it (`--retries 0`).

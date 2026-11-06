@@ -94,13 +94,14 @@ settings:
 workers:
   mode: BackgroundAsync
 
-# No mail leaves a run: the stub mailer keeps it in memory.
+# The lane's own Mailpit (e2e/run.sh, E2E_SMTP_PORT), whose API the tests
+# read the welcome mail's link and the sign-in code from: no mail leaves a
+# run. As an islands app on this stack reads its own.
 mailer:
-  stub: true
   smtp:
     enable: true
     host: localhost
-    port: 1025
+    port: <%= get_env(name="E2E_SMTP_PORT", default="1100") %>
     secure: false
 
 # A fresh file every run, in the lane's folder (e2e/run.sh). Never

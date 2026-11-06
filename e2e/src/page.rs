@@ -59,6 +59,8 @@ pub struct Page {
     /// The lane's device (`E2E_DEVICE`): the emulator's adb serial for
     /// the app's adb (src/device.rs); empty for a desktop browser.
     pub(crate) device: String,
+    /// The lane's Mailpit (`E2E_MAILPIT`), read by src/mail.rs.
+    pub(crate) mailpit: String,
     /// The lane's folder (`target/e2e/<browser>/`).
     pub(crate) dir: String,
     /// The running test's name, for its skip.

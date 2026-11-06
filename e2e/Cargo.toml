@@ -33,7 +33,7 @@ thirtyfour = { version = "0.38.1", default-features = false, features = [
   "cdp-events",
   "bidi",
 ] }
-tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time", "process"] }
 serde_json = { version = "1.0.154" }
 # DevTools' and BiDi's events as a stream. In the tree through thirtyfour.
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
@@ -41,3 +41,7 @@ futures-util = { version = "0.3.34", default-features = false, features = ["std"
 # `cdp()` sends to Chrome's address alone (src/devtools.rs, `EdgeDevTools`).
 # In the tree through thirtyfour; same version.
 http = { version = "1.5.0" }
+# The lane's Mailpit read through its API (src/mail.rs): the welcome mail's
+# link, the sign-in code. In the tree through thirtyfour; same version, its
+# JSON alone, plain http to localhost.
+reqwest = { version = "0.13.5", default-features = false, features = ["json"] }

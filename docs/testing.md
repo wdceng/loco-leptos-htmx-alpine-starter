@@ -451,6 +451,12 @@ and called flaky if it then passes. It never touches the watch loop's
 watch`. Each lane's files are in `target/e2e/<lane>/`: `run.txt`,
 `server.log`, `driver.log`, `skipped.txt` and `failures/`.
 
+Each lane has its own Mailpit, which the site sends to (SMTP on 1100 plus
+the lane's number, its web side on 8100 plus it, `config/e2e.yaml`'s
+`E2E_SMTP_PORT`): the tests read the welcome mail's link and the sign-in
+code from its API (`e2e/src/mail.rs`), so no mail leaves a run. A Mac
+without `mailpit` refuses the lane (`prerequisites.md`).
+
 Chrome's driver is the one in `~/Library/Caches/chromedriver` (the
 collector's, above), or `CHROMEDRIVER`, or the one on the `PATH`; the
 others are on the `PATH`, the beta bar's in `~/Library/Caches/e2e-beta`,
@@ -493,6 +499,14 @@ and an emulator's is the one of its Chrome's version
   fetches no WASM again and starts the page at its top, never passing
   below; a desktop's move is asked for at the mouse's press, a hover
   asking nothing.
+- **Accounts** (`e2e/tests/accounts.rs`): a visitor signs up, verifies
+  through the welcome mail's link and signs in in place, the session's
+  cookie from htmx's answer signing the next page in; a wrong password
+  refused in the region, the field marked and focused; an admin's mailed
+  code typed; the account's deletion asked in a dialog, the focus on
+  Cancel; a large photo shrunk to a JPEG under 1 MB before it goes. Each
+  test signs up an account of its own (`mailbox`, a retry's its own), an
+  admin made one by its role in the lane's database (`make_admin`).
 - **Blocked** (`e2e/tests/blocked.rs`, Chrome and Edge): with htmx refused
   a link and a form are page loads; with Alpine or the WASM refused a move
   and a refused form still stay in place.

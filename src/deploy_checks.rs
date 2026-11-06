@@ -46,13 +46,10 @@ pub const PLACEHOLDER: &str = "replace_me";
 pub const TODO: &str = "TODO";
 
 /// The secrets a deployed boot reads, by the variable that sets them: the
-/// mail account's.
-fn secrets(ctx: &AppContext) -> Vec<(&'static str, String)> {
+/// mail account's, from the config's `mailer` block.
+fn secrets(mailer: Option<&loco_rs::config::Mailer>) -> Vec<(&'static str, String)> {
     let mut values = Vec::new();
-    let smtp = ctx
-        .config
-        .mailer
-        .as_ref()
+    let smtp = mailer
         .and_then(|mailer| mailer.smtp.as_ref())
         .filter(|smtp| smtp.enable);
     if let Some(smtp) = smtp {
@@ -87,7 +84,7 @@ pub fn refuse_placeholders(ctx: &AppContext) -> Result<()> {
     if !matches!(env, Environment::Production) {
         return Ok(());
     }
-    let missing = not_filled_in(&secrets(ctx));
+    let missing = not_filled_in(&secrets(ctx.config.mailer.as_ref()));
     if !missing.is_empty() {
         return Err(Error::Message(format!(
             "{env} won't start: {} empty or still `{PLACEHOLDER}`. Fill them in secrets.{env}.env and deploy it (docs/{env}.md)",
@@ -222,6 +219,33 @@ mod tests {
             not_filled_in(&mixed),
             vec!["MAILER_HOST", "MAILER_USER", "MAILER_PASSWORD"]
         );
+    }
+
+    /// The mail account's three values read from a deployed config's
+    /// `mailer` block, a placeholder and an empty one named; a mailer off,
+    /// or none, asks for nothing.
+    #[test]
+    fn the_mail_accounts_secrets_come_from_the_mailer_block() {
+        let mailer = |enable: bool, password: &str| -> loco_rs::config::Mailer {
+            serde_json::from_value(serde_json::json!({
+                "smtp": {
+                    "enable": enable,
+                    "host": "replace_me",
+                    "port": 587,
+                    "secure": true,
+                    "auth": { "user": "noreply@example.net", "password": password },
+                },
+            }))
+            .expect("a mailer block")
+        };
+        let read = secrets(Some(&mailer(true, "")));
+        assert_eq!(
+            read.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            vec!["MAILER_HOST", "MAILER_USER", "MAILER_PASSWORD"]
+        );
+        assert_eq!(not_filled_in(&read), vec!["MAILER_HOST", "MAILER_PASSWORD"]);
+        assert!(secrets(Some(&mailer(false, ""))).is_empty(), "a mailer off");
+        assert!(secrets(None).is_empty(), "no mailer");
     }
 
     #[test]

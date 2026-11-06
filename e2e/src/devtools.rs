@@ -111,6 +111,7 @@ impl Page {
             cdp,
             base: run.base.clone(),
             device: run.device.clone(),
+            mailpit: run.mailpit.clone(),
             dir: run.dir.clone(),
             test: test.to_owned(),
             heard,
