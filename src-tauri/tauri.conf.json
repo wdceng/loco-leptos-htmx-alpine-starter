@@ -15,7 +15,8 @@
         "width": 1280,
         "height": 800,
         "minWidth": 360,
-        "minHeight": 480
+        "minHeight": 480,
+        "allowLinkPreview": false
       }
     ],
     "security": {

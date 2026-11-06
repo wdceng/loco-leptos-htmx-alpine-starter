@@ -736,6 +736,36 @@ swift src-tauri/opaque.swift src-tauri/gen/apple/Assets.xcassets/AppIcon.appicon
   (`dev-server.md`, `staging.md`): an iPhone whose fetch was challenged
   drew a letter for the icon.
 
+### Before the stores
+
+What the template already carries for a review: the iPhone's privacy
+manifest, icons without an alpha channel and the encryption declared
+(above), the Play bundle signed with an upload key, `targetSdk` current,
+the account deleted from the account page, TestFlight and Play's internal
+testing for test installs. What each app adds itself, as an islands app
+on this stack found its way to the stores:
+
+- **More than its website** (Apple's guideline 4.2, the likeliest
+  refusal): native parts a site can't have, push, the phone's own
+  gestures, native navigation, a first-launch screen. The template's app
+  is the site in a window.
+- **A privacy policy page,** its address in both stores' listings. The
+  template has none.
+- **The privacy answers:** Apple's App Privacy label and Google's Data
+  safety form, filled in the stores' consoles, what the site collects
+  through the webview included.
+- **The review kit:** a demo account with a way past any second step (an
+  admin's mailed code reaches no reviewer), review notes walking through
+  the native parts, the screenshots.
+- **The account that submits:** a health app comes from the provider's
+  organization, not a developer (Apple's guideline 5.1.1(ix)).
+
+From the stores' rules, not yet checked against their pages: a new
+personal Play account runs a closed test, about 12 testers for 14 days,
+before production; Sign in with Apple is due wherever Google or Facebook
+sign-in is offered (guideline 4.8), which the template's email and
+password are not.
+
 ## Start a new project
 
 Replace the template's placeholders before your first deploy: every value
@@ -756,6 +786,9 @@ names.
 | Favicon and the apps' icons | `public/favicon/`, `src-tauri/icons/`, the phones' in `gen/`: four drawings of one logo ("The app", Icons), never the site's icon run through `cargo tauri icon` |
 | Colours | `style/tailwind.css`: `primary`, `surface`, `ink`, `ink-muted`, `danger` |
 | The app's name, id and address | `src-tauri/tauri.conf.json` (`productName`, `mainBinaryName`, `title`, `identifier`, `connect-src`; the identifier letters, digits and dots only, not ending in `.app`); `<title>` and `SITE` in `src-tauri/offline/index.html`; then the phones' projects again ("The app") |
+
+Before an app goes to a store, its privacy policy page and the rest of
+"Before the stores" above: none of them is a `TODO` in the code.
 
 Renaming `app` is optional: "Rename the app" below.
 

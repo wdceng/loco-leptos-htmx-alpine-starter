@@ -13,10 +13,8 @@ ignore = [
   # needs jsonwebtoken 11, and loco-rs 1.2 requires ^10.3: re-check when
   # Loco moves.
   "RUSTSEC-2026-0387",
-  # `paste` (via leptos -> either_of) and `proc-macro-error2` (via
-  # leptos_macro): unmaintained compile-time proc-macro helpers, nothing of
-  # theirs reaches the binary or the wasm bundle. Only a Leptos release can
-  # replace them; re-check after each `leptos` upgrade.
+  # `paste` (via leptos -> either_of): an unmaintained compile-time proc-macro
+  # helper, nothing of it reaches the binary or the wasm bundle. Only a Leptos
+  # release can replace it; re-check after each `leptos` upgrade.
   "RUSTSEC-2024-0436",
-  "RUSTSEC-2026-0173",
 ]

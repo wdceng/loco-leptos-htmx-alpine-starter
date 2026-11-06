@@ -19,6 +19,12 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
+    /// In one transaction, its statements all or none: sea-orm-migration
+    /// 2.0.4 runs SQLite's outside one (sea-orm #3136).
+    fn use_transaction(&self) -> Option<bool> {
+        Some(true)
+    }
+
     async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
         let db = m.get_connection();
         // Constant defaults, which `ALTER TABLE` asks; every row is given

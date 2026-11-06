@@ -370,6 +370,25 @@ mod tests {
         );
     }
 
+    /// A long press on a link shows no preview card in the app: the
+    /// iPhone's and the Mac's webview offer one by default
+    /// (`allowLinkPreview`, WKWebView's `allowsLinkPreview`), a browser's
+    /// way that told the app was a website (an islands app on this stack,
+    /// 2026-11-07).
+    #[test]
+    fn a_long_press_on_a_link_shows_no_preview() {
+        let config = include_str!("../tauri.conf.json");
+        let window = config
+            .split_once("\"windows\"")
+            .and_then(|(_, rest)| rest.split_once(']'))
+            .map(|(window, _)| window)
+            .expect("the window's config");
+        assert!(
+            window.contains("\"allowLinkPreview\": false"),
+            "the window's link preview off:\n{window}"
+        );
+    }
+
     /// The phones' release library is stripped by Cargo's profile, before
     /// Gradle sees it: Tauri's Android template strips nothing itself, its
     /// `keepDebugSymbols` reaching every build type (tauri#15884) and
