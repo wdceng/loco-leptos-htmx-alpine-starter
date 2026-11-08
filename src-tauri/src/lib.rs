@@ -389,6 +389,18 @@ mod tests {
         );
     }
 
+    /// The Android app's activity runs in a task of its own, so another
+    /// app's cannot take its place there (task hijacking, OWASP MASTG); a
+    /// manifest Tauri writes again would lose it.
+    #[test]
+    fn the_android_activity_keeps_a_task_of_its_own() {
+        let manifest = include_str!("../gen/android/app/src/main/AndroidManifest.xml");
+        assert!(
+            manifest.contains("android:taskAffinity=\"\""),
+            "MainActivity's taskAffinity empty"
+        );
+    }
+
     /// The phones' release library is stripped by Cargo's profile, before
     /// Gradle sees it: Tauri's Android template strips nothing itself, its
     /// `keepDebugSymbols` reaching every build type (tauri#15884) and

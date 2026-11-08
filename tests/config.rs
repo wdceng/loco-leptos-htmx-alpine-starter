@@ -456,6 +456,16 @@ fn every_environment_keeps_the_security_baseline(#[case] env: Environment) {
         csp.contains("frame-ancestors 'none'"),
         "{env}: CSP must forbid framing"
     );
+    // No frame of anyone's: in the apps Tauri checks a call against the
+    // webview's own address, the top page's, never a frame's (tauri 2.12.5,
+    // `webview/mod.rs`), so a framed page would reach the app's plugins.
+    // `default-src 'none'` keeps every frame out while no directive lets one in.
+    for directive in ["frame-src", "child-src"] {
+        assert!(
+            !csp.contains(directive),
+            "{env}: CSP names `{directive}`, which would let a framed page reach the app's plugins"
+        );
+    }
     assert!(!csp.contains("unsafe-inline"), "{env}: CSP allows inline");
     // With the quotes: `'wasm-unsafe-eval'` contains the same words and stays.
     // `'unsafe-eval'` would let a library that reads attributes (full

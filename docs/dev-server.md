@@ -469,8 +469,10 @@ ssh <server> "systemd-analyze security caddy --no-pager | tail -1"
 Then each site's code through Caddy, the key never printed:
 
 ```bash
-ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); for h in $(grep -E "^[a-z].*\{$" /etc/caddy/Caddyfile | cut -d: -f1); do curl -sk -m 5 --resolve $h:443:127.0.0.1 -H "X-Origin-Key: $K" -o /dev/null -w "%{http_code} $h\n" https://$h/; done'
+ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); for h in $(grep -E "^[a-z].*\{$" /etc/caddy/Caddyfile | cut -d: -f1); do printf "X-Origin-Key: %s\n" "$K" | curl -sk -m 5 --resolve $h:443:127.0.0.1 -H @- -o /dev/null -w "%{http_code} $h\n" https://$h/; done'
 ```
+
+**The key never goes on a command line.** A command's arguments are visible to every process on the box, so the checks hand it to curl on its standard input (`-H @-`).
 
 On a box without it, the file and one restart, every site cut for a second
 or two:

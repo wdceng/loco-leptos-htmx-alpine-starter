@@ -10,9 +10,13 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.app_native"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
+        <!-- A task of its own (`taskAffinity` empty): another app's activity
+             cannot take the app's place in its task (task hijacking, OWASP
+             MASTG). -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"
+            android:taskAffinity=""
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
             android:exported="true">

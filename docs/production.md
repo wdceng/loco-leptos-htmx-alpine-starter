@@ -514,8 +514,10 @@ ssh <server> "systemd-analyze security caddy --no-pager | tail -1"
 Then each site's code through Caddy, the key never printed:
 
 ```bash
-ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); for h in $(grep -E "^[a-z].*\{$" /etc/caddy/Caddyfile | cut -d: -f1); do curl -sk -m 5 --resolve $h:443:127.0.0.1 -H "X-Origin-Key: $K" -o /dev/null -w "%{http_code} $h\n" https://$h/; done'
+ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); for h in $(grep -E "^[a-z].*\{$" /etc/caddy/Caddyfile | cut -d: -f1); do printf "X-Origin-Key: %s\n" "$K" | curl -sk -m 5 --resolve $h:443:127.0.0.1 -H @- -o /dev/null -w "%{http_code} $h\n" https://$h/; done'
 ```
+
+**The key never goes on a command line.** A command's arguments are visible to every process on the box, so the checks hand it to curl on its standard input (`-H @-`).
 
 On a box without it, the file and one restart, every site cut for a second
 or two:
@@ -669,7 +671,7 @@ Check it, with the key masked in the output: `000` without the key, `200`
 with it.
 
 ```bash
-ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); h=<domain>; curl -sk -m 5 --resolve $h:443:127.0.0.1 -o /dev/null -w "without key: %{http_code}\n" https://$h/; curl -sk -m 5 --resolve $h:443:127.0.0.1 -H "X-Origin-Key: $K" -o /dev/null -w "with key: %{http_code}\n" https://$h/'
+ssh <server> 'K=$(grep -o "[0-9a-f]\{64\}" /etc/caddy/origin-check.caddy); h=<domain>; curl -sk -m 5 --resolve $h:443:127.0.0.1 -o /dev/null -w "without key: %{http_code}\n" https://$h/; printf "X-Origin-Key: %s\n" "$K" | curl -sk -m 5 --resolve $h:443:127.0.0.1 -H @- -o /dev/null -w "with key: %{http_code}\n" https://$h/'
 ```
 
 ## Manual run (without systemd)
@@ -694,8 +696,10 @@ ssh <server> -t "systemctl stop app-prod && cd /srv/app/prod && { pkill -f '^/sr
    `config/production.yaml`.
 5. A backup, which the template doesn't set up: the database every night
    with `sqlite3 … ".backup"` (never a copy of the live file), and the
-   uploads' folder (`/var/lib/app-prod/uploads`) with it, off the box,
-   `0600`, seven kept, and a restore tried once.
+   uploads' folder (`/var/lib/app-prod/uploads`) with it, encrypted on the
+   box with `age` to a public key whose private half never touches the
+   box, then off the box, `0600`, seven kept, and a restore tried once,
+   decrypting it.
 6. Submit `<domain>` at https://hstspreload.org. **Last on purpose:** from
    then on every subdomain must be https, and removal takes months.
 

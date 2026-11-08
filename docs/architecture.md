@@ -123,6 +123,12 @@ stack with:
 - a status the app never sends as a page (a gateway's 502, the 429) loads
   plainly, so a click never does nothing.
 
+**An Alpine event sent at `htmx:after:settle` goes unheard.** htmx 4 fires
+the settle before its Alpine extension sets up what the swap brought
+(it flushes at `htmx:after:swap`, which htmx 4.0.1 fires after every
+task's settle); send it a frame later (found by the project this template
+shares its stack with, 2026-11-08).
+
 A page answered to a post keeps the browser's address (`HX-Push-Url:
 false`, `src/render.rs`). The page title is written as escaped text, never
 a child view, whose `<!>` marker showed in the tab in dev builds. Checked
