@@ -4,7 +4,12 @@
 
 use app::{
     app::App,
-    models::{sessions::Session, users},
+    models::{
+        auth_events::{self, Event},
+        sessions::Session,
+        sign_ins::SignIn,
+        users,
+    },
     sql, uploads,
 };
 use chrono::{Duration, Utc};
@@ -236,6 +241,19 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         assert_eq!(wrong.status_code(), 400);
         assert!(users::Model::find_by_email(&ctx.db, EMAIL).await.is_ok());
 
+        // A second step waiting and a wrong code on the account: rows of
+        // its own the deletion must take with it.
+        let (waiting, _, _) = SignIn::open(pool, user.id).await.expect("opened");
+        auth_events::record(pool, user.id, Event::CodeWrong)
+            .await
+            .expect("recorded");
+        assert_eq!(
+            auth_events::code_failures(pool, user.id)
+                .await
+                .expect("counted"),
+            1
+        );
+
         let deleted = request
             .post("/account/delete")
             .add_header("cookie", here.clone())
@@ -251,7 +269,16 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
                 .contains("Max-Age=0")
         );
         assert!(users::Model::find_by_email(&ctx.db, EMAIL).await.is_err());
+        // The database's cascade, nothing deleted by hand: the sessions,
+        // the sign-in and the events went with the account's row.
         assert_eq!(Session::count(pool, user.id).await.expect("counted"), 0);
+        assert!(SignIn::find(pool, &waiting).await.expect("read").is_none());
+        assert_eq!(
+            auth_events::code_failures(pool, user.id)
+                .await
+                .expect("counted"),
+            0
+        );
 
         let after = request.get("/account/deleted").await;
         assert_eq!(after.status_code(), 200);

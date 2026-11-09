@@ -160,18 +160,6 @@ pub async fn record<'e>(
     Ok(())
 }
 
-/// The account's rows deleted: the account is gone. By hand, as its
-/// sessions: SQLite's cascade holds only where foreign keys are on.
-///
-/// # Errors
-/// The database refused the delete.
-pub async fn forget(pool: &SqlitePool, user_id: i64) -> sqlx::Result<()> {
-    sqlx::query!("DELETE FROM auth_events WHERE user_id = ?", user_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
 /// The rows older than [`KEEP_DAYS`] at `now` deleted: how many.
 ///
 /// # Errors

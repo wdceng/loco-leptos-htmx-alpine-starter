@@ -13,7 +13,7 @@ Install commands are each tool's own. Your package manager works too.
 | # | Tool | Purpose | Install |
 |-----|------|---------|---------|
 | 1.1 | **C toolchain** | Linker and system libraries for the native build | Xcode Command Line Tools on macOS (`xcode-select --install`), `build-essential` on Debian/Ubuntu, Visual Studio Build Tools on Windows |
-| 1.2 | **Rust**, stable 1.94+ | Compiles both halves. Loco 1.2 and Sea-ORM 2.0.4 need 1.94+ | https://rustup.rs |
+| 1.2 | **Rust**, stable 1.94+ | Compiles both halves. Loco 1.3 and Sea-ORM 2.0.4 need 1.94+ | https://rustup.rs |
 | 1.3 | **wasm32 target** | Compiles the islands bundle | `rustup target add wasm32-unknown-unknown` |
 | 1.4 | **cargo-leptos**, from #691's commit | Builds both halves, runs Tailwind and the live-reload dev loop. 0.3.11 plus the two split fixes lazy islands need, the same build as CI (`development.md`, "Lazy islands"). Once per machine, and again when `tools/cargo-leptos/` changes | `tools/cargo-leptos/install.sh` |
 

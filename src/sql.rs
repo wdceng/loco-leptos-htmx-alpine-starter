@@ -1,6 +1,7 @@
 //! The app's own queries run on SQLx (`sqlx::query!`, checked at compile
-//! time), on the pool Sea-ORM opened for Loco: one set of connections, with
-//! the PRAGMAs Loco applied. Sea-ORM keeps the migrations and Loco's own
+//! time), on the pool Sea-ORM opened for Loco: one set of connections, each
+//! with the PRAGMAs Loco 1.3 applies to every connection it opens. Sea-ORM
+//! keeps the migrations and Loco's own
 //! models (`docs/architecture.md`, "Sea-ORM and SQLx").
 
 use loco_rs::app::AppContext;
@@ -10,7 +11,8 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 ///
 /// # Panics
 /// Never in this app: Sea-ORM panics for a database other than SQLite, and
-/// SQLite is the only driver compiled in (`Cargo.toml`).
+/// SQLite is the only driver compiled in (Loco's `db-postgres` off,
+/// `Cargo.toml`), so another database's URL refuses to boot first.
 #[must_use]
 pub fn pool(ctx: &AppContext) -> &SqlitePool {
     ctx.db.get_sqlite_connection_pool()

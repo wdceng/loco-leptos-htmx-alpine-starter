@@ -30,10 +30,8 @@ use crate::{
     cookies,
     middleware::rate_limit::auth_limited,
     models::{
-        auth_events,
         avatars::{self, Avatars},
         sessions::{self, Session},
-        sign_ins::SignIn,
         users::{self, password_problem},
     },
     render::render_private_page,
@@ -328,10 +326,10 @@ async fn password(
 }
 
 /// `POST /account/delete`: the password, unless the session is proven;
-/// then the user's sessions and the user are gone, the cookie with them,
-/// and the browser goes to [`DELETED`]. The sessions are deleted first, by
-/// hand: SQLite's cascade holds only on a connection whose foreign keys
-/// are on, and Loco turns them on for one of the pool's.
+/// then the user is gone, the cookie with them, and the browser goes to
+/// [`DELETED`]. The account's sessions, sign-ins and events go with its
+/// row, by the database's cascade (`ON DELETE CASCADE`, foreign keys on
+/// for every connection of the pool).
 async fn delete(
     State(ctx): State<AppContext>,
     signed: Signed,
@@ -355,15 +353,6 @@ async fn delete(
         .await;
     }
     let pool = sql::pool(&ctx);
-    Session::close_all(pool, signed.user.id)
-        .await
-        .map_err(Error::wrap)?;
-    SignIn::close_all(pool, signed.user.id)
-        .await
-        .map_err(Error::wrap)?;
-    auth_events::forget(pool, signed.user.id)
-        .await
-        .map_err(Error::wrap)?;
     let avatar = avatars::of(pool, signed.user.id)
         .await
         .map_err(Error::wrap)?;

@@ -110,6 +110,10 @@ impl Task for UserCreate {
         println!("   Email: {}", user.email);
         println!("   Name: {}", user.name);
         println!("   PID: {}", user.pid);
+        // Said, so a mistyped role shows at once: since Loco 1.3 an
+        // argument without its colon (`role admin`) reaches the task
+        // unread, and the user is a member.
+        println!("   Role: {}", role.as_str());
 
         Ok(())
     }

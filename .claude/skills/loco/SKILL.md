@@ -114,6 +114,10 @@ Then, by subject:
 api-index` that made them is not in this repo, so nothing regenerates them
 at an upgrade. When `Cargo.lock` holds another version, a name missing here
 may exist: the registry source answers instead (the escape hatch below).
+`Cargo.lock` holds loco-rs 1.3.1 since 2026-11-09, the indexes still
+1.2.0's: what loco-rs 1.3.1's release added (the server-side sessions,
+OAuth, `or_err`) is not listed, and `JWT` is Loco's own now, no longer
+jsonwebtoken's.
 
 Symbols that sound plausible but **do not exist**: `loco_rs::app::AppState`,
 `loco_rs::jobs::Job`, `loco_rs::controller::Controller`,

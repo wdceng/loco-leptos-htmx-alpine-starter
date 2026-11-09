@@ -81,6 +81,37 @@ async fn the_task_gives_the_role_it_is_told() {
     );
 }
 
+/// A role typed without its colon (`role admin`) reaches the task unread,
+/// as Loco 1.3 hands over every argument: the user is a member, the least a
+/// role can do, and the task's summary says so (`Role: member`).
+#[tokio::test]
+#[serial]
+async fn a_role_without_its_colon_makes_a_member() {
+    let boot = boot_test::<App>().await.unwrap();
+    let ctx = &boot.app_context;
+    let vars = task::Vars::from_args(
+        [
+            "email:typo@example.com",
+            "name:Typo",
+            "password:securepassword",
+            "role",
+            "admin",
+        ]
+        .map(String::from)
+        .to_vec(),
+    );
+    run_task::<App>(ctx, Some(&"user:create".to_string()), &vars)
+        .await
+        .expect("created");
+    let user = users::Model::find_by_email(&ctx.db, "typo@example.com")
+        .await
+        .expect("the user");
+    assert_eq!(
+        Role::of(sql::pool(ctx), user.id).await.expect("read"),
+        Role::Member
+    );
+}
+
 /// Each of the three arguments is asked for by name, and none missing
 /// creates anybody or sends a mail.
 #[tokio::test]

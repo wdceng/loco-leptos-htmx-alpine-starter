@@ -20,7 +20,22 @@ crate-type = ["cdylib", "rlib"]
 # "this or any compatible newer release", so the number is the lowest one
 # the project accepts, and Cargo.lock holds the one actually built.
 [workspace.dependencies]
-loco-rs = { version = "1.2.0" }
+# Loco's default features less two: `db-postgres`, so SQLite is the only
+# driver compiled and a `postgres://` URL refuses to boot, and
+# `compression`, which the reverse proxy does in front of the app (its
+# middleware stays off, `tests/config.rs`; an enabled one without the
+# feature refuses to boot). `generators` for `cargo loco generate` in a
+# scratch worktree.
+loco-rs = { version = "1.3.1", default-features = false, features = [
+  "auth",
+  "cli",
+  "with-db",
+  "cache_inmem",
+  "worker",
+  "db-sqlite",
+  "mailer",
+  "generators",
+] }
 
 # Leptos 0.8.22 as published, with one line more: the islands loader's
 # `requestIdleCallback` given a timeout, as Leptos's `hydration_script.js`
@@ -44,10 +59,11 @@ leptos = { git = "https://github.com/wdceng/leptos", rev = "edce065baeb60c9cb4ba
 # serde_json are the exception: island props derive Serialize/Deserialize
 # in both halves.
 #
-# Unlike the lightweight-service starter, this app keeps Loco's default
-# features: `with-db` (Sea-ORM, migrations), `db-sqlite` (its SQLite
-# driver), `auth` (JWT), `worker`, `cache_inmem` and `cli`. The users model
-# and the auth controller depend on them.
+# Loco's features are listed once, under `[workspace.dependencies]`:
+# `with-db` (Sea-ORM, migrations), `db-sqlite` (its SQLite driver), `auth`
+# (password hashing and Loco's own HMAC tokens), `mailer`, `worker`,
+# `cache_inmem`, `cli` and `generators`. The users model, the mailers and
+# the unmounted auth controller depend on them.
 # ---------------------------------------------------------------------------
 loco-rs = { workspace = true, optional = true }
 # `multipart`: an avatar's upload (src/controllers/account.rs).
@@ -68,9 +84,9 @@ serde_json = { version = "1.0.154" }
 
 # Database and the typed API contract. All server only: none of these build
 # for wasm32. SQLite in every environment, on the server one file in the
-# unit's /var/lib directory; `sqlx-postgres` was dropped on purpose, so a
-# `postgres://` URL refuses to boot rather than silently working on one
-# machine only.
+# unit's /var/lib directory; `sqlx-postgres` is not compiled (Loco's
+# `db-postgres` off, above), so a `postgres://` URL refuses to boot rather
+# than silently working on one machine only.
 migration = { path = "migration", optional = true }
 sea-orm = { version = "2.0.4", features = [
   "sqlx-sqlite",
@@ -210,8 +226,8 @@ lettre = { version = "0.11.23", default-features = false, features = [
 ], optional = true }
 # Nightly restart (src/maintenance.rs): the hour is read in a fixed IANA
 # zone from config, not the server's local time. `serde` lets the zone name
-# deserialize straight into a `Tz`, so a typo refuses to boot. Already in
-# the graph through loco-rs, so no extra compile. Server only.
+# deserialize straight into a `Tz`, so a typo refuses to boot. The app's
+# own: Loco 1.3 no longer brings it. Server only.
 chrono-tz = { version = "0.10.4", features = ["serde"], optional = true }
 
 # The nightly restart stops the server by sending SIGTERM to its own

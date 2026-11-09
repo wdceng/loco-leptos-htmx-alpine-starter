@@ -3,8 +3,8 @@
 Why things are built the way they are. To get started, read `README.md`
 instead.
 
-Versions: Loco 1.2, Leptos 0.8, Sea-ORM 2.0, Tailwind v4, and stable Rust
-1.94 or newer (edition 2024), which Loco 1.2 and Sea-ORM 2.0.4 need.
+Versions: Loco 1.3, Leptos 0.8, Sea-ORM 2.0, Tailwind v4, and stable Rust
+1.94 or newer (edition 2024), which Loco 1.3 and Sea-ORM 2.0.4 need.
 
 ## One Crate, Two Builds
 
@@ -168,11 +168,16 @@ so the hashes always match the files served; no hash file is needed. The
 one address without a version is `/favicon.ico` at the root: browsers ask
 for it by that name, and only when a page links no icon, which ours do.
 
-**SQLite** - Sea-ORM over SQLx, SQLite driver only (`sqlx-postgres` was
-dropped on purpose). Each environment has its own `app_<env>.sqlite`:
-`?mode=rwc` in the URL creates it, `auto_migrate` applies the schema at
-boot. Loco sets the PRAGMAs: WAL, `synchronous = NORMAL`, foreign keys on,
-5 s busy timeout. The `-wal` and `-shm` files are part of the database, so
+**SQLite** - Sea-ORM over SQLx, SQLite driver only (Loco's `db-postgres`
+feature off, so `sqlx-postgres` is never built). Each environment has its
+own `app_<env>.sqlite`: `?mode=rwc` in the URL creates it, `auto_migrate`
+applies the schema at boot. Loco 1.3 sets the PRAGMAs on every connection
+of the pool: WAL, `synchronous = NORMAL`, foreign keys on, 5 s busy
+timeout, and its cache and size limits. Foreign keys on, an account's rows
+(sessions, sign-ins, events) go with it by `ON DELETE CASCADE`, no delete
+by hand. **The wait for a pooled connection is `connect_timeout` plus the
+busy timeout:** 500 ms + 5 s since Loco 1.3.1, so a busy database waits
+rather than fails at once. The `-wal` and `-shm` files are part of the database, so
 back up with `sqlite3 <file> ".backup <copy>"`, never by copying the file
 alone.
 
@@ -271,7 +276,7 @@ the `compression` middleware is off.
 The reference deployment (`production.md`) is Cloudflare in front of Caddy,
 so `config/staging.yaml` and `config/production.yaml` set
 `remote_ip.source: CfConnectingIp` and the rate limiter keys on the same
-header. Loco 1.2 trusts exactly one source, with no list of trusted proxies.
+header. Loco 1.3 trusts exactly one source, with no list of trusted proxies.
 
 It's set in config, not code, but it's enforced: the limiter won't boot a
 deployed environment keyed on the TCP peer, which behind a proxy is the

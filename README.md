@@ -4,7 +4,7 @@
 
 [![License: MIT or Apache-2.0](https://img.shields.io/badge/license-MIT%20or%20Apache--2.0-blue)](#license)
 [![Rust 1.94+](https://img.shields.io/badge/rust-1.94%2B-orange)](docs/prerequisites.md)
-[![Loco 1.2](https://img.shields.io/badge/loco-1.2-green)](https://loco.rs)
+[![Loco 1.3](https://img.shields.io/badge/loco-1.3-green)](https://loco.rs)
 [![Leptos 0.8 islands](https://img.shields.io/badge/leptos-0.8%20islands-red)](https://leptos.dev)
 [![htmx 4](https://img.shields.io/badge/htmx-4-blue)](https://htmx.org)
 [![Alpine 3 CSP](https://img.shields.io/badge/alpine-3%20CSP-teal)](https://alpinejs.dev)
@@ -84,7 +84,7 @@ src-tauri/linux.sh
 
 | Part | From | Version |
 |---|---|---|
-| Server, database, accounts, e-mail, jobs | Loco's Rest API starter | Loco 1.2.0, Sea-ORM 2.0.4 |
+| Server, database, accounts, e-mail, jobs | Loco's Rest API starter | Loco 1.3.1 (SQLite only), Sea-ORM 2.0.4 |
 | Pages, rendered on the server | Leptos in islands mode | 0.8.22, from a fork ([Fixed upstream](#fixed-upstream)) |
 | Moves between pages, without a reload | htmx 4 | 4.0.1, its preload and alpine-compat extensions 4.0.1 |
 | Small page state, like a menu | Alpine, its CSP build | 3.17.4 |

@@ -9,7 +9,8 @@ change of mind gets a new line, and the old one moves to
 - 2026-09-28: **Loco's Rest API starter as the base**, not "SaaS App with
   server side rendering". Leptos makes the pages, so the SaaS starter's
   Tera views, translations and `/static` would only be removed.
-- 2026-09-28: **Loco 1.2, Sea-ORM 2.0.4, Rust 1.94 or newer.**
+- 2026-09-28: **Loco 1.2, Sea-ORM 2.0.4, Rust 1.94 or newer.** Loco
+  1.3.1 since 2026-11-09 (below).
 - 2026-10-02: **SQLx `query!` for the app's own queries**, on Sea-ORM's
   pool, checked at compile time. Loco's own models stay on Sea-ORM.
 - 2026-10-02: **Mails, error answers and the 429 page are Leptos**, not
@@ -24,6 +25,16 @@ change of mind gets a new line, and the old one moves to
   (`full_title`, "Page | App"), and a page that only tells something is
   one `Notice`. Three pages had written the title three ways, and four
   the same heading, line and way home.
+- 2026-11-09: **Loco 1.3.1, SQLite alone compiled.** 1.3 sets the
+  SQLite PRAGMAs on every connection of the pool (1.2 on one); 1.3.0 is
+  skipped, its boot could time out on a locked file (fixed in 1.3.1,
+  loco-rs #1899). Loco's default features off and listed, without
+  `db-postgres` and `compression`: the template never used Postgres, now
+  never builds it, and a `postgres://` URL refuses to boot. An account's
+  rows go by the database's cascade alone, the deletes by hand dropped
+  (foreign keys were on for every connection on 1.2 too). Merged before
+  the two-week rule's date, on the maintainer's word: the starter's checks
+  are the test.
 - 2026-10-21: **One Reduce Motion rule, the scrollbar's room kept, no
   scroll anchoring, controls 44px tall.** Not a look but how pages behave:
   an islands app on this stack saw each go wrong (a move flashing the
