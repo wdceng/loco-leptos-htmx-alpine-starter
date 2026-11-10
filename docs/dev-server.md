@@ -53,7 +53,7 @@ LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
 ### Build and deploy
 
 ```bash
-test -f secrets.dev-server.env && tools/cargo-leptos/check.sh &&
+test -f secrets.dev-server.env &&
 LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&
 CARGO_TARGET_DIR=target/zig cargo zigbuild --profile dev-server --target x86_64-unknown-linux-gnu.2.31 &&
 rm -rf dist && mkdir dist &&
@@ -77,9 +77,6 @@ ssh <server> "journalctl -u app-dev -f"
 - **No `secrets.dev-server.env`, no deploy.** The first line stops the
   chain before anything is built; without it the upload near the end would
   fail with the unit already stopped.
-- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
-  the chain when this machine's cargo-leptos lacks the split fixes
-  (`development.md`, "Lazy islands").
 - The `dev-server` profile is faster to rebuild than `--release`. It's
   stripped, so backtraces have no names or line numbers.
 - `.2.31` is the oldest glibc the binary needs (Step 0 in

@@ -5,7 +5,7 @@
 [![License: MIT or Apache-2.0](https://img.shields.io/badge/license-MIT%20or%20Apache--2.0-blue)](#license)
 [![Rust 1.94+](https://img.shields.io/badge/rust-1.94%2B-orange)](docs/prerequisites.md)
 [![Loco 1.3](https://img.shields.io/badge/loco-1.3-green)](https://loco.rs)
-[![Leptos 0.8 islands](https://img.shields.io/badge/leptos-0.8%20islands-red)](https://leptos.dev)
+[![Leptos 0.9 islands](https://img.shields.io/badge/leptos-0.9%20islands-red)](https://leptos.dev)
 [![htmx 4](https://img.shields.io/badge/htmx-4-blue)](https://htmx.org)
 [![Alpine 3 CSP](https://img.shields.io/badge/alpine-3%20CSP-teal)](https://alpinejs.dev)
 [![Tailwind v4](https://img.shields.io/badge/tailwind-v4-38bdf8)](https://tailwindcss.com)
@@ -85,13 +85,13 @@ src-tauri/linux.sh
 | Part | From | Version |
 |---|---|---|
 | Server, database, accounts, e-mail, jobs | Loco's Rest API starter | Loco 1.3.1 (SQLite only), Sea-ORM 2.0.4 |
-| Pages, rendered on the server | Leptos in islands mode | 0.8.22, from a fork ([Fixed upstream](#fixed-upstream)) |
+| Pages, rendered on the server | Leptos in islands mode | 0.9.0-rc1, its release candidate |
 | Moves between pages, without a reload | htmx 4 | 4.0.1, its preload and alpine-compat extensions 4.0.1 |
 | Small page state, like a menu | Alpine, its CSP build | 3.17.4 |
 | Styling | Tailwind v4, its default look | v4, the one cargo-leptos downloads, unpinned |
 | The app's own queries | SQLx `query!`, checked at compile time | 0.9.0 |
 | The app on desktops and phones | Tauri 2 | 2.12.5 |
-| The build | cargo-leptos | PR #691's commit `0fb3de86`, on 0.3.11, with wasm-split 0.2.4 ([Fixed upstream](#fixed-upstream)) |
+| The build | cargo-leptos | 0.3.12 or newer |
 | The language | Rust | 1.94 or newer |
 
 ## What the template adds
@@ -144,10 +144,10 @@ Let Rust compile for the browser:
 rustup target add wasm32-unknown-unknown
 ```
 
-Install the build tool, from the commit with its fix:
+Install the build tool:
 
 ```sh
-tools/cargo-leptos/install.sh
+cargo install --locked cargo-leptos --version 0.3.12
 ```
 
 Build the server, the WASM and Tailwind, and run on http://localhost:5150:
@@ -220,16 +220,16 @@ What each covers, and what the browser tests need:
 ## Fixed upstream
 
 Bugs upstream that this works around, and the workaround used here until
-the fix is released. `tools/upstream.sh` asks GitHub and
-crates.io whether it is; how to undo each workaround is under "Way back" in
-`docs/decisions.md`.
+the fix is released. `tools/upstream.sh` asks GitHub whether it is; how
+to undo each workaround is under "Way back" in `docs/decisions.md`. Fixed
+and gone with Leptos 0.9 and cargo-leptos 0.3.12: the split build's stale
+names (cargo-leptos #690, wasm-split #79), islands kept after htmx swapped
+them out (Leptos #4952), and the islands loader waiting for idle time
+forever (Leptos #4959).
 
 | Problem | Reported | Upstream fix | Here | Goes when |
 |---|---|---|---|---|
-| cargo-leptos: with `--split` and hashed names, the main files kept an old name | [#690](https://github.com/leptos-rs/cargo-leptos/issues/690) | [#691](https://github.com/leptos-rs/cargo-leptos/pull/691), merged | cargo-leptos from #691's commit (`tools/cargo-leptos/`) | A cargo-leptos release with #691 that locks wasm-split 0.2.4 |
-| wasm-split: unsorted imports, new file names on every build | [#79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | [#80](https://github.com/WorldSEnder/wasm-split-prototype/pull/80), released in 0.2.4 | The same install, unlocked, so it takes 0.2.4 | The same cargo-leptos release |
-| Leptos: an island's state stayed in memory after htmx swapped it out | [#4952](https://github.com/leptos-rs/leptos/issues/4952) | [#4953](https://github.com/leptos-rs/leptos/pull/4953), merged, for 0.9 | An island collector (`src/collect.rs`) | Leptos 0.9; `htmx-islands.js` then calls its `$$dispose` |
-| Leptos: the islands loader waited for idle time forever, so Chrome 114 to 123 could start no island | [#4959](https://github.com/leptos-rs/leptos/issues/4959) | [#4978](https://github.com/leptos-rs/leptos/pull/4978) by Leptos's author, merged, for 0.9 | Leptos from our fork, the wait capped at 2 s, pinned in `Cargo.toml` | The Leptos release with #4978 (0.9, or a backport to 0.8) |
+| Leptos 0.9: a timer helper's callback kept by the root owner, which lives as long as the tab in islands mode | Not reported yet | None | No island calls Leptos's timer helpers: a job makes its callback once (`Job`, `src/islands.rs`), a test refuses the helpers | A Leptos release that frees such a callback |
 | htmx: Chrome 150 to 156 drops the comments Leptos hydrates by | [#4147](https://github.com/bigskysoftware/htmx/issues/4147) | Chrome 157 | `public/js/htmx-islands.js` removes `parseHTMLUnsafe`, so htmx parses with DOMParser | **Stays** while Chrome 150 to 156 are above the low bar |
 | htmx 4.0.1: every swap fails in Chrome 124 to 145, from its own fix for the row above ([#4150](https://github.com/bigskysoftware/htmx/pull/4150)) | [#4182](https://github.com/bigskysoftware/htmx/issues/4182) | Open | The same line: with `parseHTMLUnsafe` gone, htmx never makes the call | **Stays** until a release fixes #4182 and Chrome 156 is below the low bar |
 | htmx 4: an extension loaded with `defer` can miss the first page, so its links don't preload (seen in Chrome 114) | [#4170](https://github.com/bigskysoftware/htmx/issues/4170) | Closed: `defer` is outside htmx's documented way | htmx and its extensions as plain tags, as its docs show | Stays: it's the documented way |

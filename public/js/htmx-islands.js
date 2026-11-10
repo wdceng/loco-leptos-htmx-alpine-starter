@@ -1,5 +1,6 @@
 // For htmx 4 only (htmx 2 names its events differently: htmx:afterSwap).
-// Keeps Leptos islands alive in HTML htmx swaps in. The one hand-written
+// Keeps Leptos islands alive in HTML htmx swaps in, and frees the ones it
+// takes out. The one hand-written
 // script in the template: plumbing, no page logic (CLAUDE.md, "Islands,
 // htmx and Alpine").
 
@@ -17,28 +18,54 @@ delete Document.parseHTMLUnsafe;
 
 // In blocks, so these consts stay out of the page's global scope.
 {
-  // 2. Wake islands htmx swaps in, as Leptos's own router does. The
+  // 2. Free the islands htmx takes off the page, as Leptos's own router
+  //    does: Leptos 0.9 keeps an island's state behind `$$dispose` on its
+  //    element (#4953), its owner's `on_cleanup` run then. Called once,
+  //    outer island first, and only for an element off the page when the
+  //    observer below looks: one a swap moves within one task (a morph,
+  //    hx-preserve) is back by then and kept.
+  const dispose = (island) => {
+    const free = island.$$dispose;
+    if (!free) return;
+    delete island.$$dispose;
+    free();
+  };
+  const disposeGone = (node) => {
+    if (node.nodeType !== 1 || node.isConnected) return;
+    if (node.matches("leptos-island")) dispose(node);
+    for (const island of node.querySelectorAll("leptos-island"))
+      dispose(island);
+  };
+
+  // 3. Wake islands htmx swaps in, as Leptos's own router does. The
   //    islands the page loads with are Leptos's first pass: this script
   //    runs in <head>, before any is parsed, so the observer below marks
   //    them as the parser adds them, the wasm not yet there to wake them.
+  //    A lazy island swapped out while its chunk still loads hydrates off
+  //    the page, after the observer looked: freed once it has.
   const wake = () => {
     const hydrate = window.__hydrateIsland;
     for (const el of document.querySelectorAll("leptos-island")) {
       if (el.$$hydrated) continue;
       el.$$hydrated = true;
       // A failure while the wasm still starts: the first pass takes it.
-      if (hydrate) hydrate(el, el.dataset.component).catch(() => {});
+      if (hydrate)
+        hydrate(el, el.dataset.component)
+          .then(() => disposeGone(el))
+          .catch(() => {});
     }
   };
   document.addEventListener("htmx:after:swap", wake);
 
-  // 3. htmx 4 doesn't watch the page: process hx-* added later, and wake
-  //    islands added later (the swap event may fire on a removed element).
+  // 4. htmx 4 doesn't watch the page: process hx-* added later, wake
+  //    islands added later (the swap event may fire on a removed element),
+  //    and free the islands removed.
   const HX =
     "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger]";
   new MutationObserver((records) => {
     let islands = false;
     for (const record of records) {
+      for (const node of record.removedNodes) disposeGone(node);
       for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;
         // Not where htmx was blocked: the page works as plain links then.

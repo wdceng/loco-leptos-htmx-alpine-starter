@@ -68,9 +68,10 @@ async fn home_renders_html() {
         );
         // Leptos names the wasm file at compile time from LEPTOS_OUTPUT_NAME
         // (set in .cargo/config.toml). Without it the loader asks for
-        // `app_bg.wasm`, which cargo-leptos never writes.
+        // `app_bg.wasm`, which cargo-leptos never writes. The call's first
+        // four arguments: Leptos 0.9 adds a fifth, `defer`.
         assert!(
-            body.contains(r#"("", "pkg", "app", "app")"#),
+            body.contains(r#"("", "pkg", "app", "app""#),
             "loader script does not name app.wasm:\n{body}"
         );
     })
@@ -238,9 +239,9 @@ async fn the_shell_moves_between_pages_in_place() {
 /// Leptos's islands loader, inline in every page, waits for the browser to
 /// be idle with a timeout, so a browser that never calls it idle still
 /// starts the islands (Chrome 114 to 123, fixed in 124, stopped after about
-/// 9 to 14 whole loads in one tab): the fork Cargo.toml's
-/// `[patch.crates-io]` builds in. Should this fail after a Leptos update,
-/// the release has its own way: drop the patch.
+/// 9 to 14 whole loads in one tab): Leptos 0.9's loader has it (#4978),
+/// which a fork built in until then. Should this fail after a Leptos
+/// update, the loader changed its way: read the new one.
 #[tokio::test]
 #[serial]
 async fn the_islands_loader_waits_for_idle_two_seconds_at_most() {

@@ -1,10 +1,10 @@
 //! Leaks. Twenty moves in place between the home page and the reset page,
 //! and twenty steps Back and Forward, each leave the page holding about
 //! what it held before: no swapped-out page's documents, nodes or
-//! listeners kept, the JavaScript heap and the WASM's memory flat, and the
-//! collector holding no more islands than the page shows (src/collect.rs;
-//! the debug build's `data-islands-live`). The home page's lazy
-//! `IslandsCheck` is loaded, woken and freed on every round.
+//! listeners kept, the JavaScript heap and the WASM's memory flat. The home
+//! page's lazy `IslandsCheck` is loaded, woken and freed on every round:
+//! `public/js/htmx-islands.js` calls the `$$dispose` Leptos 0.9 keeps its
+//! state behind, which [`an_island_that_leaves_is_freed`] watches.
 //!
 //! The sister app's method: measured three times, the garbage collected
 //! first, before the rounds, halfway and at the end. The end against the
@@ -26,9 +26,10 @@ use serde_json::json;
 /// How many times each round is repeated.
 const ROUNDS: usize = 20;
 
-/// Long enough for the collector's two sweeps (2 s apart in a debug build)
-/// to free the islands that left.
-const SWEEPS: Duration = Duration::from_secs(5);
+/// Long enough for the last move's own work to end (its title read out,
+/// the home page's lazy island woken) before the page is measured: an
+/// island is freed as it leaves, nothing to wait for there.
+const REST: Duration = Duration::from_secs(1);
 
 /// How much the heap may grow over the second half, in bytes: the
 /// measure's own noise after a collection, not a page's worth.
@@ -42,9 +43,9 @@ const ONE_REGION: usize = 1_000;
 /// page, the allocator's own step.
 const WASM_SLOPE: u64 = 64 * 1024;
 
-/// What the page holds once the collector has swept twice.
+/// What the page holds once it has come to rest ([`REST`]).
 async fn settled_memory(page: &Page) -> WebDriverResult<Held> {
-    tokio::time::sleep(SWEEPS).await;
+    tokio::time::sleep(REST).await;
     page.held().await
 }
 
@@ -95,19 +96,14 @@ where
     assert!(page.in_place().await?, "{what}: every move in place");
     let after = settled_memory(page).await?;
     eprintln!("{what}: before {before:?}\n  halfway {half:?}\n  after {after:?}");
-    about_the_same(page, what, before, half, after).await
+    about_the_same(what, before, half, after);
+    Ok(())
 }
 
 /// The page holding about what it held: against `before` the rounds, some
 /// growth allowed (a leak of a page's worth a round would be twenty pages'
 /// worth by now); against `half` of them, almost none, the slope.
-async fn about_the_same(
-    page: &Page,
-    what: &str,
-    before: Held,
-    half: Held,
-    after: Held,
-) -> WebDriverResult<()> {
+fn about_the_same(what: &str, before: Held, half: Held, after: Held) {
     assert!(
         after.documents <= before.documents,
         "{what}: documents kept, {} then {}",
@@ -160,37 +156,35 @@ async fn about_the_same(
         half.wasm,
         after.wasm
     );
-    let islands = page
-        .eval(
-            "return [Number(document.documentElement.dataset.islandsLive ?? 0),
-                     document.querySelectorAll('leptos-island').length]",
-        )
-        .await?;
-    let (live, shown) = (
-        islands[0].as_u64().unwrap_or_default(),
-        islands[1].as_u64().unwrap_or_default(),
-    );
-    assert!(
-        live <= shown,
-        "{what}: the collector holds {live} islands, the page shows {shown}"
-    );
-    Ok(())
 }
 
+/// `IslandsCheck` swapped out is freed as it leaves: its element, held by
+/// the test, no longer carries the `$$dispose` Leptos kept its state behind
+/// (called and deleted by public/js/htmx-islands.js). `Navigation`,
+/// outside the region, keeps its own.
 #[tokio::test]
 async fn an_island_that_leaves_is_freed() {
     browse(|page| async move {
         page.open("/").await?;
         page.mark().await?;
+        page.eval(
+            "window.__e2eIsland = document.querySelector('leptos-island[data-component^=\"IslandsCheck\"]');
+             return !!window.__e2eIsland",
+        )
+        .await?;
         page.add_link(RESET).await?;
         page.move_to("#e2e-link", RESET).await?;
         assert!(page.in_place().await?, "no full load");
-        // `IslandsCheck` swapped out and freed after two sweeps;
-        // `Navigation`, outside the region, kept.
         page.until_within(
-            "one island live",
-            "return document.documentElement.dataset.islandsLive === '1'",
+            "the swapped-out island freed",
+            "return !!window.__e2eIsland && !window.__e2eIsland.isConnected
+                 && !('$$dispose' in window.__e2eIsland)",
             Duration::from_secs(10),
+        )
+        .await?;
+        page.until(
+            "Navigation kept",
+            "return typeof document.querySelector('leptos-island[data-component^=\"Navigation\"]').$$dispose === 'function'",
         )
         .await
     })

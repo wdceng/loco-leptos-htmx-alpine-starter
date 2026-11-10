@@ -33,23 +33,30 @@
 //! for what neither can (Rust shared with the server, a browser API Alpine
 //! can't reach, state that must outlive the server's answers).
 //!
-//! **Every island's body runs through `collected`** (src/collect.rs):
-//! Leptos never frees an island htmx swaps out, so without it each one
-//! stays in the tab's memory until the next full load. A test below refuses
-//! an island that doesn't.
+//! **An island is freed when htmx takes it off the page:** Leptos 0.9 keeps
+//! its state behind `$$dispose` on its `<leptos-island>` element (#4953),
+//! which `public/js/htmx-islands.js` calls for every island a swap removes;
+//! its owner's `on_cleanup` runs then, where an island removes its window
+//! listeners.
+//!
+//! **No Leptos timer helper in an island** (`set_timeout`, `set_interval`,
+//! `request_animation_frame`, `request_idle_callback`): Leptos 0.9 hands
+//! each call's callback to the owner current at the call, and in an islands
+//! page that is the root, kept as long as the tab, so a call per scroll or
+//! per move would stay in memory for the whole visit. A job scheduled again
+//! and again makes its callback once ([`Job`]). A test below refuses the
+//! helpers.
 
 use std::{cell::RefCell, time::Duration};
 
 use leptos::{
     prelude::*,
-    wasm_bindgen::{JsCast, JsValue},
+    wasm_bindgen::{JsCast, JsValue, closure::Closure},
 };
 use web_sys::{
     ScrollBehavior, ScrollRestoration, ScrollToOptions,
     js_sys::{Function, Object, Reflect},
 };
-
-use crate::collect::collected;
 
 mod shrink;
 
@@ -101,6 +108,93 @@ thread_local! {
     /// The build this page loaded ([`BUILD_META`]): the pages move in place,
     /// so it is the build of the whole visit's code.
     static BUILD: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// [`Navigation`]'s scheduled jobs, made when it starts in the browser
+    /// and dropped with it.
+    static JOBS: RefCell<Option<Jobs>> = const { RefCell::new(None) };
+}
+
+/// Something the page schedules again and again: its callback made once,
+/// and the call still queued, which a new one replaces, so the last one
+/// runs. Scheduled through the browser's own `setTimeout` and
+/// `requestAnimationFrame`, never Leptos's helpers (the module's doc).
+/// Dropped, it cancels what is queued, then frees its callback.
+struct Job {
+    run: Closure<dyn Fn()>,
+    queued: std::cell::Cell<Option<Queued>>,
+}
+
+/// A [`Job`]'s call the browser holds: a timeout's id or a frame's.
+#[derive(Clone, Copy)]
+enum Queued {
+    Timeout(i32),
+    Frame(i32),
+}
+
+impl Job {
+    fn new(run: fn()) -> Self {
+        Self {
+            run: Closure::new(run),
+            queued: std::cell::Cell::new(None),
+        }
+    }
+
+    /// Runs once `delay` has passed, the call still queued replaced.
+    fn after(&self, delay: Duration) {
+        self.cancel();
+        let ms = i32::try_from(delay.as_millis()).unwrap_or(i32::MAX);
+        if let Ok(id) = window().set_timeout_with_callback_and_timeout_and_arguments_0(
+            self.run.as_ref().unchecked_ref(),
+            ms,
+        ) {
+            self.queued.set(Some(Queued::Timeout(id)));
+        }
+    }
+
+    /// Runs before the next repaint, the call still queued replaced.
+    fn next_frame(&self) {
+        self.cancel();
+        if let Ok(id) = window().request_animation_frame(self.run.as_ref().unchecked_ref()) {
+            self.queued.set(Some(Queued::Frame(id)));
+        }
+    }
+
+    /// The call still queued, if any, cancelled; one that ran already is
+    /// no call the browser holds, so cancelling it does nothing.
+    fn cancel(&self) {
+        match self.queued.take() {
+            Some(Queued::Timeout(id)) => window().clear_timeout_with_handle(id),
+            Some(Queued::Frame(id)) => {
+                let _ = window().cancel_animation_frame(id);
+            }
+            None => {}
+        }
+    }
+}
+
+impl Drop for Job {
+    fn drop(&mut self) {
+        self.cancel();
+    }
+}
+
+/// [`Navigation`]'s jobs.
+struct Jobs {
+    /// The page's scroll kept in its history entry once scrolling rests.
+    rest: Job,
+    /// A move's new page asked to its top again a frame later.
+    top: Job,
+    /// The new page's title read out a tick after a move.
+    announce: Job,
+}
+
+/// `schedule` given [`Navigation`]'s jobs, where they exist: in the browser,
+/// once it has started.
+fn with_jobs(schedule: impl FnOnce(&Jobs)) {
+    JOBS.with_borrow(|jobs| {
+        if let Some(jobs) = jobs {
+            schedule(jobs);
+        }
+    });
 }
 
 /// What a move between pages in place needs that htmx doesn't do, on every
@@ -127,99 +221,97 @@ thread_local! {
 ///   nothing; so does any error answering Back or Forward, whose request
 ///   htmx sends from `<body>`, out of the region's `hx-status`.
 ///
-/// The listeners are removed with the island's owner.
+/// The listeners are removed with the island's owner, and its jobs dropped.
 #[island]
 pub fn Navigation() -> impl IntoView {
-    collected(|| {
-        // Effects run in the browser only, after hydration.
-        Effect::new(move |_| {
-            take_scroll_over();
-            REGION.set(document().get_element_by_id(PAGE_REGION));
-            BUILD.set(
-                document()
-                    .query_selector(&format!("meta[name={BUILD_META}]"))
-                    .ok()
-                    .flatten()
-                    .and_then(|meta| meta.get_attribute("content")),
-            );
-        });
-        let fresher = window_event_listener_untyped("htmx:before:response", |ev| {
-            if let Some(page) = newer_build(&ev) {
-                ev.prevent_default();
-                let _ = window().location().assign(&page);
-            }
-        });
-        let swapped = window_event_listener_untyped("htmx:after:swap", |_| {
-            if moved() {
-                at_the_top_again();
-                arrive();
-            }
-        });
-        // Back's swap keeps the region's element, so it is no move to
-        // `moved`: the scroll is put back once htmx has settled the swap.
-        let settled = window_event_listener_untyped("htmx:after:settle", |_| restored());
-        // The entry Back or Forward brings back is the current one by now:
-        // its scroll is read before htmx asks for its page.
-        let restoring = window_event_listener_untyped("htmx:before:history:restore", |_| {
-            RESTORING.set(Some(kept_scroll().unwrap_or(0.0)));
-        });
-        // The entry a move leaves keeps where its page stood, before the
-        // move pushes the next one; not while a page is being brought back.
-        let leaving = window_event_listener_untyped("htmx:before:request", |_| {
-            if RESTORING.with_borrow(Option::is_none) {
-                keep_scroll();
-            }
-        });
-        let resting = StoredValue::new(None::<TimeoutHandle>);
-        let scrolled = window_event_listener_untyped("scroll", move |_| {
-            if let Some(queued) = resting.get_value() {
-                queued.clear();
-            }
-            resting.set_value(set_timeout_with_handle(keep_scroll, SCROLL_REST).ok());
-        });
-        // htmx gives the focus back to the element with the same `id` in
-        // the new page, and `arrive` then moves it to `<main>`: a field
-        // styled on its focus (a search that opens) would open and close
-        // over the new page. Nothing is focused before a move's swap; a
-        // field the new page marks `autofocus` still gets the focus.
-        let unfocused = window_event_listener_untyped("htmx:before:swap", |ev| {
-            if into_region(&ev) {
-                blur_focused();
-            }
-        });
-        let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
-        // No answer at all to Back's request: the page Back went to, loaded
-        // plainly, says why.
-        let failed = window_event_listener_untyped("htmx:error", |_| {
-            restore_failed();
-        });
-        // A picture chosen in a field marked `data-shrink` shrunk before
-        // its form goes (shrink.rs): on every page, as this island is.
-        let chosen = window_event_listener_untyped("change", |ev| {
-            if let Some(field) = ev
-                .target()
-                .and_then(|target| target.dyn_into::<web_sys::HtmlInputElement>().ok())
-                .filter(|field| field.has_attribute("data-shrink"))
-            {
-                shrink::chosen(field);
-            }
-        });
-        on_cleanup(move || {
-            chosen.remove();
-            fresher.remove();
-            swapped.remove();
-            settled.remove();
-            restoring.remove();
-            leaving.remove();
-            scrolled.remove();
-            unfocused.remove();
-            refused.remove();
-            failed.remove();
-            if let Some(queued) = resting.get_value() {
-                queued.clear();
-            }
-        });
-    })
+    // Effects run in the browser only, after hydration.
+    Effect::new(move |_| {
+        take_scroll_over();
+        REGION.set(document().get_element_by_id(PAGE_REGION));
+        BUILD.set(
+            document()
+                .query_selector(&format!("meta[name={BUILD_META}]"))
+                .ok()
+                .flatten()
+                .and_then(|meta| meta.get_attribute("content")),
+        );
+        JOBS.set(Some(Jobs {
+            rest: Job::new(keep_scroll),
+            top: Job::new(to_the_top),
+            announce: Job::new(announce_title),
+        }));
+    });
+    let fresher = window_event_listener_untyped("htmx:before:response", |ev| {
+        if let Some(page) = newer_build(&ev) {
+            ev.prevent_default();
+            let _ = window().location().assign(&page);
+        }
+    });
+    let swapped = window_event_listener_untyped("htmx:after:swap", |_| {
+        if moved() {
+            with_jobs(|jobs| jobs.top.next_frame());
+            arrive();
+        }
+    });
+    // Back's swap keeps the region's element, so it is no move to
+    // `moved`: the scroll is put back once htmx has settled the swap.
+    let settled = window_event_listener_untyped("htmx:after:settle", |_| restored());
+    // The entry Back or Forward brings back is the current one by now:
+    // its scroll is read before htmx asks for its page.
+    let restoring = window_event_listener_untyped("htmx:before:history:restore", |_| {
+        RESTORING.set(Some(kept_scroll().unwrap_or(0.0)));
+    });
+    // The entry a move leaves keeps where its page stood, before the
+    // move pushes the next one; not while a page is being brought back.
+    let leaving = window_event_listener_untyped("htmx:before:request", |_| {
+        if RESTORING.with_borrow(Option::is_none) {
+            keep_scroll();
+        }
+    });
+    let scrolled = window_event_listener_untyped("scroll", |_| {
+        with_jobs(|jobs| jobs.rest.after(SCROLL_REST));
+    });
+    // htmx gives the focus back to the element with the same `id` in
+    // the new page, and `arrive` then moves it to `<main>`: a field
+    // styled on its focus (a search that opens) would open and close
+    // over the new page. Nothing is focused before a move's swap; a
+    // field the new page marks `autofocus` still gets the focus.
+    let unfocused = window_event_listener_untyped("htmx:before:swap", |ev| {
+        if into_region(&ev) {
+            blur_focused();
+        }
+    });
+    let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
+    // No answer at all to Back's request: the page Back went to, loaded
+    // plainly, says why.
+    let failed = window_event_listener_untyped("htmx:error", |_| {
+        restore_failed();
+    });
+    // A picture chosen in a field marked `data-shrink` shrunk before
+    // its form goes (shrink.rs): on every page, as this island is.
+    let chosen = window_event_listener_untyped("change", |ev| {
+        if let Some(field) = ev
+            .target()
+            .and_then(|target| target.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .filter(|field| field.has_attribute("data-shrink"))
+        {
+            shrink::chosen(field);
+        }
+    });
+    on_cleanup(move || {
+        chosen.remove();
+        fresher.remove();
+        swapped.remove();
+        settled.remove();
+        restoring.remove();
+        leaving.remove();
+        scrolled.remove();
+        unfocused.remove();
+        refused.remove();
+        failed.remove();
+        // Their queued calls cancelled, their callbacks freed.
+        JOBS.take();
+    });
 }
 
 /// Whether a swap brought a new page's region: the region is another
@@ -307,21 +399,19 @@ fn restore_failed() -> bool {
 }
 
 /// A move's new page, which htmx's swap puts at its top (`show:top`, the
-/// shell's `hx-boost`), asked there again a frame later where it isn't:
-/// iOS's WebKit drops a scroll right after the swap now and then, and the
-/// new page showed at its foot; the second always takes (an islands app on
-/// this stack, a probe on the iPhone, 2026-11-03). An address with a `#`
-/// is left where it went.
-fn at_the_top_again() {
-    request_animation_frame(|| {
-        let anchored = window()
-            .location()
-            .hash()
-            .is_ok_and(|hash| !hash.is_empty());
-        if !anchored && window().scroll_y().is_ok_and(|y| y != 0.0) {
-            scroll_to(0.0);
-        }
-    });
+/// shell's `hx-boost`), asked there again a frame later where it isn't
+/// ([`Jobs::top`]): iOS's WebKit drops a scroll right after the swap now
+/// and then, and the new page showed at its foot; the second always takes
+/// (an islands app on this stack, a probe on the iPhone, 2026-11-03). An
+/// address with a `#` is left where it went.
+fn to_the_top() {
+    let anchored = window()
+        .location()
+        .hash()
+        .is_ok_and(|hash| !hash.is_empty());
+    if !anchored && window().scroll_y().is_ok_and(|y| y != 0.0) {
+        scroll_to(0.0);
+    }
 }
 
 /// The page scrolled to `top` at once, never a smooth glide from wherever
@@ -352,14 +442,15 @@ fn arrive() {
         options.set_prevent_scroll(true);
         let _ = main.focus_with_options(&options);
     }
-    set_timeout(
-        || {
-            if let Some(region) = document().get_element_by_id(PAGE_ANNOUNCE) {
-                region.set_text_content(Some(&document().title()));
-            }
-        },
-        Duration::ZERO,
-    );
+    with_jobs(|jobs| jobs.announce.after(Duration::ZERO));
+}
+
+/// The page's title into the live region ([`PAGE_ANNOUNCE`]), a tick after
+/// a move ([`arrive`], [`Jobs::announce`]).
+fn announce_title() {
+    if let Some(region) = document().get_element_by_id(PAGE_ANNOUNCE) {
+        region.set_text_content(Some(&document().title()));
+    }
 }
 
 /// A link's answer that htmx left unswapped, a status not among
@@ -451,29 +542,22 @@ fn blur_focused() {
 /// Shows whether the browser half runs: the server renders "not running",
 /// and the island switches to "running" once its chunk has loaded and
 /// hydrated. Lazy, so it also proves the split build works. Home page only.
-// Lazy everywhere but the browser tests' build (src/collect.rs): they run a
-// plain wasm, not cargo-leptos's split one, and a lazy island's import of
-// `__wasm_split_placeholder__` would stop the test page from loading. As an
-// islands app on this stack writes it.
-#[cfg_attr(not(all(test, target_family = "wasm")), island(lazy))]
-#[cfg_attr(all(test, target_family = "wasm"), island)]
+#[island(lazy)]
 pub fn IslandsCheck() -> impl IntoView {
-    collected(|| {
-        let (running, set_running) = signal(false);
-        // Effects run in the browser only, after hydration.
-        Effect::new(move |_| set_running.set(true));
-        view! {
-            <p class="mt-8 text-sm text-ink-muted">
-                {move || {
-                    if running.get() {
-                        "Islands: running. This line is a lazy island, loaded on its own."
-                    } else {
-                        "Islands: not running."
-                    }
-                }}
-            </p>
-        }
-    })
+    let (running, set_running) = signal(false);
+    // Effects run in the browser only, after hydration.
+    Effect::new(move |_| set_running.set(true));
+    view! {
+        <p class="mt-8 text-sm text-ink-muted">
+            {move || {
+                if running.get() {
+                    "Islands: running. This line is a lazy island, loaded on its own."
+                } else {
+                    "Islands: not running."
+                }
+            }}
+        </p>
+    }
 }
 
 /// Reads the source, so native only: the browser tests build for wasm32.
@@ -502,47 +586,68 @@ mod tests {
         found
     }
 
-    /// Every island's body runs through `collected` (src/collect.rs): its
-    /// first statement is the call. One that doesn't would stay in the
-    /// tab's memory after htmx swaps it out, which no other test sees.
-    /// Read in every file of the module, `src/islands/` too.
+    /// Leptos's timer helpers, called bare as the prelude brings them.
+    const HELPERS: [&str; 4] = [
+        "set_timeout(",
+        "set_interval(",
+        "request_animation_frame(",
+        "request_idle_callback(",
+    ];
+
+    /// The helper a line of code calls bare, if any: the browser's own
+    /// methods (`window().request_animation_frame(…)`, a [`super::Job`]'s)
+    /// are no call of it, a `.` or a longer name before the helper's.
+    /// Comments aside.
+    fn bare_helper(line: &str) -> Option<&'static str> {
+        let code = line.split("//").next().unwrap_or_default();
+        HELPERS.into_iter().find(|helper| {
+            code.match_indices(helper).any(|(start, _)| {
+                !code[..start]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c == '.' || c == '_' || c.is_alphanumeric())
+            })
+        })
+    }
+
+    /// No island schedules through Leptos's timer helpers: each call's
+    /// callback would stay in the tab's memory for the whole visit (the
+    /// module's doc), which no other test sees. Read in every file of the
+    /// module, `src/islands/` too, up to its tests, which name the helpers.
     #[test]
-    fn every_island_runs_through_collected() {
-        let mut islands = 0;
+    fn no_island_schedules_through_leptos_timer_helpers() {
         for path in sources() {
             let source =
                 fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-            let lines: Vec<&str> = source.lines().collect();
-            for (at, line) in lines.iter().enumerate() {
-                if !line.trim_start().starts_with("pub fn ") {
-                    continue;
+            let code = source
+                .lines()
+                .take_while(|line| !line.contains("mod tests"));
+            for (at, line) in code.enumerate() {
+                if let Some(helper) = bare_helper(line) {
+                    panic!(
+                        "{}:{}: `{helper}` is Leptos's helper; schedule through a `Job`",
+                        path.display(),
+                        at + 1
+                    );
                 }
-                // An island: an attribute right above it names `island`,
-                // plain or inside a `cfg_attr`.
-                let island = lines[..at]
-                    .iter()
-                    .rev()
-                    .take_while(|above| above.trim_start().starts_with("#["))
-                    .any(|attribute| attribute.contains("island"));
-                if !island {
-                    continue;
-                }
-                islands += 1;
-                let first = lines[at + 1..]
-                    .iter()
-                    .map(|line| line.trim())
-                    .find(|line| !line.is_empty() && !line.starts_with("//"))
-                    .expect("the island's first statement");
-                assert!(
-                    first.starts_with("collected("),
-                    "{}: {line}\n  its body must go through `collected`, starts with: {first}",
-                    path.display()
-                );
             }
         }
+    }
+
+    /// The check finds a bare call and leaves the browser's own methods.
+    #[test]
+    fn the_timer_check_finds_a_bare_call() {
         assert_eq!(
-            islands, 2,
-            "Navigation and IslandsCheck: has the file changed?"
+            bare_helper("    set_timeout(|| {}, Duration::ZERO);"),
+            Some("set_timeout(")
         );
+        assert!(bare_helper("let _ = request_animation_frame(f);").is_some());
+        assert!(bare_helper("window().request_animation_frame(f)").is_none());
+        assert!(
+            bare_helper("window().set_timeout_with_callback_and_timeout_and_arguments_0(f, 0)")
+                .is_none()
+        );
+        assert!(bare_helper("// set_timeout( in a comment").is_none());
+        assert!(bare_helper("jobs.rest.after(SCROLL_REST)").is_none());
     }
 }

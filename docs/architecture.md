@@ -3,7 +3,7 @@
 Why things are built the way they are. To get started, read `README.md`
 instead.
 
-Versions: Loco 1.3, Leptos 0.8, Sea-ORM 2.0, Tailwind v4, and stable Rust
+Versions: Loco 1.3, Leptos 0.9 (release candidate), Sea-ORM 2.0, Tailwind v4, and stable Rust
 1.94 or newer (edition 2024), which Loco 1.3 and Sea-ORM 2.0.4 need.
 
 ## One Crate, Two Builds
@@ -92,11 +92,10 @@ that renders it. Every cargo-leptos command carries `--split`: cargo-leptos
 reads it from the command line only, never from `Cargo.toml`. Without it the
 main script imports `__wasm_split_placeholder__`, a module no browser can
 load, so not one island runs. `src/assets.rs` refuses to boot that build,
-and one whose main script names a loader the site folder lacks. Released
-cargo-leptos 0.3.11 gets hashed split names wrong in two ways, so every
-machine and CI install it from #691's commit (`tools/cargo-leptos/`)
-(`development.md`, "Lazy islands"). The home page's `IslandsCheck` keeps
-the split path in use, so CI builds and checks it.
+and one whose main script names a loader the site folder lacks.
+cargo-leptos 0.3.12 or newer: 0.3.11 got hashed split names wrong in two
+ways (`development.md`, "Lazy islands"). The home page's `IslandsCheck`
+keeps the split path in use, so CI builds and checks it.
 
 **Moves in place (htmx 4, Alpine)** - The shell's `#page` region boosts
 every link and form in it (`hx-boost`), so htmx fetches the next page and
@@ -104,10 +103,10 @@ swaps its region in: no reload, the islands bundle stays loaded. Every
 status the app answers with a page (400, 403, 404, 405, 408, 413, 415, 500)
 shows in the region too. htmx, its preload and Alpine extensions, and
 Alpine's CSP build are vendored byte for byte in `public/vendor/`, versioned
-like every public file. Leptos itself comes from a fork pinned in
-`Cargo.toml`, whose island loader has a timeout for when Chrome gives no
-idle time. Two glues: `public/js/htmx-islands.js` wakes the islands htmx
-swaps in (and
+like every public file. Leptos is 0.9's release candidate, whose island
+loader has a timeout for when Chrome gives no idle time. Two glues:
+`public/js/htmx-islands.js` wakes the islands htmx swaps in, frees the
+ones it takes out (and
 works around Chrome's `parseHTMLUnsafe` losing the comments Leptos
 hydrates by, htmx #4147, by removing it, so htmx parses with DOMParser),
 and htmx's Alpine extension
@@ -135,18 +134,25 @@ a child view, whose `<!>` marker showed in the tab in dev builds. Checked
 in Chrome on 2026-10-18: swaps, a lazy island swapped in, focus and
 announcement, Back's scroll, a 404, a deploy, a refused form, a 502.
 
-**The island collector** - Leptos never frees an island: its `#[island]`
-macro forgets the island's view and owner once hydrated. A full page load
-hides that; a swap doesn't, so every island htmx swaps out would stay in
-the tab's memory until the next full load. Every island's body therefore
-runs through `collected` (`src/collect.rs`, from the sister app, where
-it's proven): the island's state and owner go into a registry, and a sweep
-every 30 s (2 s in a debug build) frees an island whose element has been
-off the page at two sweeps in a row, its `on_cleanup` included. A test
-refuses an island that skips it. A stopgap until Leptos frees islands
-itself (PR #4953, `tools/upstream.sh`). Checked in Chrome on 2026-10-18:
-`IslandsCheck` swapped out and freed, `Navigation` kept; and its four
-browser tests (`testing.md`, "The island collector").
+**An island freed as it leaves** - Leptos 0.9 keeps an island's state
+and owner behind `$$dispose` on its `<leptos-island>` element (#4953), and
+only its own router calls it. htmx swaps here, so `htmx-islands.js` does:
+its MutationObserver calls `$$dispose` once for every island off the page
+when it looks, outer first, as Leptos's router does; one a swap moves
+within one task (a morph, `hx-preserve`) is back by then and kept. The
+island's `on_cleanup` runs then, where it removes its window listeners. A
+lazy island swapped out while its chunk loads is freed once it has
+hydrated, when htmx swapped it in; one the first page load brought stays
+until the next full load, a rare case. `e2e/tests/memory.rs` watches
+`IslandsCheck` freed and `Navigation` kept.
+
+**No Leptos timer helper in an island.** Leptos 0.9 hands the callback of
+`set_timeout`, `set_interval`, `request_animation_frame` and
+`request_idle_callback` to the owner current at the call; in islands mode
+that is the root, kept as long as the tab, so a call per scroll or per move
+would stay in memory for the visit. A job scheduled again and again makes
+its callback once (`Job`, `src/islands.rs`), and a test there refuses the
+helpers.
 
 cargo-leptos doesn't hash anything in `public/`, so `build.rs` versions
 every file there itself, at compile time: a hash of each file's bytes

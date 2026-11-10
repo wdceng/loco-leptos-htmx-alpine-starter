@@ -114,10 +114,8 @@ export LOCO_ENV=e2e
 
 # The site and the tests, built once; a lane a family run starts skips it
 # (E2E_BUILT), several builds at once waiting on one another's lock.
-# cargo-leptos from #691's commit (CLAUDE.md, Islands), and `--split`: the
-# real lazy path.
+# `--split`: the real lazy path.
 build() {
-  tools/cargo-leptos/check.sh
   cargo leptos build --split
   cargo test --manifest-path e2e/Cargo.toml --no-run
 }

@@ -166,8 +166,8 @@ async fn insets(page: &Page, insets: Value) -> WebDriverResult<bool> {
 
 /// Chrome 114 to 123 stopped calling the page idle after 9 to 14 whole
 /// loads in one tab, and Leptos's loader waited for that with no timeout
-/// until the fork's (`Cargo.toml`): twenty loads, each one's islands awake
-/// ([`Page::open`] waits for them). It proves the fork in the low lane.
+/// until 0.9's (#4978): twenty loads, each one's islands awake
+/// ([`Page::open`] waits for them). It proves the timeout in the low lane.
 #[tokio::test]
 async fn the_islands_wake_on_every_load_in_one_tab() {
     browse(|page| async move {

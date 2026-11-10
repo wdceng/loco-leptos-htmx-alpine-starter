@@ -4,9 +4,7 @@
 //! first gate is server only.
 
 // Compiled in both halves: the server renders an island, the browser
-// hydrates it, and frees it once it has left the page (`collect`). The
-// only modules without a gate.
-pub mod collect;
+// hydrates it. The only module without a gate.
 pub mod islands;
 
 #[cfg(feature = "ssr")]

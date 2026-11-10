@@ -65,7 +65,7 @@ LEPTOS_SITE_ROOT=target/site-release PORT=5153 ./target/release/app start
 
 ```bash
 cargo audit && ! grep -Hn 'example\.com\|TODO App\|"TODO:' config/production.yaml src/views/layout.rs src/controllers/home.rs src/views/home.rs | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)' | grep -q . &&
-test -s secrets.production.env && ! grep -q "replace_me" secrets.production.env && tools/cargo-leptos/check.sh &&
+test -s secrets.production.env && ! grep -q "replace_me" secrets.production.env &&
 cargo clippy --all-targets && cargo test &&
 LEPTOS_HASH_FILES=true LEPTOS_SITE_ROOT=target/site-release cargo leptos build --release --split --frontend-only &&
 CARGO_TARGET_DIR=target/zig cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.31 &&
@@ -91,9 +91,6 @@ ssh <server> "journalctl -u app-prod -f"
   has no `replace_me` left. A placeholder mail account would boot fine and
   only fail when the first mail is sent. A missing file would fail at the
   upload, after the service was already stopped.
-- **No cargo-leptos with the split fixes, no deploy.** `tools/cargo-leptos/check.sh` stops
-  the chain when this machine's cargo-leptos lacks the split fixes
-  (`development.md`, "Lazy islands").
 - A failing step stops the chain. A failed build never touches the server.
 - `--release` is a full, slow build every time. `.2.31` is the oldest glibc
   the binary needs (Step 0); `target/zig` keeps this build apart from the

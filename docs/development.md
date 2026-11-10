@@ -315,16 +315,10 @@ rustc passes `-O1`, Zig's linker ignores it.
 own, fetched only by a page that renders it. `IslandsCheck` on the home page
 is one (`src/islands.rs`).
 
-Does this machine's cargo-leptos have both fixes?
+Which cargo-leptos this machine has (0.3.12 or newer):
 
 ```bash
-tools/cargo-leptos/check.sh
-```
-
-If not, install it from #691's commit (a few minutes):
-
-```bash
-tools/cargo-leptos/install.sh
+cargo leptos --version
 ```
 
 - **`--split` on every cargo-leptos command:** the watch loop, local
@@ -337,37 +331,24 @@ tools/cargo-leptos/install.sh
 - **`hash.txt` gains `split:` and `manifest:` lines.** It travels with the
   binary as before.
 
-**Why cargo-leptos from a commit.** Released cargo-leptos (0.3.11) has two
-bugs with `--split` and hashed names. The watch loop doesn't hash, so they
-show only in release builds:
-
-| Bug | Effect | Fix |
-|---|---|---|
-| [cargo-leptos #690](https://github.com/leptos-rs/cargo-leptos/issues/690) | The main `.js`/`.wasm` keep their old names after the loader's name is written into them. After a deploy, a cached main script imports a loader that's gone: no island runs until a hard refresh | [PR #691](https://github.com/leptos-rs/cargo-leptos/pull/691), commit `0fb3de86`. Merged 2026-10-16, not released |
-| [wasm-split-prototype #79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79) | The loader's imports come out in random order, so every build gets new names and visitors download it all again | Released in `wasm_split_cli_support` 0.2.4, but released cargo-leptos still locks 0.2.3 |
-
-`install.sh` installs cargo-leptos at that commit without `--locked`, so it
-takes 0.2.4: the commit's own lock holds 0.2.3. CI uses the same script,
-and checks that two hashed builds give the same names and that the main
+**Why 0.3.12 or newer.** cargo-leptos 0.3.11 had two bugs with `--split`
+and hashed names, both fixed in 0.3.12 (`--locked` takes its lock): the
+main `.js`/`.wasm` kept their old names after the loader's name was
+written into them ([#690](https://github.com/leptos-rs/cargo-leptos/issues/690)),
+and the loader's imports came out in random order, new names on every
+build ([wasm-split #79](https://github.com/WorldSEnder/wasm-split-prototype/issues/79)).
+The watch loop doesn't hash, so they showed only in release builds. CI
+checks that two hashed builds give the same names and that the main
 script names a loader that exists.
 
-**Released yet?** Every upstream fix the template waits for, and whether
-it's released:
+**Released yet?** Every upstream fix the template still waits for, and
+whether it's released:
 
 ```bash
 tools/upstream.sh
 ```
 
-It watches four: the two above, leptos #4953 (islands disposed when they
-leave the page) and htmx #4147 (Chrome dropping the comments Leptos
-hydrates by). Fix 2 counts only once a cargo-leptos **release's own
-`Cargo.lock`** locks a newer `wasm_split_cli_support`: `cargo install
---locked` takes that lock, not crates.io's latest. When both split fixes
-are in a release it prints a two-build check that installs the plain
-release into a scratch folder, so your working cargo-leptos stays.
-**If that passes:** `cargo install --locked cargo-leptos@<version>`, the
-same line in CI, and delete `tools/cargo-leptos/` ("Way back" in
-`docs/decisions.md`).
+It watches htmx #4182 (`parseHTMLUnsafe`, Chrome 124 to 145).
 
 ## Environments
 
@@ -424,8 +405,11 @@ An island, for what htmx and Alpine can't do:
 
 - **In `src/islands.rs`,** the only file also compiled for the browser: an
   island anywhere else renders but never runs.
-- **Its whole body inside `collected(|| { … })`,** so it's freed when htmx
-  swaps it out. A test fails without it.
+- **Its window listeners removed in `on_cleanup`,** which runs when htmx
+  swaps it out (`$$dispose`, `htmx-islands.js`).
+- **Something scheduled again and again through a `Job`,** never Leptos's
+  `set_timeout`, `set_interval` or `request_animation_frame`, whose
+  callbacks the tab would keep. A test fails on them.
 - **`#[island(lazy)]` when only some pages use it,** as `IslandsCheck`
   (with the plain `island` for tests).
 - **Content comes in as `children`:** it renders on the server and never
@@ -949,11 +933,10 @@ Inspector), then this line in its console:
   script checks no `minlength`.
 - **An empty live region is truly empty,** no space, or some readers
   announce it.
-- **`leptos` comes from a fork, pinned by commit** (`[patch.crates-io]` in
-  `Cargo.toml`): 0.8.22 with the island loader's idle timeout. On a Leptos
-  upgrade, drop the block if the release has the timeout, else move the
-  fork to the new version; `the_islands_loader_waits_for_idle_two_seconds_at_most`
-  checks the loader either way.
+- **Leptos is pinned exactly at 0.9's release candidate** (`=0.9.0-rc1`
+  in `Cargo.toml`): a newer rc is a choice, not a `cargo update`.
+  `the_islands_loader_waits_for_idle_two_seconds_at_most` checks the
+  loader's idle timeout on every upgrade.
 - **Staging and production restart every night.** Development never does,
   so a watch loop left on overnight is still running in the morning.
 - **The home-screen app reaches the glass.** Opened from a phone's home

@@ -256,17 +256,15 @@ requests. Same list as the pre-deploy checks in `staging.md` and `production.md`
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo test`
 - the wasm32 lint below
-- a full `cargo leptos build --split`, with cargo-leptos from #691's
-  commit (`tools/cargo-leptos/`)
+- a full `cargo leptos build --split`, with cargo-leptos 0.3.12
 - two hashed `--split` builds that must give the same file names, the main
   script naming a split loader that exists (`development.md`, "Lazy
   islands")
 - `cargo audit`
 - the `.sqlx/` cache check: a fresh test database, migrated, then
   `cargo sqlx prepare --check -- --all-targets`
-- the browser tests in Chrome: the island collector's, then
-  `e2e/run.sh chrome` (below). A failed run keeps `target/e2e/chrome/` as
-  an artifact
+- the browser tests in Chrome, `e2e/run.sh chrome` (below). A failed run
+  keeps `target/e2e/chrome/` as an artifact
 
 Every job builds with `SQLX_OFFLINE=true`, from the committed cache, like
 the server build.
@@ -286,32 +284,19 @@ cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --featu
 It fails if a server-only dependency leaks out of the `ssr` gate, and it's
 the only pass that sees the islands.
 
-### The island collector
+### An island freed as it leaves
 
-`src/collect.rs` frees islands in the browser half only, so its tests run
-there, in headless Chrome. Both programs are already on your machine:
-cargo-leptos downloaded the test runner with wasm-bindgen, and chromedriver
-must match your Chrome. The collector's four tests:
+Leptos 0.9 keeps an island's state behind `$$dispose` on its element, and
+`public/js/htmx-islands.js` calls it for every island a swap takes out
+(`architecture.md`). `an_island_that_leaves_is_freed`
+(`e2e/tests/memory.rs`) swaps `IslandsCheck` away and watches its element
+lose `$$dispose`, `Navigation` keeping its own;
+`no_island_schedules_through_leptos_timer_helpers` (`src/islands.rs`,
+native) refuses the timer helpers whose callbacks the tab would keep.
 
-```bash
-CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=~/Library/Caches/cargo-leptos/wasm-bindgen-0.2.130/wasm-bindgen-0.2.130/wasm-bindgen-0.2.130-aarch64-apple-darwin/wasm-bindgen-test-runner CHROMEDRIVER=~/Library/Caches/chromedriver/chromedriver-mac-arm64/chromedriver cargo test --lib --target wasm32-unknown-unknown --no-default-features --features hydrate
-```
-
-Freed after two sweeps off the page, kept while on it, one strike then
-back is kept, and through a debug build's type erasure.
-
-- **Lazy islands are plain in a test build.** The runner loads a plain
-  wasm, not cargo-leptos's split one, and a lazy island's import of
-  `__wasm_split_placeholder__` would stop the page from loading
-  (`IslandsCheck`, `cfg_attr(test, island)`).
-- **The server's test crates are native only** (`Cargo.toml`): built for
-  wasm32 they don't compile.
-- **`every_island_runs_through_collected`** (`src/islands.rs`, native)
-  refuses an island whose body skips `collected`.
-
-On a real page: swap `IslandsCheck` away (any link from the home page),
-wait two sweeps (2 s each in a debug build), and `data-islands-live` on
-`<html>` drops by one, the console saying `islands: 1 live, 1 freed`.
+On a real page: keep the home page's island in the console
+(`x = document.querySelector('leptos-island[data-component^="IslandsCheck"]')`),
+follow any link, and `'$$dispose' in x` is `false`.
 
 ### Browser tests
 
@@ -457,8 +442,8 @@ the lane's number, its web side on 8100 plus it, `config/e2e.yaml`'s
 code from its API (`e2e/src/mail.rs`), so no mail leaves a run. A Mac
 without `mailpit` refuses the lane (`prerequisites.md`).
 
-Chrome's driver is the one in `~/Library/Caches/chromedriver` (the
-collector's, above), or `CHROMEDRIVER`, or the one on the `PATH`; the
+Chrome's driver is the one in `~/Library/Caches/chromedriver`, or
+`CHROMEDRIVER`, or the one on the `PATH`; the
 others are on the `PATH`, the beta bar's in `~/Library/Caches/e2e-beta`,
 and an emulator's is the one of its Chrome's version
 (`prerequisites.md`).
@@ -1094,8 +1079,8 @@ Site bugs it found, for when an app uses these features:
 - **No subgrid in Chrome 114 to 116:** `grid-cols-subgrid` lists stack
   every value on its own line.
 - **Chrome 114 to 123 stop starting islands** after 9 to 14 whole loads
-  in one tab (idle time starved). Light pages never get there. The
-  template's Leptos fork gives the loader a 2 s timeout.
+  in one tab (idle time starved). Light pages never get there. Leptos
+  0.9's loader waits 2 s at most.
 
 Probe before fixing: a small test that prints what the page saw, on the
 failing lane and on its current twin. Rerun a failure alone before

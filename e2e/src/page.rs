@@ -106,15 +106,15 @@ impl Page {
     }
 
     /// Wait until htmx and Alpine have started and every island on the
-    /// page is awake: the debug build's `data-awake` on each
-    /// `<leptos-island>` (src/collect.rs, `mark_awake`), since Leptos's
-    /// loader says nothing when it's done. `e2e/run.sh` builds a debug
-    /// site; a release one carries no mark.
+    /// page is awake: Leptos 0.9 sets `$$dispose` on an island's
+    /// `<leptos-island>` once it has hydrated, a lazy one once its chunk
+    /// has come too, since its loader says nothing when it's done. In any
+    /// build, debug or release.
     pub async fn ready(&self) -> WebDriverResult<()> {
         self.until_within(
             "htmx, Alpine and the islands",
             "return !!(window.htmx && window.Alpine)
-                 && [...document.querySelectorAll('leptos-island')].every(i => i.hasAttribute('data-awake'))",
+                 && [...document.querySelectorAll('leptos-island')].every(i => typeof i.$$dispose === 'function')",
             AWAKE_WITHIN,
         )
         .await

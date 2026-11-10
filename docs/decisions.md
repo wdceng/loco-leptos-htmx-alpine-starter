@@ -35,6 +35,19 @@ change of mind gets a new line, and the old one moves to
   (foreign keys were on for every connection on 1.2 too). Merged before
   the two-week rule's date, on the maintainer's word: the starter's checks
   are the test.
+- 2026-11-10: **Leptos 0.9.0-rc1, pinned exactly (`=`), and cargo-leptos
+  0.3.12**, the maintainer's call, on a branch from Loco 1.3.1's. rc1 has
+  both fixes the template waited for, so the Leptos fork (#4978, the
+  loader's idle timeout) and the island collector (#4953, an island's
+  state behind `$$dispose`) are gone: `htmx-islands.js` calls `$$dispose`
+  for every island a swap takes out. 0.3.12 has #691 and locks the sorted
+  `wasm_split_cli_support` 0.2.5, so `tools/cargo-leptos/` and its deploy
+  gates are gone ("Way back" of 2026-10-30); a day old, under the
+  two-week rule, on the maintainer's word. One thing rc1 brought: a timer
+  helper's callback goes to the owner current at the call, in islands mode
+  the root, kept as long as the tab; so no island calls them, a job makes
+  its callback once (`Job`, `src/islands.rs`), and a test refuses the
+  helpers. `leptos/lazy` stays off: `#[island(lazy)]` hydrates without it.
 - 2026-10-21: **One Reduce Motion rule, the scrollbar's room kept, no
   scroll anchoring, controls 44px tall.** Not a look but how pages behave:
   an islands app on this stack saw each go wrong (a move flashing the
