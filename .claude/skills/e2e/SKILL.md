@@ -1,6 +1,6 @@
 ---
 name: e2e
-description: Use when running, reading or fixing this starter's browser tests (e2e/run.sh, the twenty lanes, the M1, the Simulators and emulators). They run only when Davor says so; while developing they are written and compiled, never run.
+description: Use when running, reading or fixing this starter's browser tests (e2e/run.sh, the twenty lanes, the M1, the Simulators and emulators). They run only when the maintainer asks; while developing they are written and compiled, never run.
 ---
 
 # Browser tests
@@ -9,7 +9,7 @@ What each test covers, the lanes and their ports: [docs/testing.md](../../../doc
 
 ## When
 
-- Only when Davor says so ("run e2e", "run the lanes"). A go on a change is not a go to run them.
+- Only when the maintainer asks ("run e2e", "run the lanes"). A go on a change is not a go to run them.
 - While developing: write the test and compile it, `cd e2e && cargo fmt --check && CARGO_TARGET_DIR=../target/claude-e2e cargo clippy --all-targets -- -D warnings`. A plan lists it as "written, not run".
 
 ## Where
@@ -38,7 +38,7 @@ ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5
 - **Flaky is not passed:** report it with its lane; a second run of that lane alone says whether it's the test or the load.
 - `target/e2e/<lane>/`: `run.txt`, `server.log`, `driver.log`, `skipped.txt` (each skip with its reason), `failures/` (`<test>.txt` with the address and what failed, `.png`, `.html`, `.server.log`); a Simulator that would not boot: `boot-why.txt`.
 - On the M1: `ssh m1 'cat /tmp/starter-checks/target/e2e/<lane>/failures/<test>.txt'`, or `scp` the folder.
-- I read the logs and report; Davor gets no `tail -f` or watch command.
+- I read the logs and report; the maintainer gets no `tail -f` or watch command.
 
 ## A failure
 

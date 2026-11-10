@@ -1,15 +1,15 @@
 ---
 name: review
-description: Use when Davor asks for a review, an inspection or an audit of recent work in this starter ("inspect for DRY, redundant code, bugs, leaks", "one-job drift, security, accessibility, performance", "Rust superpowers", "fable do your thing"). An inline pass over the diff, findings by severity, no edit until his go.
+description: Use when the maintainer asks for a review, an inspection or an audit of recent work in this starter ("inspect for DRY, redundant code, bugs, leaks", "one-job drift, security, accessibility, performance", "Rust superpowers", "fable do your thing"). An inline pass over the diff, findings by severity, no edit until their go.
 ---
 
 # Review recent work
 
-Inline, one focused pass (CLAUDE.md; Davor's own rules): no Workflow, one subagent at most, and an agent runs no cargo command.
+Inline, one focused pass (CLAUDE.md): no Workflow, one subagent at most, and an agent runs no cargo command.
 
 ## Scope
 
-- The commits Davor names, a branch, or the whole project. Otherwise `git log --oneline -20`, and the commits since the last review's fixes; ask when the start is unclear.
+- The commits the maintainer names, a branch, or the whole project. Otherwise `git log --oneline -20`, and the commits since the last review's fixes; ask when the start is unclear.
 - Plus what is not committed yet: `git status --short`, `git diff`.
 - Read the diff (`git diff <base>..HEAD`), then each touched file in full around every change.
 

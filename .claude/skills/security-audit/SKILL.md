@@ -1,17 +1,17 @@
 ---
 name: security-audit
-description: Use when Davor asks for a security audit, a pen inspection or a white-hat check of this starter ("audit the app for security", "check all endpoints for weaknesses", "think like a hacker"). A white-box read of the code, the configs and the deploy docs from the attacker's side, findings by severity, each Medium and up checked twice, no edit until his go. Not a pen test: nothing is sent at a live site.
+description: Use when the maintainer asks for a security audit, a pen inspection or a white-hat check of this starter ("audit the app for security", "check all endpoints for weaknesses", "think like a hacker"). A white-box read of the code, the configs and the deploy docs from the attacker's side, findings by severity, each Medium and up checked twice, no edit until their go. Not a pen test: nothing is sent at a live site.
 ---
 
 # Security audit
 
 A white-box audit: the source, `config/*.yaml` and the deploy docs read from the attacker's side (a visitor, someone with another person's mail link, a stolen JWT, another project's code on the shared box). Read-only. Not a pen test: no attack is sent at the dev-server, staging or production.
 
-Inline, one focused pass, one subagent at most (CLAUDE.md, Working with Davor); the multi-agent workflow only on his word ("ultracode", "use a workflow"), and an agent runs no cargo command. A review of recent work is the `review` skill; this one reads the whole app.
+Inline, one focused pass, one subagent at most (CLAUDE.md); the multi-agent workflow only on the maintainer's word ("ultracode", "use a workflow"), and an agent runs no cargo command. A review of recent work is the `review` skill; this one reads the whole app.
 
 ## Scope
 
-- The whole app, or the commits Davor names; ask when unclear.
+- The whole app, or the commits the maintainer names; ask when unclear.
 - Every route: `CARGO_TARGET_DIR=target/claude cargo loco routes`.
 - The dependencies: `cargo audit` (its ignores in `.cargo/audit.toml`, each with its reason), and the vendored htmx and Alpine in `public/vendor/` checked against their GitHub advisories.
 
@@ -42,7 +42,7 @@ Every High and Medium is checked a second time by trying to refute it (the subag
 
 ## The server
 
-Davor runs the server; read-only checks may be run (`ssh <server> "stat -c '%a %U %n' /srv/app/*/secrets.env /var/lib/app-*/*"`, `ss -ltnp`, `systemctl cat app-prod`), never a write. Anything that changes the box is handed to him as a command with its proof; the way back only once the proof fails. Never print a secrets file, `/etc/caddy/origin-check.caddy` or the origin key.
+The maintainer runs the server; read-only checks may be run (`ssh <server> "stat -c '%a %U %n' /srv/app/*/secrets.env /var/lib/app-*/*"`, `ss -ltnp`, `systemctl cat app-prod`), never a write. Anything that changes the box is handed to them as a command with its proof; the way back only once the proof fails. Never print a secrets file, `/etc/caddy/origin-check.caddy` or the origin key.
 
 ## Report
 
