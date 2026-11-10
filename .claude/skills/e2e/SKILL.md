@@ -1,6 +1,6 @@
 ---
 name: e2e
-description: Use when running, reading or fixing this starter's browser tests (e2e/run.sh, the twenty lanes, the M1, the Simulators and emulators). They run only when the maintainer asks; while developing they are written and compiled, never run.
+description: Use when running, reading or fixing this starter's browser tests (e2e/run.sh, the twenty lanes, the Simulators and emulators). They run only when the maintainer asks; while developing they are written and compiled, never run.
 ---
 
 # Browser tests
@@ -14,19 +14,19 @@ What each test covers, the lanes and their ports: [docs/testing.md](../../../doc
 
 ## Where
 
-- The M1 Max (64 GB, `ssh m1`): `all` runs the nine top lanes at once; `run.sh` reads the chip and the memory by `sysctl`. Then `low` (two batches on every Mac) and `beta`, one after another, never two families at once.
-- The M5: `main`, then `tablets`; never the nine at once (a 24 GB Mac ran out of memory, 2026-10-12).
-- Never beside another project's run: the apps on this stack share the Simulators and the emulators. `pgrep -fl e2e/run.sh` on that Mac first.
+- A Mac with 48 GB or more: `all` runs the nine top lanes at once; `run.sh` reads the chip and the memory by `sysctl`. Then `low` (two batches on every Mac) and `beta`, one after another, never two families at once.
+- A smaller Mac: `main`, then `tablets`; never the nine at once (a 24 GB Mac ran out of memory, 2026-10-12).
+- Never beside another project's run: the apps on this stack share the Simulators and the emulators. `pgrep -fl e2e/run.sh` first.
 - `run.sh` refuses while Safari or Safari Technology Preview is open.
+- A test machine of the maintainer's own, and how a commit reaches it, is in `CLAUDE.local.md` where there is one.
 
-## Running on the M1
+## Running
 
-The fix is made here, the tree copied to `/tmp/starter-checks`, the run started in the background (`run_in_background`), never waited on. The M1's tree is a copy: never commit from it.
+The run started in the background (`run_in_background`), its output to a file, never waited on.
 
 ```bash
-rsync -a --delete --exclude .git --exclude target/ --exclude '*.sqlite*' --exclude 'secrets*.env' --exclude node_modules ./ m1:/tmp/starter-checks/   # the tree to the M1, its builds kept
-ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "e2e/run.sh all > /tmp/starter-e2e-all.log 2>&1; e2e/run.sh low > /tmp/starter-e2e-low.log 2>&1; e2e/run.sh beta > /tmp/starter-e2e-beta.log 2>&1"'   # the three bars, one after another
-ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5 5 5 5 5\" E2E_STAGGER=1 e2e/run.sh android moves"'   # one lane, one test file, the start gaps shrunk
+caffeinate -dimsu zsh -lc "e2e/run.sh all > /tmp/starter-e2e-all.log 2>&1; e2e/run.sh low > /tmp/starter-e2e-low.log 2>&1; e2e/run.sh beta > /tmp/starter-e2e-beta.log 2>&1"   # the three bars, one after another
+caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5 5 5 5 5\" E2E_STAGGER=1 e2e/run.sh android moves"   # one lane, one test file, the start gaps shrunk
 ```
 
 - **A rerun of one lane or one test shrinks the gaps** (`E2E_DEVICE_GAPS`, `E2E_STAGGER`), or minutes go to waiting.
@@ -34,10 +34,10 @@ ssh m1 'cd /tmp/starter-checks && caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5
 
 ## Reading a run
 
-- Each lane's line: `ssh m1 'grep -hE "^== [a-z0-9-]+: " /tmp/starter-e2e-*.log'` (passed, flaky, failed, skipped). Before it, "booted <lane> in N s" or "did not boot <lane>: why"; `BROKEN` for a lane whose driver stopped opening sessions.
+- **`run.sh` exits 0 with failed tests:** its exit code is no verdict, each lane's line is.
+- Each lane's line: `grep -hE "^== [a-z0-9-]+: " /tmp/starter-e2e-*.log` (passed, flaky, failed, skipped). Before it, "booted <lane> in N s" or "did not boot <lane>: why"; `BROKEN` for a lane whose driver stopped opening sessions.
 - **Flaky is not passed:** report it with its lane; a second run of that lane alone says whether it's the test or the load.
 - `target/e2e/<lane>/`: `run.txt`, `server.log`, `driver.log`, `skipped.txt` (each skip with its reason), `failures/` (`<test>.txt` with the address and what failed, `.png`, `.html`, `.server.log`); a Simulator that would not boot: `boot-why.txt`.
-- On the M1: `ssh m1 'cat /tmp/starter-checks/target/e2e/<lane>/failures/<test>.txt'`, or `scp` the folder.
 - I read the logs and report; the maintainer gets no `tail -f` or watch command.
 
 ## A failure

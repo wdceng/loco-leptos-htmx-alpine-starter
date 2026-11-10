@@ -23,6 +23,10 @@ secrets.env
 secrets.*.env
 *.secrets.env
 
+# A maintainer's own instructions for Claude Code, read after CLAUDE.md
+# (CLAUDE.md, "Before you hand over"). Never in git.
+CLAUDE.local.md
+
 # include cargo lock
 !Cargo.lock
 

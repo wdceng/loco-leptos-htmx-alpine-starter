@@ -132,8 +132,9 @@ After a migration or a new or changed `query!`, refresh the SQLx cache
 (`docs/development.md`) and commit `.sqlx/` with the change.
 
 Commit messages are plain sentences about the change, with no tool or AI
-named in them. The maintainer commits with
-`git status --short && git add . && git commit -m "..." && git push`.
+named in them. A maintainer's own way of working (who commits, where the
+tests run, in what order) goes in a `CLAUDE.local.md` beside this file,
+kept out of git.
 
 ## Starting a new project from this template
 
