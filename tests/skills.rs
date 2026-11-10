@@ -3,33 +3,8 @@
 //! `SKILL.md` says which. A `Cargo.lock` past them makes the indexes miss
 //! what a newer release added, so the line and the lock must agree; the
 //! skill says what to do when they can't.
-//!
-//! The skills and docs are the template's, read by whoever clones it, so
-//! they say "the maintainer", never a person's name; a person's own rules
-//! live in their own `~/.claude/CLAUDE.md`.
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
-
-/// A name the skills and docs once used for the maintainer, kept in two
-/// halves so this file doesn't hold it.
-const NAMES: [[&str; 2]; 1] = [["Dav", "or"]];
-
-/// Every Markdown file under `dir`, at any depth.
-fn markdown(dir: &Path) -> Vec<PathBuf> {
-    let mut found = Vec::new();
-    for entry in fs::read_dir(dir).unwrap_or_else(|_| panic!("{}", dir.display())) {
-        let path = entry.expect("a directory entry").path();
-        if path.is_dir() {
-            found.extend(markdown(&path));
-        } else if path.extension().is_some_and(|ext| ext == "md") {
-            found.push(path);
-        }
-    }
-    found
-}
+use std::{fs, path::Path};
 
 /// The version `Cargo.lock` holds for `package`.
 fn locked(lock: &str, package: &str) -> String {
@@ -58,32 +33,4 @@ fn the_loco_skills_indexes_name_the_locked_versions() {
             skill.display()
         );
     }
-}
-
-#[test]
-fn the_skills_and_docs_name_no_one() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = markdown(&root.join(".claude"));
-    files.extend(markdown(&root.join("docs")));
-    files.extend(
-        fs::read_dir(root)
-            .expect("the repo root")
-            .map(|entry| entry.expect("a directory entry").path())
-            .filter(|path| path.extension().is_some_and(|ext| ext == "md")),
-    );
-    let names: Vec<String> = NAMES.iter().map(|halves| halves.concat()).collect();
-    let mut found = Vec::new();
-    for file in &files {
-        let text = fs::read_to_string(file).unwrap_or_else(|_| panic!("{}", file.display()));
-        for (at, line) in text.lines().enumerate() {
-            if names.iter().any(|name| line.contains(name.as_str())) {
-                found.push(format!("{}:{}", file.display(), at + 1));
-            }
-        }
-    }
-    assert!(files.len() > 10, "too few files read: {}", files.len());
-    assert!(
-        found.is_empty(),
-        "a person named where the maintainer is meant: {found:?}"
-    );
 }

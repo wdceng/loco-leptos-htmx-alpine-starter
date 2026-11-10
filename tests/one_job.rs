@@ -318,6 +318,41 @@ fn no_page_opens_a_new_tab() {
     );
 }
 
+/// The template is public and code is copied into it from other apps on
+/// this stack, so no tracked file, comments included, names the
+/// maintainer: they are "the maintainer" (the maintainer's call,
+/// 2026-11-10). The name is kept in halves so this file doesn't hold it.
+#[test]
+fn no_tracked_file_names_the_maintainer() {
+    let name = ["dav", "or"].concat();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let listed = std::process::Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(root)
+        .output()
+        .expect("git ls-files");
+    assert!(listed.status.success(), "git ls-files failed");
+    let files: Vec<String> = String::from_utf8_lossy(&listed.stdout)
+        .split('\0')
+        .filter(|file| !file.is_empty())
+        .map(str::to_owned)
+        .collect();
+    assert!(files.len() > 100, "too few files listed: {}", files.len());
+    let mut found = Vec::new();
+    for file in &files {
+        // A binary file (an icon, a picture) has no text to read.
+        let Ok(text) = fs::read_to_string(root.join(file)) else {
+            continue;
+        };
+        for (at, line) in text.lines().enumerate() {
+            if line.to_lowercase().contains(&name) {
+                found.push(format!("{file}:{}", at + 1));
+            }
+        }
+    }
+    assert!(found.is_empty(), "the maintainer named: {found:?}");
+}
+
 /// The check itself: a code line holding the pattern is found, a comment
 /// is not, and the home is left out.
 #[test]
