@@ -28,11 +28,27 @@ pub fn mailbox(name: &str) -> String {
 }
 
 impl Page {
-    /// `text` typed into the field `css`, as a person types it.
+    /// `text` typed into the field `css`, as a person types it. In an iOS
+    /// Simulator no key reaches a field (a probe of the accounts tests,
+    /// 2026-11-11: all three of the sign-up's empty after typing), so
+    /// there the page's own script sets it, with the `input` and `change`
+    /// events typing fires.
     pub async fn type_into(&self, css: &str, text: &str) -> WebDriverResult<()> {
         let field = self.driver.find(By::Css(css)).await?;
-        field.clear().await?;
-        field.send_keys(text).await
+        if self.browser.is_simulator() {
+            self.driver
+                .execute(
+                    "const f = arguments[0]; f.focus(); f.value = arguments[1];
+                     f.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: arguments[1] }));
+                     f.dispatchEvent(new Event('change', { bubbles: true }))",
+                    vec![field.to_json()?, serde_json::Value::from(text)],
+                )
+                .await
+                .map(drop)
+        } else {
+            field.clear().await?;
+            field.send_keys(text).await
+        }
     }
 
     /// An account for `email`, `name` its name and [`PASSWORD`] its

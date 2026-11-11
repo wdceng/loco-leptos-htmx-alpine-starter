@@ -203,6 +203,39 @@ impl Page {
         .await
     }
 
+    /// On Android, the keyboard a typed-into field holds open closed, and
+    /// the page waited for until it has its height back: a tap with it
+    /// open landed on the page under it, not the button, and the form was
+    /// never sent (a probe of the accounts tests, 2026-11-11).
+    async fn keyboard_closed(&self) -> WebDriverResult<()> {
+        let typing = self
+            .eval(
+                "const f = document.activeElement;
+                 const typing = !!f && f.matches('input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]), textarea');
+                 if (typing) f.blur();
+                 return typing",
+            )
+            .await?;
+        if typing != Value::Bool(true) {
+            return Ok(());
+        }
+        let height = "return Math.round(window.visualViewport?.height ?? innerHeight)";
+        let started = tokio::time::Instant::now();
+        let mut last = self.eval(height).await?;
+        while started.elapsed() < Duration::from_secs(3) {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let now = self.eval(height).await?;
+            let whole = self
+                .eval("return Math.round(window.visualViewport?.height ?? innerHeight) >= innerHeight - 1")
+                .await?;
+            if now == last && whole == Value::Bool(true) {
+                break;
+            }
+            last = now;
+        }
+        Ok(())
+    }
+
     /// Press the first element `css` finds as a person's mouse does: the
     /// pointer onto it, the button down, held long enough for the press to
     /// preload its page (`PRELOAD`, src/views/layout.rs), then up, the click
@@ -225,6 +258,7 @@ impl Page {
                 self.let_go(at).await
             }
             Browser::Android | Browser::AndroidTablet | Browser::App => {
+                self.keyboard_closed().await?;
                 self.still().await?;
                 let (x, y) = self.centre(css).await?;
                 self.pointer(
