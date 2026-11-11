@@ -150,7 +150,9 @@ pub fn AccountPage(
         </BusyForm>
 
         <h2 class=HEADING>"Where you're signed in"</h2>
-        <ul class="mt-6 space-y-4">
+        // A browser's button nearer its own lines than the next browser:
+        // groups further apart than their lines.
+        <ul class="mt-6 space-y-10">
             {browsers
                 .0
                 .into_iter()
@@ -175,7 +177,7 @@ pub fn AccountPage(
                             </p>
                             {if here {
                                 view! {
-                                    <BusyForm action=LOGOUT class=FORM>
+                                    <BusyForm action=LOGOUT class="max-w-sm">
                                         <button type="submit" class=BUTTON>
                                             "Sign out"
                                         </button>
@@ -184,7 +186,7 @@ pub fn AccountPage(
                                     .into_any()
                             } else {
                                 view! {
-                                    <BusyForm action=close_one(browser.id) class=FORM>
+                                    <BusyForm action=close_one(browser.id) class="max-w-sm">
                                         <button type="submit" class=BUTTON>
                                             "Sign it out"
                                         </button>
