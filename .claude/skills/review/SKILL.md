@@ -5,7 +5,7 @@ description: Use when the maintainer asks for a review, an inspection or an audi
 
 # Review recent work
 
-Inline, one focused pass (CLAUDE.md): no Workflow, one subagent at most, and an agent runs no cargo command.
+Inline, one focused pass: one subagent at most, a multi-agent workflow only on the maintainer's word, and an agent runs no cargo command.
 
 ## Scope
 
@@ -34,15 +34,20 @@ Inline, one focused pass (CLAUDE.md): no Workflow, one subagent at most, and an 
 10. **Depth and props**: a repeated subtree inside an island's children not `.into_any()`, as `src/views/layout.rs` does, so the view's type stays shallow and compile times short; an island prop that carries content (text, markup, a list to draw), where `children` would render it on the server: a prop is serialized into the page as JSON and read again in the browser, so its data goes twice.
 11. **Policy and pages**: a config change that alters policy (headers, CSP, rate limits, cache, timeout) without `tests/config.rs`; a layer added in code (`middleware::from_fn`, `route_layer`, a tower layer) where Loco's config already has one for the job, or one with no test pinning it; `config/dev-server.yaml` and `config/staging.yaml` changed apart; a new public page without its line in `/llms.txt` (`src/controllers/llms.rs`).
 12. **Docs**: a sentence the change made false in CLAUDE.md, `docs/architecture.md`, the feature's doc or a comment; a section changed in one of `dev-server.md`, `staging.md`, `production.md` and not the other two; a decision without its dated line in `docs/decisions.md`.
-13. **Tests**: a new branch with no request or unit test; browser behaviour with no e2e test (written, not run: the `e2e` skill).
+13. **Tests**: a new branch with no request or unit test; browser behaviour with no e2e test (written, not run: the `e2e` skill); a control that changes before its answer with no in-between test (pass 17).
 14. **Rust's own guarantees**: where the compiler could hold a rule a person holds now. A `String` or `bool` where an `enum` or newtype would make a wrong value impossible (a status as text, two flags that cannot both be true); a job's insides `pub` where private would keep the job to its one way; a `_ =>` that would swallow a new variant where listing them makes the compiler point at every place; an error logged and gone on from, or an `Option` turned into a default that hides the missing value, where `?` and a typed error would do; a `.clone()` on the request path where a borrow would do; a function that returns a new `String` for text it mostly leaves as it was, where `Cow<str>` would hand the input back; a string built once and cloned on many requests, where `Arc<str>` would share it; an index loop where an iterator says the intent; a result a caller must not drop without `#[must_use]`; a public enum other code matches on, where `#[non_exhaustive]` should keep a new variant from breaking it, or one it must match in full, where it should not; a public type without `Debug`, or an error type that says nothing of what failed.
 15. **Axum**: input read by a typed extractor (`State`, `Path`, `Query`, `Form`, a struct with real types) where a handler parses strings by hand; the body's extractor (`Form`, `Json`, `Bytes`, `String`, `Multipart`) not the last argument, or two of them; an `Extension` where `State` would do, a missing one a `500` at run time where `State` fails the build; an `Option<…>` extractor read as "absent or wrong", where a malformed value still refuses the request; a check every handler repeats in its body (`else { return … }`) where an extractor of its own, `FromRequestParts` with `Rejection = Response`, would answer the 403 or 404 itself; a route that takes an upload without a body limit of its own (`uploads.rs`), or a small form under the upload's limit (axum's default is 2 MB); a large answer built whole in memory where a streamed body would do; a handler's error a typed one turned into the answer, never a `500` hiding a `400`.
 16. **A framework's own tool**: Loco, Leptos and their crates each bring a tool for a job the starter already does its own way; one that appears is a second way (Rule no. 1), named with the one it would sit beside and asked about, never added quietly:
     - Loco's scheduler beside the nightly restart (`src/maintenance.rs`); its cache (`ctx.cache`) beside a `LazyLock`; its storage (`ctx.storage`) beside the uploads on disk (`src/uploads.rs`);
     - a Leptos server function (`#[server]`) beside Loco's controllers: a second door to the server, with its own address, outside the rate limiter and the session's checks;
     - Leptos's `Resource`, `Suspense` or `Action` beside htmx: data fetched in the browser and sent twice, and a bigger WASM bundle.
+17. **One fact drawn twice**: a fact (a status, a choice, an on or off, a count) the server draws in several places or forms (a label, an icon, an `aria-label`, `aria-busy`, `disabled`, an open dialog), checked at three moments and in its test:
+    - at the tap: what an island or Alpine changes before the answer, against every detail the server draws for that fact; a detail it doesn't switch shows the old state until the answer. The server draws every state and one attribute switches between them (a `data-*` with Tailwind's `group-data-*`, `aria-busy` with `busy:`, as `BUTTON` does), never a detail copied into the browser;
+    - at the answer: every part of the page that shows the fact is in the swap, or it stays stale until a reload; two polls on one page are one clock;
+    - at a failure: a failed or refused request leaves no browser guess on screen, back to the server's state in one place (as `BusyForm`'s `htmx:finally:request` does);
+    - its test: an e2e test that holds the answer back and compares the part after the tap with the part after the answer.
 
-Any pass or group runs alone: `/review <scope>, <passes> alone` (`/review the whole project, the async pass alone`). The whole project goes in groups, not all sixteen at once.
+Any pass or group runs alone: `/review <scope>, <passes> alone` (`/review the whole project, the async pass alone`). The whole project goes in groups, not all seventeen at once.
 
 ## Proof
 

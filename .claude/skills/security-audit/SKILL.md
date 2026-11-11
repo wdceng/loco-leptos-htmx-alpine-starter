@@ -7,7 +7,7 @@ description: Use when the maintainer asks for a security audit, a pen inspection
 
 A white-box audit: the source, `config/*.yaml` and the deploy docs read from the attacker's side (a visitor, someone with another person's mail link, a stolen JWT, another project's code on the shared box). Read-only. Not a pen test: no attack is sent at the dev-server, staging or production.
 
-Inline, one focused pass, one subagent at most (CLAUDE.md); the multi-agent workflow only on the maintainer's word ("ultracode", "use a workflow"), and an agent runs no cargo command. A review of recent work is the `review` skill; this one reads the whole app.
+Inline, one focused pass, one subagent at most; the multi-agent workflow only on the maintainer's word ("ultracode", "use a workflow"), and an agent runs no cargo command. A review of recent work is the `review` skill; this one reads the whole app.
 
 ## Scope
 
