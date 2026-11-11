@@ -273,6 +273,13 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
+  before 3.54 can hand back stale memory when it opens a database with a
+  crafted `-wal` beside it. The app opens only its own database, which
+  only it writes, and whoever could plant such files could read the
+  database itself. sqlx-sqlite 0.9.0 caps `libsqlite3-sys` below 0.38, the
+  fix is 0.39: the ignore in `.cargo/audit.toml` goes with the first sqlx
+  release that takes it.
 - 2026-10-18: **A security review of the starter auth**, its 13 findings
   and their status in `docs/security.md`. That page is updated with every
   change to auth, sessions, headers or the CSP.
