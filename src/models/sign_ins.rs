@@ -61,17 +61,29 @@ impl SignIn {
     /// A sign-in opened for the user whose row is `user_id`: its secret,
     /// for the cookie, the code, for the mail, and its row. The user's
     /// other sign-ins still waiting are closed, as are the ones that ran
-    /// out, so the table holds what is live.
+    /// out, so the table holds what is live. Not `mailed` (the account
+    /// waits after wrong codes), its code is never sent and its pause is
+    /// already over, so a code can be asked for once the wait ends
+    /// ([`SignIn::code_mailed`]).
     ///
     /// # Errors
     /// The database refused the write.
-    pub async fn open(pool: &SqlitePool, user_id: i64) -> sqlx::Result<(String, String, Self)> {
+    pub async fn open(
+        pool: &SqlitePool,
+        user_id: i64,
+        mailed: bool,
+    ) -> sqlx::Result<(String, String, Self)> {
         let secret = secret::fresh();
         let token_hash = secret::digest(&secret);
         let code = fresh_code();
         let code_hash = code_digest(&secret, &code);
         let now = Utc::now();
         let expires_at = now + Duration::minutes(CODE_MINUTES);
+        let sent_at = if mailed {
+            now
+        } else {
+            now - Duration::seconds(RESEND_SECONDS)
+        };
         let mut tx = sql::write(pool).await?;
         sqlx::query!(
             "DELETE FROM sign_ins WHERE expires_at <= ? OR user_id = ?",
@@ -91,7 +103,7 @@ impl SignIn {
             token_hash,
             code_hash,
             expires_at,
-            now,
+            sent_at,
             BY_MAIL,
         )
         .fetch_one(&mut *tx)
@@ -205,6 +217,14 @@ impl SignIn {
         (millis > 0).then(|| (millis + 999) / 1000)
     }
 
+    /// Whether a code went out for this sign-in: a mailed one lasts
+    /// [`CODE_MINUTES`] from when it went, one opened within the wait was
+    /// never sent and is dated before ([`SignIn::open`]).
+    #[must_use]
+    pub fn code_mailed(&self) -> bool {
+        self.expires_at - self.code_sent_at <= Duration::minutes(CODE_MINUTES)
+    }
+
     /// The sign-in closed: the code was right, or spent.
     ///
     /// # Errors
@@ -295,5 +315,20 @@ mod tests {
         assert_eq!(sign_in.code_wait(), Some(50));
         sign_in.code_sent_at = Utc::now() - Duration::seconds(61);
         assert_eq!(sign_in.code_wait(), None);
+    }
+
+    #[test]
+    fn a_code_opened_within_the_wait_was_never_mailed() {
+        let now = Utc::now();
+        let mut sign_in = SignIn {
+            id: 1,
+            user_id: 1,
+            expires_at: now + Duration::minutes(CODE_MINUTES),
+            code_sent_at: now,
+        };
+        assert!(sign_in.code_mailed());
+        sign_in.code_sent_at = now - Duration::seconds(RESEND_SECONDS);
+        assert!(!sign_in.code_mailed());
+        assert_eq!(sign_in.code_wait(), None, "asked for at once");
     }
 }

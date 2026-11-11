@@ -138,12 +138,14 @@ async fn submit(
     // right (src/models/sign_ins.rs). Within the wait after wrong codes no
     // code goes: the code's page says how long (src/models/auth_events.rs).
     if Role::of(pool, user.id).await.map_err(Error::wrap)? == Role::Admin {
-        let (secret, code, _) = SignIn::open(pool, user.id).await.map_err(Error::wrap)?;
-        if auth_events::code_waiting(pool, user.id, Utc::now())
+        let mailed = auth_events::code_waiting(pool, user.id, Utc::now())
             .await
             .map_err(Error::wrap)?
-            .is_none()
-        {
+            .is_none();
+        let (secret, code, _) = SignIn::open(pool, user.id, mailed)
+            .await
+            .map_err(Error::wrap)?;
+        if mailed {
             AuthMailer::sign_in_code(&ctx, &user, &code).await?;
             tracing::info!(pid = user.pid.to_string(), "sign-in code mailed");
         }
@@ -204,13 +206,15 @@ fn to_password(ctx: &AppContext) -> Result<Response> {
     Ok(res)
 }
 
-/// The code's page: `problem` what was refused, `said` what was done.
+/// The code's page: `problem` what was refused, `said` what was done,
+/// `mailed` whether a code went out at all.
 async fn show_code(
     ctx: &AppContext,
     req: Request,
     status: StatusCode,
     problem: Option<CodeProblem>,
     said: Option<&'static str>,
+    mailed: bool,
 ) -> Result<Response> {
     let meta = if problem.is_some() {
         code_meta().refused()
@@ -218,7 +222,7 @@ async fn show_code(
         code_meta()
     };
     render_private_page(ctx, req, meta, status, move || {
-        view! { <CodeForm problem=problem.clone() said=said /> }
+        view! { <CodeForm problem=problem.clone() said=said mailed=mailed /> }
     })
     .await
 }
@@ -248,7 +252,8 @@ async fn code_page(State(ctx): State<AppContext>, req: Request) -> Result<Respon
         return to_password(&ctx);
     };
     let problem = code_wait(&ctx, &sign_in).await?.map(wait_line);
-    show_code(&ctx, req, StatusCode::OK, problem, None).await
+    let mailed = sign_in.code_mailed();
+    show_code(&ctx, req, StatusCode::OK, problem, None, mailed).await
 }
 
 /// What the code's form posts; empty when the field is missing.
@@ -285,7 +290,8 @@ async fn code_submit(
         tracing::info!(seconds, "sign-in code within the wait");
         let req = Request::from_parts(parts, Body::empty());
         let problem = Some(wait_line(seconds));
-        return show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None).await;
+        let mailed = sign_in.code_mailed();
+        return show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None, mailed).await;
     }
     let pool = sql::pool(&ctx);
     let user = user_of(&ctx, &sign_in).await?;
@@ -311,7 +317,7 @@ async fn code_submit(
                 if left == 1 { "try" } else { "tries" }
             );
             let problem = Some(CodeProblem::Wrong(problem));
-            show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None).await
+            show_code(&ctx, req, StatusCode::BAD_REQUEST, problem, None, true).await
         }
         Checked::Spent => {
             auth_events::record(pool, user.id, Event::CodeSpent)
@@ -360,7 +366,8 @@ async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Respo
     let req = Request::from_parts(parts, Body::empty());
     if let Some(seconds) = code_wait(&ctx, &sign_in).await? {
         let problem = Some(wait_line(seconds));
-        return show_code(&ctx, req, StatusCode::OK, problem, None).await;
+        let mailed = sign_in.code_mailed();
+        return show_code(&ctx, req, StatusCode::OK, problem, None, mailed).await;
     }
     let renewed = sign_in
         .renew_code(sql::pool(&ctx), &secret)
@@ -369,14 +376,19 @@ async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Respo
     if let Some(code) = renewed {
         let user = user_of(&ctx, &sign_in).await?;
         AuthMailer::sign_in_code(&ctx, &user, &code).await?;
-        let said = Some("A new code is on its way; the one before no longer works.");
-        return show_code(&ctx, req, StatusCode::OK, None, said).await;
+        let said = if sign_in.code_mailed() {
+            "A new code is on its way; the one before no longer works."
+        } else {
+            "A code is on its way."
+        };
+        return show_code(&ctx, req, StatusCode::OK, None, Some(said), true).await;
     }
     let wait = sign_in.code_wait().unwrap_or(1);
     let problem = Some(CodeProblem::NotNow(format!(
         "You can ask for a new code in {wait} seconds."
     )));
-    show_code(&ctx, req, StatusCode::OK, problem, None).await
+    let mailed = sign_in.code_mailed();
+    show_code(&ctx, req, StatusCode::OK, problem, None, mailed).await
 }
 
 /// `POST /logout`: the session closed and the cookie taken away, then the

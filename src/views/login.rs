@@ -83,21 +83,47 @@ pub enum CodeProblem {
 /// The second step: the six digits mailed after the password, one field
 /// the phone fills from the mail (`one-time-code`), and a new code on
 /// request. `problem` is what the last post refused, `said` what it did.
+/// Not `mailed` (the password reached it within the wait after wrong
+/// codes), no code went: no field to type one into, only the button that
+/// mails one once the wait is over.
 #[component]
-pub fn CodeForm(problem: Option<CodeProblem>, said: Option<&'static str>) -> impl IntoView {
+pub fn CodeForm(
+    problem: Option<CodeProblem>,
+    said: Option<&'static str>,
+    mailed: bool,
+) -> impl IntoView {
     let wrong = matches!(problem, Some(CodeProblem::Wrong(_)));
     let problem = problem.map(|problem| match problem {
         CodeProblem::Wrong(line) | CodeProblem::NotNow(line) => line,
     });
+    let lead = if mailed {
+        format!("We mailed you six digits. They work for {CODE_MINUTES} minutes.")
+    } else {
+        "We'll mail you six digits once the wait is over.".to_string()
+    };
+    let again = if mailed {
+        "Mail me a new code"
+    } else {
+        "Mail me a code"
+    };
     view! {
         <h1 class=TITLE>"Your sign-in code"</h1>
-        <p class=LEAD>
-            {format!(
-                "We mailed you six digits. They work for {CODE_MINUTES} minutes.",
-            )}
-        </p>
+        <p class=LEAD>{lead}</p>
         <ProblemLine id=CODE_PROBLEM problem />
         <SaidLine said />
+        {mailed.then(|| view! { <CodeField wrong /> })}
+        <BusyForm action=CODE_AGAIN class="">
+            <button type="submit" class=QUIET_BUTTON>
+                {again}
+            </button>
+        </BusyForm>
+    }
+}
+
+/// The code's field and its button, `wrong` marking the field.
+#[component]
+fn CodeField(wrong: bool) -> impl IntoView {
+    view! {
         <BusyForm action=CODE>
             <label for="code" class="block font-semibold">"Code"</label>
             <input
@@ -115,11 +141,6 @@ pub fn CodeForm(problem: Option<CodeProblem>, said: Option<&'static str>) -> imp
             />
             <button type="submit" class=BUTTON>
                 "Sign in"
-            </button>
-        </BusyForm>
-        <BusyForm action=CODE_AGAIN class="">
-            <button type="submit" class=QUIET_BUTTON>
-                "Mail me a new code"
             </button>
         </BusyForm>
     }

@@ -243,7 +243,7 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
 
         // A second step waiting and a wrong code on the account: rows of
         // its own the deletion must take with it.
-        let (waiting, _, _) = SignIn::open(pool, user.id).await.expect("opened");
+        let (waiting, _, _) = SignIn::open(pool, user.id, true).await.expect("opened");
         auth_events::record(pool, user.id, Event::CodeWrong)
             .await
             .expect("recorded");

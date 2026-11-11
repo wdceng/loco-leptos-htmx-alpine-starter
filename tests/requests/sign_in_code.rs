@@ -252,6 +252,10 @@ async fn wrong_codes_count_across_sign_ins_and_the_fifth_is_mailed() {
             "{}",
             page.text()
         );
+        // No code went, so none is said to have gone, nor asked for.
+        assert!(!page.text().contains("We mailed you"), "{}", page.text());
+        assert!(!page.text().contains("name=\"code\""), "{}", page.text());
+        assert!(page.text().contains("Mail me a code"), "{}", page.text());
         let posted = request
             .post("/login/code")
             .add_header("cookie", waiting.clone())
