@@ -88,6 +88,8 @@ async fn the_reset_page_changes_the_password_once() {
             r#"aria-invalid="true""#,
             r#"aria-describedby="password-problem""#,
             r#"x-data="{ invalid: true }""#,
+            // The line goes with the mark once the password passes.
+            r#"x-show="invalid""#,
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }

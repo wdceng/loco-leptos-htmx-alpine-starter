@@ -22,7 +22,8 @@ const PASSWORD_PROBLEM: &str = "password-problem";
 /// A refused field is `aria-invalid` and points at its line
 /// (`aria-describedby`). As the visitor leaves a changed field, Alpine
 /// marks it the same way from the browser's own check (`minlength`,
-/// `maxlength`), and clears the mark once it passes.
+/// `maxlength`), and clears the mark once it passes, the refusal's line
+/// going with it: one Alpine state for both.
 ///
 /// Sent as every form is (`BusyForm`): a second press sends nothing, where
 /// it would find the token used up and swap "expired" over "changed".
@@ -34,30 +35,31 @@ pub fn ResetForm(token: String, problem: Option<String>) -> impl IntoView {
         <p class=LEAD>
             {format!("{PASSWORD_MIN} to {PASSWORD_MAX} characters. Any characters work.")}
         </p>
-        <ProblemLine id=PASSWORD_PROBLEM problem />
-        <BusyForm action=PATH>
-            <input type="hidden" name="token" value=token />
-            <label for="password" class="block font-semibold">"New password"</label>
-            <input
-                id="password"
-                name="password"
-                type="password"
-                autocomplete="new-password"
-                autofocus=refused
-                required
-                minlength=PASSWORD_MIN
-                maxlength=PASSWORD_MAX
-                aria-invalid=refused.then_some("true")
-                aria-describedby=refused.then_some(PASSWORD_PROBLEM)
-                x-data=if refused { "{ invalid: true }" } else { "{ invalid: false }" }
-                x-on:change="invalid = !$el.checkValidity()"
-                x-bind:aria-invalid="invalid"
-                class=FIELD
-            />
-            <button type="submit" class=BUTTON>
-                "Save the new password"
-            </button>
-        </BusyForm>
+        <div x-data=if refused { "{ invalid: true }" } else { "{ invalid: false }" }>
+            <ProblemLine id=PASSWORD_PROBLEM problem shown="invalid" />
+            <BusyForm action=PATH>
+                <input type="hidden" name="token" value=token />
+                <label for="password" class="block font-semibold">"New password"</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="new-password"
+                    autofocus=refused
+                    required
+                    minlength=PASSWORD_MIN
+                    maxlength=PASSWORD_MAX
+                    aria-invalid=refused.then_some("true")
+                    aria-describedby=refused.then_some(PASSWORD_PROBLEM)
+                    x-on:change="invalid = !$el.checkValidity()"
+                    x-bind:aria-invalid="invalid"
+                    class=FIELD
+                />
+                <button type="submit" class=BUTTON>
+                    "Save the new password"
+                </button>
+            </BusyForm>
+        </div>
     }
 }
 

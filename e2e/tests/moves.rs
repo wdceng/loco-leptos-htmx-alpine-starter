@@ -314,6 +314,21 @@ async fn a_refused_form_swaps_in_and_keeps_the_address() {
             Value::from("password"),
             "the focus in the field for the next try, not on <main>"
         );
+        // Put right, the mark and the line go together, as a change of the
+        // field does.
+        page.eval(
+            "const field = document.getElementById('password');
+             field.value = 'long enough to pass';
+             field.dispatchEvent(new Event('change', { bubbles: true }))",
+        )
+        .await?;
+        page.until(
+            "the refusal's line and mark gone",
+            "const line = document.getElementById('password-problem');
+             return document.getElementById('password').getAttribute('aria-invalid') !== 'true'
+                 && !!line && getComputedStyle(line).display === 'none'",
+        )
+        .await?;
         Ok(())
     })
     .await;

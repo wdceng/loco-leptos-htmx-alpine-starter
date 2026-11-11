@@ -166,12 +166,17 @@ pub const SAID: &str = "mt-6 font-semibold";
 
 /// The line saying why a form was refused ([`PROBLEM`]), an alert: its
 /// refused field is `aria-invalid` and points at `id` (`aria-describedby`).
-/// Nothing where nothing was refused.
+/// Nothing where nothing was refused. `shown`, an Alpine expression, hides
+/// it once the field's mark goes, so the line and the mark tell one story.
 #[component]
-pub fn ProblemLine(id: &'static str, problem: Option<String>) -> impl IntoView {
+pub fn ProblemLine(
+    id: &'static str,
+    problem: Option<String>,
+    #[prop(optional)] shown: Option<&'static str>,
+) -> impl IntoView {
     problem.map(|problem| {
         view! {
-            <p id=id role="alert" class=PROBLEM>
+            <p id=id role="alert" class=PROBLEM x-show=shown>
                 {problem}
             </p>
         }
