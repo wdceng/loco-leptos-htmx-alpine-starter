@@ -344,13 +344,54 @@ not_booted() {
 }
 trap not_booted EXIT
 
+# A driver a browser's update left behind, fetched as docs/prerequisites.md
+# does: unzipped from `$1` into the folder `$2`, through a zip of the
+# lane's own, so two lanes never share one.
+fetch_driver() {
+  local url=$1 into=$2 zip
+  zip=$(mktemp -t driver)
+  echo "fetching $url" >&2
+  curl -fsSL "$url" -o "$zip" && mkdir -p "$into" && unzip -oq "$zip" -d "$into"
+  local fetched=$?
+  rm -f "$zip"
+  return $fetched
+}
+
+# chromedriver for Chrome's major version `$1` into `$2`, from Google's
+# Chrome for Testing.
+fetch_chromedriver() {
+  local version
+  version=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json |
+    python3 -I -c 'import json, sys; print(json.load(sys.stdin)["milestones"][sys.argv[1]]["version"])' "$1") || return 1
+  fetch_driver "https://storage.googleapis.com/chrome-for-testing-public/$version/mac-arm64/chromedriver-mac-arm64.zip" "$2"
+}
+
+# msedgedriver for Edge's version `$1` into `$2`, from Microsoft.
+fetch_msedgedriver() {
+  fetch_driver "https://msedgedriver.microsoft.com/$1/edgedriver_mac64_m1.zip" "$2"
+}
+
 case $kind in
+  # The installed Chrome's driver, fetched anew where its major version
+  # is not Chrome's.
   chrome)
     chromedriver=${CHROMEDRIVER:-$HOME/Library/Caches/chromedriver/chromedriver-mac-arm64/chromedriver}
-    [[ -x $chromedriver ]] || chromedriver=chromedriver
+    chrome_major=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version 2>/dev/null | awk '{print $3}' | cut -d. -f1 || true)
+    driver_major=$("$chromedriver" --version 2>/dev/null | awk '{print $2}' | cut -d. -f1 || true)
+    if [[ -z ${CHROMEDRIVER:-} && -n $chrome_major && $driver_major != "$chrome_major" ]]; then
+      fetch_chromedriver "$chrome_major" "$HOME/Library/Caches/chromedriver" || true
+    fi
     driver=("$chromedriver" --port="$driver_port")
     ;;
-  edge) driver=(msedgedriver --port="$driver_port") ;;
+  # The installed Edge's driver, one a major version, fetched where missing.
+  edge)
+    edge_version=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || true)
+    msedgedriver=$HOME/Library/Caches/msedgedriver/${edge_version%%.*}/msedgedriver
+    if [[ -n $edge_version && ! -x $msedgedriver ]]; then
+      fetch_msedgedriver "$edge_version" "${msedgedriver%/*}" || true
+    fi
+    driver=("$msedgedriver" --port="$driver_port")
+    ;;
   firefox) driver=(geckodriver --port "$driver_port") ;;
   safari | iphone | ipad | ipad-air) driver=(safaridriver -p "$driver_port") ;;
   # The emulator's Chrome's own version, or its webview's for the app,
@@ -380,11 +421,17 @@ case $browser in
     chrome_beta=$(find "$beta_browsers" -maxdepth 1 -name 'chrome-[0-9]*' 2>/dev/null | sort -t- -k2 -n | tail -1)
     E2E_BINARY="$chrome_beta/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
     driver=("$beta_browsers/chromedriver-${chrome_beta##*-}/chromedriver-mac-arm64/chromedriver" --port="$driver_port")
+    if [[ -n $chrome_beta && ! -x ${driver[0]} ]]; then
+      fetch_chromedriver "${chrome_beta##*-}" "$beta_browsers/chromedriver-${chrome_beta##*-}" || true
+    fi
     ;;
   edge-beta)
     E2E_BINARY="/Applications/Microsoft Edge Beta.app/Contents/MacOS/Microsoft Edge Beta"
     edge_beta=$(defaults read "/Applications/Microsoft Edge Beta.app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || true)
     driver=("$beta_browsers/msedgedriver-${edge_beta%%.*}/msedgedriver" --port="$driver_port")
+    if [[ -n $edge_beta && ! -x ${driver[0]} ]]; then
+      fetch_msedgedriver "$edge_beta" "$beta_browsers/msedgedriver-${edge_beta%%.*}" || true
+    fi
     ;;
   firefox-beta) E2E_BINARY="/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox" ;;
   safari-beta)
@@ -531,6 +578,30 @@ print(found[0] if found else "")' "$runtime" "$device_name")
       [[ $kind == app ]] && engine=com.google.android.webview
       local chrome
       chrome=$("$adb" -s "$device" shell dumpsys package "$engine" | grep -m1 -o 'versionName=[0-9]*' | cut -d= -f2)
+      # The top bar's Chrome as new as the Play Store makes it, then held for
+      # the run, so it never moves under a running lane and strands its
+      # driver: the Play Store on, Chrome watched until its version holds
+      # 30 s (90 s at most), the Play Store off until the next boot. The low
+      # bar's stays off (docs/testing.md, The Low Bar).
+      if [[ $browser != *-low ]]; then
+        "$adb" -s "$device" shell pm enable com.android.vending >/dev/null 2>&1 || true
+        local held=0 watched=0 now
+        while ((held < 30 && watched < 90)); do
+          sleep 5
+          watched=$((watched + 5))
+          now=$("$adb" -s "$device" shell dumpsys package "$engine" | grep -m1 -o 'versionName=[0-9]*' | cut -d= -f2 || true)
+          if [[ -z $now ]]; then
+            held=0
+          elif [[ $now == "$chrome" ]]; then
+            held=$((held + 5))
+          else
+            echo "$avd's $engine moved from $chrome to $now as it booted" >&2
+            chrome=$now
+            held=0
+          fi
+        done
+        "$adb" -s "$device" shell pm disable-user --user 0 com.android.vending >/dev/null 2>&1 || true
+      fi
       if [[ $kind == app ]]; then
         # A fresh boot says it is done a moment before its package manager
         # takes an install (devices.sh's lesson): its answer waited for,
@@ -563,6 +634,10 @@ print(found[0] if found else "")' "$runtime" "$device_name")
         exit 1
       fi
       local chromedriver=${CHROMEDRIVER_ANDROID:-$HOME/Library/Caches/chromedriver-android/$chrome/chromedriver-mac-arm64/chromedriver}
+      # A new Chrome brings its own driver, fetched as docs/prerequisites.md does.
+      if [[ ! -x $chromedriver && -z ${CHROMEDRIVER_ANDROID:-} ]]; then
+        fetch_chromedriver "$chrome" "$HOME/Library/Caches/chromedriver-android/$chrome" || true
+      fi
       if [[ ! -x $chromedriver ]]; then
         echo "chromedriver $chrome for the emulator's $engine is missing: $chromedriver (docs/prerequisites.md, the devices)" >&2
         exit 1

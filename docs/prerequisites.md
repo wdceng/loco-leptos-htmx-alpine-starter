@@ -84,7 +84,13 @@ The desktop lanes' browsers, kept current by `brew upgrade`:
 brew install --cask google-chrome microsoft-edge firefox
 ```
 
-Chrome's driver, matching it (again after a Chrome update):
+Chrome's and Edge's drivers: `e2e/run.sh` fetches each itself where it
+misses or its major version isn't the browser's, Chrome's into
+`~/Library/Caches/chromedriver`, Edge's into
+`~/Library/Caches/msedgedriver/<major>`. By hand, only where its fetch
+fails.
+
+Chrome's driver, matching it:
 
 ```bash
 V=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version | awk '{print $3}') && mkdir -p ~/Library/Caches/chromedriver && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver.zip && unzip -o -q /tmp/chromedriver.zip -d ~/Library/Caches/chromedriver
@@ -103,15 +109,14 @@ automation":
 sudo safaridriver --enable
 ```
 
-Edge's driver, matching it (again after an Edge update); it prints its
-version:
+Edge's driver, matching it; it prints its version:
 
 ```bash
-V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundleShortVersionString) && D=$(mktemp -d) && curl -sfL -o "$D/e.zip" "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && unzip -oq "$D/e.zip" -d "$D" && mv "$D/msedgedriver" /opt/homebrew/bin/ && xattr -d com.apple.quarantine /opt/homebrew/bin/msedgedriver 2>/dev/null; msedgedriver --version
+V=$(defaults read "/Applications/Microsoft Edge.app/Contents/Info.plist" CFBundleShortVersionString) && D=~/Library/Caches/msedgedriver/${V%%.*} && mkdir -p "$D" && curl -sfL -o /tmp/msedgedriver.zip "https://msedgedriver.microsoft.com/$V/edgedriver_mac64_m1.zip" && unzip -oq /tmp/msedgedriver.zip -d "$D" && "$D/msedgedriver" --version
 ```
 
 - **A driver that no longer matches its browser** fails the session with
-  "only supports … version": fetch it again.
+  "only supports … version": the next run fetches it again.
 - **An Edge `brew upgrade` put in is opened once by hand:**
   `open -a "Microsoft Edge"`, approve the prompt, quit it. Until then
   macOS refuses to start it, and the Edge lane fails with
@@ -190,9 +195,14 @@ Chromedriver for the emulator's Chrome, `M` its major version:
 M=145 && V=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["milestones"][sys.argv[1]]["version"])' $M) && mkdir -p ~/Library/Caches/chromedriver-android/$M && curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$V/mac-arm64/chromedriver-mac-arm64.zip" -o /tmp/chromedriver-android.zip && unzip -oq /tmp/chromedriver-android.zip -d ~/Library/Caches/chromedriver-android/$M
 ```
 
-- `e2e/run.sh` reads the emulator's Chrome version as it boots and names
-  the chromedriver it misses: fetch that `M`. The app's lane reads the
-  webview's (`com.google.android.webview`), the same folder.
+- `e2e/run.sh` reads the emulator's Chrome version as it boots and fetches
+  the chromedriver it misses itself, the line above's way; it names that
+  `M` only where the fetch fails. The app's lane reads the webview's
+  (`com.google.android.webview`), the same folder.
+- **The top bar's Chrome is held for the run:** its lanes turn the Play
+  Store on as the emulator boots, wait until Chrome's version holds 30 s
+  (90 s at most), then turn it off, so Chrome never moves under a running
+  lane and strands its driver. The low bar's Play Store stays off.
 - **Emulator 37.2.13 crashes, 37.2.12 holds.** 37.2.13 crashed every lane
   in its own OpenGL layer, on the GPU and in software alike (2026-10-30);
   `e2e/run.sh` refuses it. `sdkmanager --update` brings it back: update the

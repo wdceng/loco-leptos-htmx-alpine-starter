@@ -50,7 +50,7 @@ caffeinate -dimsu zsh -lc "E2E_DEVICE_GAPS=\"5 5 5 5 5\" E2E_STAGGER=1 e2e/run.s
 
 ## Already handled, don't fix again
 
-Chrome's slow first start (`DevToolsActivePort`, retried once, `e2e/src/session.rs`); a Simulator's lost runtime profile after a Mac restart (`code=401`, CoreSimulator restarted and the boot retried); a Simulator whose first session fails (restarted once, `boot-why.txt`); the emulators' Vulkan (off: MoltenVK crashed); Safari open on the Mac (refused, "Safari is open"); a crashed emulator (named in the summary with its report); a missing chromedriver for an emulator's Chrome (named, with the `M` to fetch).
+Chrome's slow first start (`DevToolsActivePort`, retried once, `e2e/src/session.rs`); a Simulator's lost runtime profile after a Mac restart (`code=401`, CoreSimulator restarted and the boot retried); a Simulator whose first session fails (restarted once, `boot-why.txt`); the emulators' Vulkan (off: MoltenVK crashed); Safari open on the Mac (refused, "Safari is open"); a crashed emulator (named in the summary with its report); a missing or outdated driver for Chrome, Edge, the betas or an emulator's Chrome (fetched by `run.sh`, named only where the fetch fails); the top bar's emulator Chrome updating mid-lane (the Play Store on at boot, then off for the run).
 
 ## Known on the devices
 
