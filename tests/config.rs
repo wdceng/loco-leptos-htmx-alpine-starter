@@ -623,6 +623,26 @@ fn a_deployed_server_listens_on_loopback_and_keeps_its_database(#[case] env: Env
     assert!(!config.database.dangerously_recreate, "{env}");
 }
 
+/// SQLite's PRAGMAs are Loco's, the same on every connection of the pool
+/// (WAL, `synchronous` NORMAL, the busy timeout, foreign keys on;
+/// docs/architecture.md): no environment overrides them or runs SQL of its
+/// own at the start.
+#[rstest]
+#[case::development(Environment::Development)]
+#[case::test(Environment::Test)]
+#[case::e2e(e2e())]
+#[case::dev_server(dev_server())]
+#[case::staging(staging())]
+#[case::production(Environment::Production)]
+fn the_sqlite_pragmas_are_locos_everywhere(#[case] env: Environment) {
+    let database = load(&env).database;
+    assert!(
+        database.sqlite.pragmas.is_empty(),
+        "{env}: PRAGMAs overridden"
+    );
+    assert_eq!(database.run_on_start, None, "{env}: SQL run at the start");
+}
+
 /// The browser tests key on the peer like development, refuse to start
 /// without the site they test, have a bucket a whole run fits in, and build
 /// once, so no live-reload socket.

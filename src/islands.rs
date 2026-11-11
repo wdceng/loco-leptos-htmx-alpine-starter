@@ -40,7 +40,8 @@
 //! listeners.
 //!
 //! **No Leptos timer helper in an island** (`set_timeout`, `set_interval`,
-//! `request_animation_frame`, `request_idle_callback`): Leptos 0.9 hands
+//! `request_animation_frame`, `request_idle_callback`, and `debounce`, a
+//! `set_timeout` on every event): Leptos 0.9 hands
 //! each call's callback to the owner current at the call, and in an islands
 //! page that is the root, kept as long as the tab, so a call per scroll or
 //! per move would stay in memory for the whole visit. A job scheduled again
@@ -587,11 +588,13 @@ mod tests {
     }
 
     /// Leptos's timer helpers, called bare as the prelude brings them.
-    const HELPERS: [&str; 4] = [
+    const HELPERS: [&str; 5] = [
         "set_timeout(",
         "set_interval(",
         "request_animation_frame(",
         "request_idle_callback(",
+        // A `set_timeout` on every event it debounces.
+        "debounce(",
     ];
 
     /// The helper a line of code calls bare, if any: the browser's own
@@ -642,6 +645,7 @@ mod tests {
             Some("set_timeout(")
         );
         assert!(bare_helper("let _ = request_animation_frame(f);").is_some());
+        assert!(bare_helper("let on_input = debounce(delay, move |_| {});").is_some());
         assert!(bare_helper("window().request_animation_frame(f)").is_none());
         assert!(
             bare_helper("window().set_timeout_with_callback_and_timeout_and_arguments_0(f, 0)")
