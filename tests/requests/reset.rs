@@ -49,12 +49,26 @@ async fn the_reset_page_changes_the_password_once() {
         // busy look after 200 ms.
         for wanted in [
             r#"hx-sync="this:drop""#,
-            r#"x-data="{ sending: false }""#,
+            r#"x-data="{ sending: false, failed: false }""#,
             r#"x-on:htmx:before:request="sending = true""#,
             r#"x-on:htmx:finally:request="sending = false""#,
             r#"x-bind:aria-busy="sending""#,
             "busy:opacity-60",
             "busy:delay-200",
+        ] {
+            assert!(body.contains(wanted), "{wanted}: {body}");
+        }
+        // A failure a second try may cure keeps the form, and says so
+        // under it until the next try.
+        for wanted in [
+            r#"hx-status:408="swap:none push:false""#,
+            r#"hx-status:429="swap:none push:false""#,
+            r#"hx-status:500="swap:none push:false""#,
+            r#"hx-status:50x="swap:none push:false""#,
+            r#"x-on:htmx:config:request="failed = false""#,
+            r#"x-on:htmx:response:error="failed = true""#,
+            r#"x-on:htmx:error="failed = true""#,
+            "It did not go through. Please try again.",
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }

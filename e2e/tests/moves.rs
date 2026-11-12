@@ -11,7 +11,7 @@
 
 use std::time::Duration;
 
-use app_e2e::{HOME_LINK, Page, RESET, WebDriverResult, browse};
+use app_e2e::{HOME_LINK, NEWER_BUILD, Page, RESET, WebDriverResult, browse};
 use serde_json::{Value, json};
 
 /// The home page's title, from a full load.
@@ -272,12 +272,6 @@ async fn back_to_a_page_that_fails_loads_it_plainly() {
     .await;
 }
 
-/// The real answer, named as a newer build's ([`Page::answer_with`]).
-const NEWER_BUILD: &str = "const real = await original(...args);
-     const headers = new Headers(real.headers);
-     headers.set('X-Build', 'e2e-newer');
-     return new Response(await real.text(), { status: real.status, headers });";
-
 /// Every POST htmx sends from now on counted in `window.__posts`, where it
 /// leaves: htmx binds `window.fetch` per request, a queued one too.
 async fn count_posts(page: &Page) -> WebDriverResult<()> {
@@ -342,37 +336,79 @@ async fn a_newer_builds_answer_to_a_post_swaps_in_without_a_second_post() {
     .await;
 }
 
-/// A gateway's error to a form's post stays in place: only a link's GET is
-/// loaded plainly, never a post, which would go twice (`load_plainly`,
-/// src/islands.rs).
+/// A post a second try may cure (the server's error, a gateway's, no
+/// answer at all) keeps the form as it was, what was typed too, and says
+/// so under it, the address the page's; the next try clears the line
+/// (`BusyForm`, src/views/layout.rs). Never loaded plainly, which would
+/// send the post twice (`load_plainly`, src/islands.rs).
 #[tokio::test]
-async fn a_gateway_error_to_a_post_sends_it_once() {
+async fn a_failed_post_keeps_the_form_and_says_so() {
     browse(|page| async move {
-        page.open(RESET).await?;
-        page.mark().await?;
+        for (what, answer) in [
+            (
+                "the server's error",
+                "return new Response('<!doctype html><title>500</title>',
+                     { status: 500, headers: { 'Content-Type': 'text/html' } });",
+            ),
+            (
+                "a gateway's error",
+                "return new Response('<!doctype html><title>502</title><h1>Bad gateway</h1>',
+                     { status: 502, headers: { 'Content-Type': 'text/html' } });",
+            ),
+            ("no answer", "throw new TypeError('Failed to fetch');"),
+        ] {
+            page.open(RESET).await?;
+            page.mark().await?;
+            page.answer_with("/reset", answer).await?;
+            count_posts(&page).await?;
+            send_reset(&page, "long enough to pass").await?;
+            page.until(
+                &format!("{what}: the form saying it did not go through"),
+                &format!(
+                    "return document.querySelector('main form [role=alert]')?.textContent === {NOT_SENT:?}"
+                ),
+            )
+            .await?;
+            page.settled().await?;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            assert!(page.in_place().await?, "{what}: no full load");
+            assert_eq!(page.path().await?, RESET, "{what}: the address the page's");
+            assert_eq!(
+                page.eval("return document.getElementById('password')?.value")
+                    .await?,
+                Value::from("long enough to pass"),
+                "{what}: what was typed kept"
+            );
+            assert_eq!(
+                page.eval("return window.__posts").await?,
+                Value::from(1),
+                "{what}: one post"
+            );
+        }
+        // The next try, its answer held back: the line gone while it's
+        // on its way.
+        page.allow_failed_load(400, "/reset");
         page.answer_with(
             "/reset",
-            "return new Response('<!doctype html><title>502</title><h1>Bad gateway</h1>',
-                 { status: 502, headers: { 'Content-Type': 'text/html' } });",
+            "await new Promise(done => setTimeout(done, 1500));
+             return original(...args);",
         )
         .await?;
-        count_posts(&page).await?;
         send_reset(&page, "long enough to pass").await?;
-        page.until("the post answered", "return window.__posts === 1")
-            .await?;
-        page.settled().await?;
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        assert!(page.in_place().await?, "no full load");
-        assert_eq!(page.path().await?, RESET, "the address stays the page's");
-        assert_eq!(
-            page.eval("return window.__posts").await?,
-            Value::from(1),
-            "one post"
-        );
-        Ok(())
+        page.until(
+            "the line cleared while the next try is on its way",
+            "const form = document.querySelector('main form');
+             return form?.getAttribute('aria-busy') === 'true'
+                 && form.querySelector('[role=alert]').textContent === ''",
+        )
+        .await
     })
     .await;
 }
+
+/// What a form says when it didn't go through (`NOT_SENT`,
+/// src/views/layout.rs).
+const NOT_SENT: &str = "It did not go through. Please try again.";
 
 /// Back with no answer at all, the network gone, loads the page plainly:
 /// the address is Back's already, so the browser says what it can

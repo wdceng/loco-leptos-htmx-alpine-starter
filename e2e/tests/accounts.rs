@@ -6,7 +6,7 @@
 //! Alpine. Each test signs up an account of its own ([`mailbox`]), its
 //! mails read from the lane's Mailpit.
 
-use app_e2e::{PASSWORD, browse, mailbox};
+use app_e2e::{NEWER_BUILD, PASSWORD, browse, mailbox};
 use serde_json::Value;
 
 /// A visitor signs up, verifies through the mail's link, and signs in: the
@@ -304,16 +304,7 @@ async fn a_newer_builds_answer_to_a_sign_in_loads_its_page_plainly() {
         page.sign_up("Ana", &email).await?;
         page.open("/login").await?;
         page.mark().await?;
-        page.answer_with(
-            "/login",
-            "const real = await original(...args);
-             const headers = new Headers(real.headers);
-             headers.set('X-Build', 'e2e-newer');
-             const made = new Response(await real.text(), { status: real.status, headers });
-             Object.defineProperty(made, 'redirected', { value: real.redirected });
-             return made;",
-        )
-        .await?;
+        page.answer_with("/login", NEWER_BUILD).await?;
         page.type_into("#email", &email).await?;
         page.type_into("#password", PASSWORD).await?;
         page.press("form[action='/login'] button[type=submit]")

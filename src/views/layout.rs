@@ -204,6 +204,12 @@ pub fn SaidLine(said: Option<&'static str>) -> impl IntoView {
 /// Alpine's CSP build takes one expression per attribute. `class` its
 /// place on the page; `enctype` for a file; `described_by` a line about
 /// the whole form.
+///
+/// A failure a second try may cure (a timeout, the rate limit, the
+/// server's error, a gateway's, no answer at all) keeps the form as it
+/// was, what was typed in it too, and says so under it ([`NOT_SENT`]),
+/// the next try clearing the line; as an islands app on this stack does
+/// it. Any other refusal is its page in the region.
 #[component]
 pub fn BusyForm(
     #[prop(into)] action: String,
@@ -220,15 +226,39 @@ pub fn BusyForm(
             class=class
             aria-describedby=described_by
             hx-sync="this:drop"
-            x-data="{ sending: false }"
+            hx-status:408=KEEP_FORM
+            hx-status:429=KEEP_FORM
+            hx-status:500=KEEP_FORM
+            hx-status:50x=KEEP_FORM
+            x-data="{ sending: false, failed: false }"
+            x-on:htmx:config:request="failed = false"
             x-on:htmx:before:request="sending = true"
             x-on:htmx:finally:request="sending = false"
+            x-on:htmx:response:error="failed = true"
+            x-on:htmx:error="failed = true"
             x-bind:aria-busy="sending"
         >
             {children()}
+            <p
+                role="alert"
+                class=format!("{PROBLEM} empty:hidden")
+                x-text=format!("failed ? '{NOT_SENT}' : ''")
+            ></p>
         </form>
     }
 }
+
+/// What [`BusyForm`] does with an answer a second try may cure: nothing,
+/// so the form stays as it was, and its address too (htmx would push the
+/// post's). htmx looks a status up whole, then as `50x`, then `5xx`, each
+/// on the form and above it: `500` itself, or the region's would win;
+/// `50x` for a gateway's, since `noSwap` takes every `5xx` first
+/// (`HTMX_CONFIG`).
+const KEEP_FORM: &str = "swap:none push:false";
+
+/// What [`BusyForm`] says under its button when it didn't go through. In
+/// Alpine's expression, so no `'` in it.
+const NOT_SENT: &str = "It did not go through. Please try again.";
 
 /// A form's submit button: a finger's height (`min-h-11`), and while htmx
 /// sends the form (`aria-busy` on the form, through Alpine) the `busy:`

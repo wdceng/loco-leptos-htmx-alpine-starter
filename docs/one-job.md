@@ -74,7 +74,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A step just done, said above the form | `SaidLine` (`SAID`, `role="status"`), never the refusal's line, as the account page and the code's "a new code" | `src/views/layout.rs` |
 | A grid's columns. Guarded | `grid-cols-N` or `minmax(0,1fr)`, never a plain `1fr` | `tests/one_job.rs` |
 | A colour where CSS can't reach (`theme-color`, the manifest). The Android app reads the `theme-color` tag for its status bar, never a copy of its own | `SURFACE_HEX`, `BRAND_HEX` | `src/views/layout.rs` |
-| A form, and its submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`, the sending state in `BusyForm` alone) | `BusyForm`: `hx-sync="this:drop"` and `aria-busy` through Alpine; `BUTTON`: the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled` | `src/views/layout.rs`, `style/tailwind.css` |
+| A form, and its submit button while htmx sends it. Guarded (no `disabled`, every form's `hx-sync`, the sending state in `BusyForm` alone) | `BusyForm`: `hx-sync="this:drop"` and `aria-busy` through Alpine; a failure a second try may cure keeps the form and says `NOT_SENT` under it; `BUTTON`: the `busy:` variant, delayed 200 ms (`busy:delay-200`), never `disabled` | `src/views/layout.rs`, `style/tailwind.css` |
 | A click on what loads a page sets Alpine's state, never flips it. Guarded | `open = true`, never `open = !open` | `tests/requests/races.rs` |
 | A tap outside closes at its end. Guarded | `pointerup`, never `pointerdown` | `tests/one_job.rs` |
 | Less motion when the visitor asks | the one Reduce Motion rule, never `motion-reduce:` per class | `style/tailwind.css` |

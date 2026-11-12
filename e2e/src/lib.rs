@@ -56,5 +56,14 @@ pub(crate) const PRESS_HELD: Duration = Duration::from_millis(300);
 /// form, long enough to scroll in a short window.
 pub const RESET: &str = "/reset?token=e2e";
 
+/// An [`Page::answer_with`] answer: the real one, named as a newer build's
+/// (`X-Build`), followed redirects and all.
+pub const NEWER_BUILD: &str = "const real = await original(...args);
+     const headers = new Headers(real.headers);
+     headers.set('X-Build', 'e2e-newer');
+     const made = new Response(await real.text(), { status: real.status, headers });
+     Object.defineProperty(made, 'redirected', { value: real.redirected });
+     return made;";
+
 /// The header's link home, on every page.
 pub const HOME_LINK: &str = "header a[href='/']";

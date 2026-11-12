@@ -196,6 +196,15 @@ change of mind gets a new line, and the old one moves to
   those four files are in (about 16 KB gzip), cached a year after. Chosen
   over another app on this stack's way (all five at the body's end), which has no such pause,
   to follow the authors.
+- 2026-11-12: **A form that didn't go through stays as it was and says
+  so.** A 408, 429 or 5xx (`swap:none push:false` on the form, `500` and
+  `50x`, as htmx looks a status up) or no answer at all keeps the form,
+  what was typed and the address, and puts `NOT_SENT` under its button,
+  the next try clearing it. Before, a 502 to a post showed nothing and
+  pushed the post's address, losing the reset link's token; a 500
+  replaced the form with the error page.
+  As an islands app on this stack does it (since 2026-10-20); found by the
+  test-coverage map.
 - 2026-10-20: **A form drops a second press and looks busy while sent.**
   htmx 4's default without `hx-sync` queues one more request: two presses
   on the reset form sent two posts (a browser test proved it), the second
