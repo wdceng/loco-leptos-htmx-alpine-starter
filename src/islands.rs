@@ -48,7 +48,10 @@
 //! and again makes its callback once ([`Job`]). A test below refuses the
 //! helpers.
 
-use std::{cell::RefCell, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    time::Duration,
+};
 
 use leptos::{
     prelude::*,
@@ -112,6 +115,14 @@ thread_local! {
     /// [`Navigation`]'s scheduled jobs, made when it starts in the browser
     /// and dropped with it.
     static JOBS: RefCell<Option<Jobs>> = const { RefCell::new(None) };
+    /// How many of htmx's requests are on their way.
+    static ON_THEIR_WAY: Cell<u32> = const { Cell::new(0) };
+    /// Whether the page is being left while requests are on their way
+    /// ([`watch_leaving`]).
+    static LEFT: Cell<bool> = const { Cell::new(false) };
+    /// The `beforeunload` callback that sets [`LEFT`], made when
+    /// [`Navigation`] starts in the browser and dropped with it.
+    static ON_LEAVE: RefCell<Option<Closure<dyn Fn()>>> = const { RefCell::new(None) };
 }
 
 /// Something the page schedules again and again: its callback made once,
@@ -221,7 +232,9 @@ fn with_jobs(schedule: impl FnOnce(&Jobs)) {
 ///   loads plainly, so the browser shows what came instead of a click doing
 ///   nothing; so does a link with no answer at all (the network gone), and
 ///   any error answering Back or Forward, whose request htmx sends from
-///   `<body>`, out of the region's `hx-status`.
+///   `<body>`, out of the region's `hx-status`. Not while the page is being
+///   left: Firefox and Safari call off its requests then, as if the network
+///   were gone ([`watch_leaving`]).
 ///
 /// The listeners are removed with the island's owner, and its jobs dropped.
 #[island]
@@ -242,6 +255,7 @@ pub fn Navigation() -> impl IntoView {
             top: Job::new(to_the_top),
             announce: Job::new(announce_title),
         }));
+        ON_LEAVE.set(Some(Closure::new(|| LEFT.set(true))));
     });
     let fresher = window_event_listener_untyped("htmx:before:response", |ev| {
         if let Some(page) = newer_build(&ev) {
@@ -283,6 +297,14 @@ pub fn Navigation() -> impl IntoView {
             blur_focused();
         }
     });
+    let started = window_event_listener_untyped("htmx:before:request", |_| {
+        ON_THEIR_WAY.set(ON_THEIR_WAY.get() + 1);
+        watch_leaving();
+    });
+    let ended = window_event_listener_untyped("htmx:finally:request", |_| {
+        ON_THEIR_WAY.set(ON_THEIR_WAY.get().saturating_sub(1));
+        watch_leaving();
+    });
     let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
     // No answer at all to a link's or Back's request: the page, loaded
     // plainly, says why.
@@ -307,10 +329,15 @@ pub fn Navigation() -> impl IntoView {
         leaving.remove();
         scrolled.remove();
         unfocused.remove();
+        started.remove();
+        ended.remove();
         refused.remove();
         failed.remove();
         // Their queued calls cancelled, their callbacks freed.
         JOBS.take();
+        ON_THEIR_WAY.set(0);
+        watch_leaving();
+        ON_LEAVE.take();
     });
 }
 
@@ -472,7 +499,7 @@ fn load_plainly(ev: web_sys::Event) {
 /// for none of its own call-offs (`hx-sync`, Back), and a swap that threw
 /// had its page (`ctx.text`), which this leaves alone.
 fn no_answer(ev: web_sys::Event) {
-    if restore_failed() {
+    if LEFT.get() || restore_failed() {
         return;
     }
     let ctx = htmx_ctx(&ev);
@@ -481,6 +508,29 @@ fn no_answer(ev: web_sys::Event) {
     if !arrived {
         link_plainly(&ctx, None);
     }
+}
+
+/// The page watched for being left ([`LEFT`]) while htmx has requests on
+/// their way, and not otherwise: Firefox and Safari call a page's pending
+/// requests off as it is left, with the same error as no network, and
+/// [`no_answer`] would then load a link's page over where the visitor went (a
+/// probe, 2026-11-12). `beforeunload` is listened to only then, as the
+/// back-forward cache advice goes; the mark is let go with the last request.
+fn watch_leaving() {
+    let watch = ON_THEIR_WAY.get() > 0;
+    if !watch {
+        LEFT.set(false);
+    }
+    ON_LEAVE.with_borrow(|on_leave| {
+        if let Some(on_leave) = on_leave {
+            let on_leave = on_leave.as_ref().unchecked_ref();
+            let _ = if watch {
+                window().add_event_listener_with_callback("beforeunload", on_leave)
+            } else {
+                window().remove_event_listener_with_callback("beforeunload", on_leave)
+            };
+        }
+    });
 }
 
 /// The request htmx's event `ev` is about (`detail.ctx`), undefined for an

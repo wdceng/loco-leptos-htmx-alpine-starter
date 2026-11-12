@@ -2,20 +2,22 @@
 //! a browser, one line for anything else, never cached, and limited like a
 //! route.
 
-use app::{app::App, views::layout::APP_NAME};
+use app::{app::App, controllers::parts, views::layout::APP_NAME};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 use super::prepare_data::WantsPage;
 
-/// The parts' page is the browser tests' alone (src/controllers/parts.rs):
-/// anywhere else it is no page at all.
+/// The parts' page and the held-back answer are the browser tests' alone
+/// (src/controllers/parts.rs): anywhere else they are no page at all.
 #[tokio::test]
 #[serial]
 async fn the_parts_page_is_the_browser_tests_alone() {
     request::<App, _, _>(|request, _ctx| async move {
-        let res = request.get("/e2e/parts").await;
-        assert_eq!(res.status_code(), 404);
+        for path in [parts::PATH, parts::SLOW_PATH] {
+            let res = request.get(path).await;
+            assert_eq!(res.status_code(), 404, "{path}");
+        }
     })
     .await;
 }

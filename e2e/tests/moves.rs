@@ -578,6 +578,53 @@ async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
     .await;
 }
 
+/// The held-back answer's address, the browser tests' alone
+/// (src/controllers/parts.rs): it answers three seconds late.
+const SLOW: &str = "/e2e/slow";
+
+/// Leaving the page while a link's request is still on its way goes where
+/// the visitor went, typed or from the page: Firefox and Safari call the
+/// request off then, with the same error as no network, which must not
+/// load the link's page (`watch_leaving`, src/islands.rs). The request is
+/// a real one, held back by the server.
+#[tokio::test]
+async fn leaving_while_a_link_waits_goes_where_the_visitor_went() {
+    browse(|page| async move {
+        // Firefox's words for the request it calls off.
+        page.allow_logged("htmx:error: NetworkError when attempting to fetch resource");
+        for typed in [true, false] {
+            page.open("/").await?;
+            page.answer_with(
+                RESET,
+                &format!("await original({SLOW:?}); return original(...args);"),
+            )
+            .await?;
+            page.add_link(RESET).await?;
+            page.press("#e2e-link").await?;
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            if typed {
+                page.open("/login").await?;
+            } else {
+                page.eval("location.href = '/login'").await?;
+                page.until(
+                    "the sign-in page from the page",
+                    "return location.pathname === '/login' && document.readyState === 'complete'",
+                )
+                .await?;
+            }
+            // Past the held-back answer: nothing comes after it.
+            tokio::time::sleep(Duration::from_secs(4)).await;
+            assert_eq!(
+                page.path().await?,
+                "/login",
+                "typed: {typed}, where the visitor went"
+            );
+        }
+        Ok(())
+    })
+    .await;
+}
+
 /// A reload comes back where the page was scrolled: the scroll kept in the
 /// history entry once scrolling rests, and put back as the page loads
 /// (`take_scroll_over`, src/islands.rs), the browser's own restoration off.

@@ -206,6 +206,13 @@ change of mind gets a new line, and the old one moves to
   nothing, and a swap that threw had its page. A mouse press preloaded at
   mousedown gets no htmx timeout (hx-preload's request ignores it); the
   server's own 15 s limit answers a hung handler.
+- 2026-11-12: **Not while the page is being left.** Firefox and Safari
+  call a page's pending requests off as it is left, with no-network's
+  error, and a probe ended on the link's page instead of where the
+  visitor went. A `beforeunload` listener marks the leaving
+  (`watch_leaving`), added only while htmx has requests on their way, as
+  web.dev's back-forward cache advice says, and the mark let go with the
+  last one.
 - 2026-11-12: **A form that didn't go through stays as it was and says
   so.** A 408, 429 or 5xx (`swap:none push:false` on the form, `500` and
   `50x`, as htmx looks a status up) or no answer at all keeps the form,
