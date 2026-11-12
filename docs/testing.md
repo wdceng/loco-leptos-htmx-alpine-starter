@@ -121,8 +121,9 @@ so the suite runs in about a second.
     current `?v=`: a plain or stale string fails with the constant to use.
     Anything else must be a route that answers 200, and a `#id` must exist
     on the page. `/pkg/…` is cargo-leptos's output, which `home.rs` checks.
-  - The web manifest (a route) is JSON with `APP_NAME`, `SURFACE_HEX`,
-    `standalone`, and icons that are current versioned files in `public/`.
+  - The web manifest (a route, `no-cache`) is JSON with `APP_NAME`,
+    `BRAND_HEX`, `SURFACE_HEX`, `standalone`, and icons that are current
+    versioned files in `public/`.
   - The three auth mails are sent and each link is requested: all three
     answer 200.
 - `tests/requests/reset.rs`: the reset page as a person uses it. The mail's
@@ -139,7 +140,7 @@ so the suite runs in about a second.
   `HttpOnly; SameSite=Lax`, 12 hours, and a 303 home; the page then says
   who, with the sign-out. An unknown email, a wrong password and an
   unverified account get one answer, a 400 with the email typed and no
-  cookie. The sign-out closes the row and takes the cookie; the old
+  cookie, and an unknown email takes as long as a known one. The sign-out closes the row and takes the cookie; the old
   cookie opens nothing. Another site's post signs nobody in or out. The
   eleventh try in a row is a 429, visits to the page spending none.
 - `tests/models/sessions.rs`: a session found by its secret alone, the
@@ -188,6 +189,17 @@ so the suite runs in about a second.
   - Any `style=` attribute fails it, since `style-src` is `'self'`.
   - `/robots.txt` and a miss get the strict CSP from the config
     (`default-src 'none'`, no scripts).
+- `tests/requests/canaries.rs`: every route the app mounts, read from
+  `Hooks::routes`, so a new route is checked the day it is added: every
+  account page sends a signed-out visitor to the sign-in, every POST
+  refuses another site's page, and no page has an id twice.
+- `tests/requests/stack.rs`: the site's own layers where they must stand
+  in the middleware stack, and the request log the site's own, since
+  Loco's helpers only log a warning for a name they don't find.
+- `tests/templates.rs`: no `view!` attribute compares with `<` or `>`
+  outside braces, which cargo-leptos's hot reload reads as the tag's end.
+- Every page request says `Accept: text/html` through `wants_page`
+  (`prepare_data.rs`).
 - `tests/tasks/user_create.rs`: the `user_create` CLI task.
 - `tests/workers/`: an empty Loco starter module.
 
@@ -480,7 +492,7 @@ and an emulator's is the one of its Chrome's version
 - **Moves** (`e2e/tests/moves.rs`): the lazy island wakes; a link moves in
   place with its title, the focus on `<main>` and the title read out; no
   field takes the focus on the way (htmx's refocus by `id`, blurred
-  first); Back restores the scroll; a 404 and a 500 show in the region; a
+  first); Back restores the scroll; a 404, a 500 and a 403 show in the region; a
   refused form swaps in, keeps the address and keeps the focus in its
   field; a second press sends no second post; a sent form looks busy until
   its slow answer; a newer build and a gateway's 502 load a link plainly,
@@ -502,6 +514,8 @@ and an emulator's is the one of its Chrome's version
   a sign-in loads its page plainly. Each
   test signs up an account of its own (`mailbox`, a retry's its own), an
   admin made one by its role in the lane's database (`make_admin`).
+- **Limits** (`e2e/tests/limits.rs`, Safari's lane): a body sent by hand
+  slower than the 15 s limit is cut there with a 408 (`slow_post`).
 - **Blocked** (`e2e/tests/blocked.rs`, Chrome and Edge): with htmx refused
   a link and a form are page loads; with Alpine or the WASM refused a move
   and a refused form still stay in place.

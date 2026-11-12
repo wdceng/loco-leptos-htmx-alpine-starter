@@ -6,6 +6,7 @@ mod app;
 mod blocked;
 mod boot;
 mod health;
+mod limits;
 mod memory;
 mod moves;
 mod parts;

@@ -16,7 +16,7 @@ use chrono::{Duration, Utc};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
-use super::prepare_data::{PASSWORD, session_cookie, signs_in, user};
+use super::prepare_data::{PASSWORD, WantsPage, session_cookie, signs_in, user};
 
 const EMAIL: &str = "account@example.com";
 const MAC: &str =
@@ -50,7 +50,7 @@ async fn nobody_signed_in_is_sent_to_the_sign_in() {
     request::<App, _, _>(|request, _ctx| async move {
         let res = request
             .get("/account")
-            .add_header("accept", "text/html")
+            .wants_page()
             .await;
         assert_eq!(res.status_code(), 303);
         assert_eq!(res.header("location"), "/login");
@@ -105,7 +105,7 @@ async fn the_browsers_are_listed_and_signed_out() {
         let gone = request
             .get("/account")
             .add_header("cookie", third)
-            .add_header("accept", "text/html")
+            .wants_page()
             .await;
         assert_eq!(gone.status_code(), 303, "the third browser is signed out");
     })

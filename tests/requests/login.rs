@@ -2,6 +2,8 @@
 //! form, a refused try, the session's cookie, who is signed in, and the
 //! sign-out.
 
+use std::time::{Duration, Instant};
+
 use app::{app::App, models::sessions::Session, sql};
 use loco_rs::{app::AppContext, testing::prelude::*};
 use serial_test::serial;
@@ -121,6 +123,40 @@ async fn every_refused_sign_in_answers_alike() {
                 .await
                 .expect("counted"),
             0
+        );
+    })
+    .await;
+}
+
+/// A wrong password for an address with an account and any password for
+/// one without take the same time, the dummy hash's check
+/// (src/hashing.rs), so the time tells nobody which addresses have an
+/// account. Two of each, in turn, within the sign-in's burst; the faster of
+/// each pair, so the first post's cold start counts for neither; within a
+/// factor of two, wide enough for a loaded machine, narrow enough to catch
+/// a path with no hash check, which answers in a fraction.
+#[tokio::test]
+#[serial]
+async fn an_unknown_address_takes_as_long_as_a_known_one() {
+    request::<App, _, _>(|request, ctx| async move {
+        user(&ctx, EMAIL, true).await;
+        let mut known = Duration::MAX;
+        let mut unknown = Duration::MAX;
+        for _ in 0..2 {
+            for (email, fastest) in [(EMAIL, &mut known), ("nobody@example.com", &mut unknown)] {
+                let started = Instant::now();
+                let refused = request
+                    .post("/login")
+                    .form(&sign_in(email, "not the password"))
+                    .await;
+                assert_eq!(refused.status_code(), 400, "{email}");
+                *fastest = (*fastest).min(started.elapsed());
+            }
+        }
+        let ratio = known.as_secs_f64() / unknown.as_secs_f64();
+        assert!(
+            (0.5..=2.0).contains(&ratio),
+            "known {known:?}, unknown {unknown:?}, ratio {ratio:.2}"
         );
     })
     .await;

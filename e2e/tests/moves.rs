@@ -200,10 +200,10 @@ async fn back_comes_back_in_place_where_it_was_scrolled() {
 }
 
 /// A link to nothing shows the not-found page in the region; a page
-/// answered with a 500 shows in the region too (`PAGE_STATUSES`,
-/// src/views/layout.rs), the 500 made in the page ([`Page::answer_with`]).
+/// answered with a 500 or a 403 shows in the region too (`PAGE_STATUSES`,
+/// src/views/layout.rs), each made in the page ([`Page::answer_with`]).
 #[tokio::test]
-async fn a_404_and_a_500_are_shown_in_the_region() {
+async fn a_404_a_500_and_a_403_are_shown_in_the_region() {
     browse(|page| async move {
         // The 404 asked for, which Chrome logs.
         page.allow_failed_load(404, "/no-such-page");
@@ -234,6 +234,24 @@ async fn a_404_and_a_500_are_shown_in_the_region() {
         )
         .await?;
         assert!(page.in_place().await?, "the 500 in place");
+        // A 403 with a page, a member on an admin's page: in place too.
+        page.open("/").await?;
+        page.mark().await?;
+        page.answer_with(
+            RESET,
+            "const real = await original(...args);
+             const html = (await real.text()).replace('</main>', '<p id=\"e2e-403\">e2e 403</p></main>');
+             return new Response(html, { status: 403, headers: { 'Content-Type': 'text/html' } });",
+        )
+        .await?;
+        page.add_link(RESET).await?;
+        page.press("#e2e-link").await?;
+        page.until(
+            "the 403's page in the region",
+            "return !!document.getElementById('e2e-403')",
+        )
+        .await?;
+        assert!(page.in_place().await?, "the 403 in place");
         Ok(())
     })
     .await;

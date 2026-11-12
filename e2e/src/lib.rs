@@ -11,7 +11,8 @@
 //! One file a job: the browsers (`browser`), a test's session (`session`),
 //! the page and what any test does with it (`page`), the browsers' own
 //! tools (`devtools`), the Android app's side through adb (`device`), the
-//! lane's mails (`mail`) and the accounts the tests sign in as (`accounts`).
+//! lane's mails (`mail`), the accounts the tests sign in as (`accounts`)
+//! and a post sent slowly by hand (`slow`).
 
 use std::time::Duration;
 
@@ -22,6 +23,7 @@ mod devtools;
 mod mail;
 mod page;
 mod session;
+mod slow;
 
 pub use accounts::{PASSWORD, mailbox};
 pub use browser::{Browser, Screen};
@@ -29,6 +31,7 @@ pub use device::app_package;
 pub use devtools::Held;
 pub use page::Page;
 pub use session::{browse, browse_app};
+pub use slow::{Answered, slow_post};
 pub use thirtyfour::prelude::*;
 
 /// How long a wait waits: the debug build's WASM is several megabytes.

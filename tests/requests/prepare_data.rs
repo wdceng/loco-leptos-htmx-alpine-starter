@@ -7,6 +7,37 @@ use axum::http::HeaderValue;
 use loco_rs::app::AppContext;
 use sea_orm::IntoActiveModel;
 
+/// A request for a page, as a browser asks for one: `Accept: text/html`,
+/// which makes the site answer with a page, not the one line a script's
+/// request gets (`render::accepts_html`). Every page request's one way.
+pub trait WantsPage {
+    #[must_use]
+    fn wants_page(self) -> Self;
+}
+
+impl WantsPage for axum_test::TestRequest {
+    fn wants_page(self) -> Self {
+        self.add_header("accept", "text/html")
+    }
+}
+
+/// That no id stands twice in `body`: a second one makes a label, an
+/// `aria-labelledby`, a `popovertarget` or a script find the first.
+pub fn assert_unique_ids(body: &str) {
+    let mut ids: Vec<&str> = body
+        .split(r#" id=""#)
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .collect();
+    ids.sort_unstable();
+    let twice: Vec<&str> = ids
+        .windows(2)
+        .filter(|pair| pair[0] == pair[1])
+        .map(|pair| pair[0])
+        .collect();
+    assert!(twice.is_empty(), "ids twice: {twice:?}");
+}
+
 /// Every test user's password: at least 8 characters
 /// (`users::PASSWORD_MIN`).
 pub const PASSWORD: &str = "12341234";

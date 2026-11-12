@@ -6,6 +6,8 @@ use app::{app::App, views::layout::APP_NAME};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+use super::prepare_data::WantsPage;
+
 /// The parts' page is the browser tests' alone (src/controllers/parts.rs):
 /// anywhere else it is no page at all.
 #[tokio::test]
@@ -90,7 +92,7 @@ async fn a_miss_gets_the_security_headers_and_a_request_id() {
         }
         // The page keeps its own nonce CSP: the fallback one is only added
         // where a response has none.
-        let page = request.get("/nope").add_header("accept", "text/html").await;
+        let page = request.get("/nope").wants_page().await;
         assert!(
             page.header("content-security-policy")
                 .to_str()

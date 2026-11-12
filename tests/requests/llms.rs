@@ -6,6 +6,8 @@ use loco_rs::testing::prelude::*;
 use regex::Regex;
 use serial_test::serial;
 
+use super::prepare_data::WantsPage;
+
 #[tokio::test]
 #[serial]
 async fn llms_txt_names_the_site_and_its_pages() {
@@ -40,7 +42,7 @@ async fn llms_txt_names_the_site_and_its_pages() {
         for path in paths {
             let status = request
                 .get(&path)
-                .add_header("accept", "text/html")
+                .wants_page()
                 .await
                 .status_code();
             assert_eq!(status, 200, "{path} from llms.txt answers {status}");

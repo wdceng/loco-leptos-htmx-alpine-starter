@@ -13,6 +13,8 @@ use app::app::App;
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
+use super::prepare_data::WantsPage;
+
 /// The click handlers in `body` that flip a state on an element that sends
 /// a request: each start tag's `x-on:click`, an assignment whose value
 /// reads its own name negated (`open = !open`, `open = hovered ? true :
@@ -51,7 +53,7 @@ async fn no_click_that_asks_for_a_page_flips_alpines_state() {
     request::<App, _, _>(|request, _ctx| async move {
         let mut found = Vec::new();
         for path in ["/", "/reset?token=x", "/verify?token=x", "/no-such-page"] {
-            let res = request.get(path).add_header("accept", "text/html").await;
+            let res = request.get(path).wants_page().await;
             let body = res.text();
             assert!(body.contains("<main"), "{path}: not a page");
             found.extend(

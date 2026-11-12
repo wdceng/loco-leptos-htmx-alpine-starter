@@ -298,6 +298,10 @@ serde_yaml = { version = "0.9.34" }
 # starter declared it for the magic link's allowed domains; the app itself
 # no longer uses it.
 regex = { version = "1.13.1" }
+# The page request's one way (`WantsPage`, tests/requests/prepare_data.rs)
+# names its request type. Already in the tree through loco-rs's
+# `testing`; same version.
+axum-test = { version = "17.3.0" }
 # The upload tests make their pictures (tests/requests/account.rs); the
 # app's own version and formats.
 image = { version = "0.25.10", default-features = false, features = [
