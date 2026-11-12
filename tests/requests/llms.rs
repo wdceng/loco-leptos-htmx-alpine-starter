@@ -40,11 +40,7 @@ async fn llms_txt_names_the_site_and_its_pages() {
             "no links built from server.host:\n{body}"
         );
         for path in paths {
-            let status = request
-                .get(&path)
-                .wants_page()
-                .await
-                .status_code();
+            let status = request.get(&path).wants_page().await.status_code();
             assert_eq!(status, 200, "{path} from llms.txt answers {status}");
         }
     })

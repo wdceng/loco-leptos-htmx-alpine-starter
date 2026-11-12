@@ -86,10 +86,7 @@ async fn every_account_page_asks_a_signed_in_person() {
                 continue;
             }
             for method in methods {
-                let res = server
-                    .method(method.clone(), &uri)
-                    .wants_page()
-                    .await;
+                let res = server.method(method.clone(), &uri).wants_page().await;
                 let to = res
                     .maybe_header("location")
                     .map(|to| to.to_str().unwrap_or_default().to_string());
@@ -128,9 +125,10 @@ async fn no_page_has_an_id_twice() {
                     ask = ask.add_header("cookie", cookie.clone());
                 }
                 let res = ask.await;
-                let page = res
-                    .maybe_header("content-type")
-                    .is_some_and(|kind| kind.to_str().is_ok_and(|kind| kind.starts_with("text/html")));
+                let page = res.maybe_header("content-type").is_some_and(|kind| {
+                    kind.to_str()
+                        .is_ok_and(|kind| kind.starts_with("text/html"))
+                });
                 if page {
                     assert_unique_ids(&res.text());
                     checked += 1;

@@ -48,10 +48,7 @@ async fn session_id(ctx: &loco_rs::app::AppContext, cookie: &str) -> i64 {
 #[serial]
 async fn nobody_signed_in_is_sent_to_the_sign_in() {
     request::<App, _, _>(|request, _ctx| async move {
-        let res = request
-            .get("/account")
-            .wants_page()
-            .await;
+        let res = request.get("/account").wants_page().await;
         assert_eq!(res.status_code(), 303);
         assert_eq!(res.header("location"), "/login");
     })
