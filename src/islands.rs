@@ -476,8 +476,8 @@ fn no_answer(ev: web_sys::Event) {
         return;
     }
     let ctx = htmx_ctx(&ev);
-    let arrived = Reflect::get(&ctx, &JsValue::from_str("text"))
-        .is_ok_and(|text| text.as_string().is_some());
+    let arrived =
+        Reflect::get(&ctx, &JsValue::from_str("text")).is_ok_and(|text| text.as_string().is_some());
     if !arrived {
         link_plainly(&ctx, None);
     }
