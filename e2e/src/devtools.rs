@@ -75,6 +75,9 @@ pub(crate) struct Heard {
     /// Failed loads a test causes on purpose: the status, and the full
     /// address Chrome's line ends with ([`Page::allow_failed_load`]).
     allowed: Vec<(u16, String)>,
+    /// Lines a test causes on purpose, by words they hold
+    /// ([`Page::allow_logged`]).
+    allowed_logs: Vec<String>,
     /// Whether the test expects the page's errors ([`Page::allow_errors`]).
     errors_expected: bool,
 }
@@ -151,7 +154,10 @@ impl Page {
                 !heard.allowed.iter().any(|(status, url)| {
                     problem.contains(&format!("status of {status} "))
                         && problem.ends_with(&format!(" {url}"))
-                })
+                }) && !heard
+                    .allowed_logs
+                    .iter()
+                    .any(|words| problem.contains(words.as_str()))
             })
             .cloned()
             .collect()
@@ -163,6 +169,12 @@ impl Page {
     pub fn allow_failed_load(&self, status: u16, path: &str) {
         let url = self.url(path);
         lock(&self.heard).allowed.push((status, url));
+    }
+
+    /// A line the page logs because the test makes it, not counted: any
+    /// holding `words`, such as htmx's own line for a faked network failure.
+    pub fn allow_logged(&self, words: &str) {
+        lock(&self.heard).allowed_logs.push(words.to_owned());
     }
 
     /// The page's errors expected for the rest of the test, so they don't

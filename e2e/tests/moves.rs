@@ -362,6 +362,7 @@ async fn a_newer_builds_answer_to_a_post_swaps_in_without_a_second_post() {
 #[tokio::test]
 async fn a_failed_post_keeps_the_form_and_says_so() {
     browse(|page| async move {
+        page.allow_logged(NO_ANSWER_LOGGED);
         for (what, answer) in [
             (
                 "the server's error",
@@ -428,12 +429,17 @@ async fn a_failed_post_keeps_the_form_and_says_so() {
 /// src/views/layout.rs).
 const NOT_SENT: &str = "It did not go through. Please try again.";
 
+/// What htmx logs for a request with no answer, which a test fakes on
+/// purpose ([`Page::allow_logged`]).
+const NO_ANSWER_LOGGED: &str = "htmx:error: Failed to fetch";
+
 /// Back with no answer at all, the network gone, loads the page plainly:
 /// the address is Back's already, so the browser says what it can
 /// (`restore_failed`, src/islands.rs).
 #[tokio::test]
 async fn back_with_no_answer_loads_the_page_plainly() {
     browse(|page| async move {
+        page.allow_logged(NO_ANSWER_LOGGED);
         page.open("/").await?;
         page.mark().await?;
         page.add_link(RESET).await?;
@@ -460,6 +466,7 @@ async fn back_with_no_answer_loads_the_page_plainly() {
 #[tokio::test]
 async fn a_link_with_no_answer_loads_its_page_plainly() {
     browse(|page| async move {
+        page.allow_logged(NO_ANSWER_LOGGED);
         page.open("/").await?;
         page.mark().await?;
         page.answer_with(RESET, "throw new TypeError('Failed to fetch');")
@@ -498,6 +505,7 @@ async fn note_errors(page: &Page) -> WebDriverResult<()> {
 #[tokio::test]
 async fn a_late_failure_of_a_link_a_move_took_off_the_page_is_left_alone() {
     browse(|page| async move {
+        page.allow_logged(NO_ANSWER_LOGGED);
         page.open("/").await?;
         page.mark().await?;
         note_errors(&page).await?;
@@ -536,6 +544,7 @@ async fn a_late_failure_of_a_link_a_move_took_off_the_page_is_left_alone() {
 #[tokio::test]
 async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
     browse(|page| async move {
+        page.allow_logged(NO_ANSWER_LOGGED);
         page.open("/").await?;
         page.mark().await?;
         note_errors(&page).await?;
