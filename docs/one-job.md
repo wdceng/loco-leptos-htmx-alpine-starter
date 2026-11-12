@@ -103,7 +103,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | Move between pages without a reload | a plain link or form inside the shell's `#page`, which boosts it; never a hand-written `hx-get` for a page | `src/views/layout.rs` |
 | htmx's settings | `HTMX_CONFIG` | `src/views/layout.rs` |
 | A status shown as a page in the region | `PAGE_STATUSES` | `src/islands.rs` |
-| What a move needs beyond htmx: focus, announcement, Back's scroll, a newer build, a gateway's error | `Navigation` | `src/islands.rs` |
+| What a move needs beyond htmx: focus, announcement, Back's scroll, a newer build, a gateway's error, no answer | `Navigation` | `src/islands.rs` |
 | Wake islands htmx swaps in, free the ones it takes out (Leptos's `$$dispose`), and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
 | Something an island schedules again and again (a timeout, a frame) | `Job`, its callback made once; never Leptos's timer helpers (a test refuses them) | `src/islands.rs` |
 | The app: a window on the live site, on desktops and phones | `src-tauri/`, `run` in `src/lib.rs`, its start page `offline/index.html`, the app's one script; the phones' projects in `gen/` | `src-tauri/` |

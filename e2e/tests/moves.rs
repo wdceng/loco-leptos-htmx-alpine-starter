@@ -453,6 +453,33 @@ async fn back_with_no_answer_loads_the_page_plainly() {
     .await;
 }
 
+/// A link with no answer at all, the network gone, loads its page plainly,
+/// so the browser says what it can instead of the press doing nothing
+/// (`no_answer`, src/islands.rs). The browser's own load reaches the real
+/// server, which answers it.
+#[tokio::test]
+async fn a_link_with_no_answer_loads_its_page_plainly() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        page.answer_with(RESET, "throw new TypeError('Failed to fetch');")
+            .await?;
+        page.add_link(RESET).await?;
+        page.press("#e2e-link").await?;
+        page.until(
+            "the reset page loaded plainly",
+            &format!(
+                "return window.__e2eMark !== true
+                     && location.pathname + location.search === {RESET:?}
+                     && document.readyState === 'complete'"
+            ),
+        )
+        .await?;
+        page.ready().await
+    })
+    .await;
+}
+
 /// A reload comes back where the page was scrolled: the scroll kept in the
 /// history entry once scrolling rests, and put back as the page loads
 /// (`take_scroll_over`, src/islands.rs), the browser's own restoration off.

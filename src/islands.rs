@@ -219,8 +219,9 @@ fn with_jobs(schedule: impl FnOnce(&Jobs)) {
 ///   against a new page's islands.
 /// - **An answer the app never sends as a page** (a gateway's 502, the 429)
 ///   loads plainly, so the browser shows what came instead of a click doing
-///   nothing; so does any error answering Back or Forward, whose request
-///   htmx sends from `<body>`, out of the region's `hx-status`.
+///   nothing; so does a link with no answer at all (the network gone), and
+///   any error answering Back or Forward, whose request htmx sends from
+///   `<body>`, out of the region's `hx-status`.
 ///
 /// The listeners are removed with the island's owner, and its jobs dropped.
 #[island]
@@ -283,11 +284,9 @@ pub fn Navigation() -> impl IntoView {
         }
     });
     let refused = window_event_listener_untyped("htmx:response:error", load_plainly);
-    // No answer at all to Back's request: the page Back went to, loaded
+    // No answer at all to a link's or Back's request: the page, loaded
     // plainly, says why.
-    let failed = window_event_listener_untyped("htmx:error", |_| {
-        restore_failed();
-    });
+    let failed = window_event_listener_untyped("htmx:error", no_answer);
     // A picture chosen in a field marked `data-shrink` shrunk before
     // its form goes (shrink.rs): on every page, as this island is.
     let chosen = window_event_listener_untyped("change", |ev| {
@@ -455,25 +454,67 @@ fn announce_title() {
 }
 
 /// A link's answer that htmx left unswapped, a status not among
-/// [`PAGE_STATUSES`], loaded plainly: the link's own address, so the
-/// browser shows whatever answered. A link alone (a GET): a form's post is
-/// never sent twice, and an element with its own request keeps its own
-/// handling. Back's answer with any error loads plainly too
-/// ([`restore_failed`]).
+/// [`PAGE_STATUSES`], loaded plainly ([`link_plainly`]). Back's answer with
+/// any error loads plainly too ([`restore_failed`]).
 fn load_plainly(ev: web_sys::Event) {
     if restore_failed() {
         return;
     }
-    let detail = Reflect::get(&ev, &JsValue::from_str("detail")).unwrap_or(JsValue::UNDEFINED);
-    let ctx = Reflect::get(&detail, &JsValue::from_str("ctx")).unwrap_or(JsValue::UNDEFINED);
-    let status = Reflect::get(&ctx, &JsValue::from_str("response"))
+    let ctx = htmx_ctx(&ev);
+    link_plainly(&ctx, response_status(&ctx));
+}
+
+/// A link's request whose page never arrived, the network gone before or
+/// during it, or htmx's time run out (a touch's or a key's press; a mouse
+/// press preloaded at mousedown has no such end), loaded plainly
+/// ([`link_plainly`]), so the browser says what it can instead of a click
+/// doing nothing; Back's too ([`restore_failed`]). htmx fires `htmx:error`
+/// for none of its own call-offs (`hx-sync`, Back), and a swap that threw
+/// had its page (`ctx.text`), which this leaves alone.
+fn no_answer(ev: web_sys::Event) {
+    if restore_failed() {
+        return;
+    }
+    let ctx = htmx_ctx(&ev);
+    let arrived = Reflect::get(&ctx, &JsValue::from_str("text"))
+        .is_ok_and(|text| text.as_string().is_some());
+    if !arrived {
+        link_plainly(&ctx, None);
+    }
+}
+
+/// The request htmx's event `ev` is about (`detail.ctx`), undefined for an
+/// event that has none.
+fn htmx_ctx(ev: &web_sys::Event) -> JsValue {
+    let detail = Reflect::get(ev, &JsValue::from_str("detail")).unwrap_or(JsValue::UNDEFINED);
+    Reflect::get(&detail, &JsValue::from_str("ctx")).unwrap_or(JsValue::UNDEFINED)
+}
+
+/// The status of the answer htmx's request `ctx` holds, none before one
+/// came or where the request failed.
+fn response_status(ctx: &JsValue) -> Option<f64> {
+    Reflect::get(ctx, &JsValue::from_str("response"))
         .and_then(|response| Reflect::get(&response, &JsValue::from_str("status")))
         .ok()
-        .and_then(|status| status.as_f64());
-    let link = Reflect::get(&ctx, &JsValue::from_str("sourceElement"))
+        .and_then(|status| status.as_f64())
+}
+
+/// The link that sent htmx's request `ctx`, loaded at its own address
+/// unless its answer's `status` is one the region shows as a page. A
+/// boosted link's GET alone: a form's post is never sent twice, an element
+/// with its own request (`hx-get`, `hx-delete`, …) keeps its own handling,
+/// and a link a later move took off the page leaves the visitor where they
+/// went, as htmx drops its late answer.
+fn link_plainly(ctx: &JsValue, status: Option<f64>) {
+    let get = Reflect::get(ctx, &JsValue::from_str("request"))
+        .and_then(|request| Reflect::get(&request, &JsValue::from_str("method")))
+        .ok()
+        .and_then(|method| method.as_string())
+        .is_some_and(|method| method.eq_ignore_ascii_case("get"));
+    let link = Reflect::get(ctx, &JsValue::from_str("sourceElement"))
         .ok()
         .and_then(|source| source.dyn_into::<web_sys::HtmlAnchorElement>().ok())
-        .filter(|link| !link.has_attribute("hx-get"));
+        .filter(|link| get && link.is_connected() && !link.has_attribute("hx-get"));
     let shown =
         status.is_some_and(|status| PAGE_STATUSES.iter().any(|&page| f64::from(page) == status));
     if let Some(link) = link

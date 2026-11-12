@@ -119,8 +119,9 @@ stack with:
 - the scroll on Back and Forward, kept in each history entry;
 - a newer build (`X-Build` against the page's `<meta name="build">`)
   loads the page plainly, so an old wasm never meets a new page's islands;
-- a status the app never sends as a page (a gateway's 502, the 429) loads
-  plainly, so a click never does nothing.
+- a status the app never sends as a page (a gateway's 502, the 429), or
+  no page at all (the network gone), loads plainly, so a click never does
+  nothing.
 
 **An Alpine event sent at `htmx:after:settle` goes unheard.** htmx 4 fires
 the settle before its Alpine extension sets up what the swap brought

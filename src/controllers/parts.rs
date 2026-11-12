@@ -12,6 +12,7 @@ use loco_rs::{environment::Environment, prelude::*};
 
 use crate::{
     render::render_private_page,
+    settings,
     views::{layout::PageMeta, parts::PartsPage},
 };
 
@@ -22,7 +23,7 @@ pub const PATH: &str = "/e2e/parts";
 /// is mounted in.
 #[must_use]
 pub fn mounted_in(env: &Environment) -> bool {
-    matches!(env, Environment::Any(name) if name == "e2e")
+    matches!(env, Environment::Any(name) if name == settings::E2E)
 }
 
 #[debug_handler]

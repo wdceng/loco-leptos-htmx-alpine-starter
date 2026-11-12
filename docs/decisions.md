@@ -196,6 +196,16 @@ change of mind gets a new line, and the old one moves to
   those four files are in (about 16 KB gzip), cached a year after. Chosen
   over another app on this stack's way (all five at the body's end), which has no such pause,
   to follow the authors.
+- 2026-11-12: **A link whose page never arrives loads it plainly.** The
+  network gone before or during the answer, or htmx's 60 s run out on a
+  touch's or a key's press (`htmx:error` with no page, `no_answer` in
+  src/islands.rs), loads the link's address as a page, so the browser
+  shows its own offline page instead of the press doing nothing, as
+  Back's already did. A boosted link's GET still on the page alone: a
+  form keeps its own line (below), a link a later move took away loads
+  nothing, and a swap that threw had its page. A mouse press preloaded at
+  mousedown gets no htmx timeout (hx-preload's request ignores it); the
+  server's own 15 s limit answers a hung handler.
 - 2026-11-12: **A form that didn't go through stays as it was and says
   so.** A 408, 429 or 5xx (`swap:none push:false` on the form, `500` and
   `50x`, as htmx looks a status up) or no answer at all keeps the form,
