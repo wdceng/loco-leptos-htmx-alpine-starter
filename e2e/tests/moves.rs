@@ -272,17 +272,217 @@ async fn back_to_a_page_that_fails_loads_it_plainly() {
     .await;
 }
 
+/// The real answer, named as a newer build's ([`Page::answer_with`]).
+const NEWER_BUILD: &str = "const real = await original(...args);
+     const headers = new Headers(real.headers);
+     headers.set('X-Build', 'e2e-newer');
+     return new Response(await real.text(), { status: real.status, headers });";
+
+/// Every POST htmx sends from now on counted in `window.__posts`, where it
+/// leaves: htmx binds `window.fetch` per request, a queued one too.
+async fn count_posts(page: &Page) -> WebDriverResult<()> {
+    page.eval(
+        "window.__posts = 0;
+         const fetchFirst = window.fetch;
+         window.fetch = (...args) => {
+             const method = (args[1]?.method ?? args[0]?.method ?? 'GET').toUpperCase();
+             if (method === 'POST') window.__posts++;
+             return fetchFirst(...args);
+         }",
+    )
+    .await
+    .map(drop)
+}
+
+/// The reset form sent with `password`, as Enter in the field sends it.
+async fn send_reset(page: &Page, password: &str) -> WebDriverResult<()> {
+    page.eval(&format!(
+        "const field = document.getElementById('password');
+         field.value = {password:?}; field.focus();
+         field.form.requestSubmit()"
+    ))
+    .await
+    .map(drop)
+}
+
 #[tokio::test]
 async fn a_newer_build_loads_the_next_page_plainly() {
+    browse(|page| async move { loads_plainly(&page, NEWER_BUILD).await }).await;
+}
+
+/// A newer build's answer to a post answered in place swaps in as it came:
+/// loading its page plainly would send the post again (`newer_build`,
+/// src/islands.rs).
+#[tokio::test]
+async fn a_newer_builds_answer_to_a_post_swaps_in_without_a_second_post() {
     browse(|page| async move {
-        loads_plainly(
-            &page,
-            "const real = await original(...args);
-             const headers = new Headers(real.headers);
-             headers.set('X-Build', 'e2e-newer');
-             return new Response(await real.text(), { status: real.status, headers });",
+        // The refusal's 400, which Chrome logs.
+        page.allow_failed_load(400, "/reset");
+        page.open(RESET).await?;
+        page.mark().await?;
+        page.answer_with("/reset", NEWER_BUILD).await?;
+        count_posts(&page).await?;
+        send_reset(&page, "short").await?;
+        page.until(
+            "the refused form in the region",
+            "return document.body.innerText.includes('must be 8 to 128')",
+        )
+        .await?;
+        page.settled().await?;
+        // Long enough for a plain load to have started.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(page.in_place().await?, "swapped in, no full load");
+        assert_eq!(
+            page.eval("return window.__posts").await?,
+            Value::from(1),
+            "one post"
+        );
+        Ok(())
+    })
+    .await;
+}
+
+/// A gateway's error to a form's post stays in place: only a link's GET is
+/// loaded plainly, never a post, which would go twice (`load_plainly`,
+/// src/islands.rs).
+#[tokio::test]
+async fn a_gateway_error_to_a_post_sends_it_once() {
+    browse(|page| async move {
+        page.open(RESET).await?;
+        page.mark().await?;
+        page.answer_with(
+            "/reset",
+            "return new Response('<!doctype html><title>502</title><h1>Bad gateway</h1>',
+                 { status: 502, headers: { 'Content-Type': 'text/html' } });",
+        )
+        .await?;
+        count_posts(&page).await?;
+        send_reset(&page, "long enough to pass").await?;
+        page.until("the post answered", "return window.__posts === 1")
+            .await?;
+        page.settled().await?;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(page.in_place().await?, "no full load");
+        assert_eq!(page.path().await?, RESET, "the address stays the page's");
+        assert_eq!(
+            page.eval("return window.__posts").await?,
+            Value::from(1),
+            "one post"
+        );
+        Ok(())
+    })
+    .await;
+}
+
+/// Back with no answer at all, the network gone, loads the page plainly:
+/// the address is Back's already, so the browser says what it can
+/// (`restore_failed`, src/islands.rs).
+#[tokio::test]
+async fn back_with_no_answer_loads_the_page_plainly() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        page.add_link(RESET).await?;
+        page.move_to("#e2e-link", RESET).await?;
+        assert!(page.in_place().await?, "the move in place");
+        page.answer_with("/", "throw new TypeError('Failed to fetch');")
+            .await?;
+        page.eval("history.back()").await?;
+        page.until(
+            "the home page loaded plainly",
+            "return window.__e2eMark !== true && location.pathname === '/'
+                 && document.readyState === 'complete'",
+        )
+        .await?;
+        page.ready().await
+    })
+    .await;
+}
+
+/// A reload comes back where the page was scrolled: the scroll kept in the
+/// history entry once scrolling rests, and put back as the page loads
+/// (`take_scroll_over`, src/islands.rs), the browser's own restoration off.
+#[tokio::test]
+async fn a_reload_comes_back_where_it_was_scrolled() {
+    browse(|page| async move {
+        page.viewport(800, 300).await?;
+        page.open(RESET).await?;
+        page.eval(
+            "document.documentElement.style.scrollBehavior = 'auto';
+             window.scrollTo(0, document.documentElement.scrollHeight);
+             document.documentElement.style.scrollBehavior = ''",
+        )
+        .await?;
+        let before = page.eval("return window.scrollY").await?;
+        let before = before.as_f64().unwrap_or_default();
+        if before == 0.0 && page.browser.screen().is_some() {
+            page.skip("the reset page fits this device's screen: no scroll to put back");
+            return Ok(());
+        }
+        assert!(before > 0.0, "the reset page scrolls in 300 pixels");
+        page.until(
+            "the scroll kept in the entry",
+            &format!("return Math.abs((history.state?.pageScroll ?? -1) - {before}) < 2"),
+        )
+        .await?;
+        page.driver.refresh().await?;
+        page.ready().await?;
+        page.until(
+            "the scroll put back",
+            &format!("return Math.abs(window.scrollY - {before}) < 2"),
         )
         .await
+    })
+    .await;
+}
+
+/// A move to an address with a `#` is left where it went: `Navigation`'s
+/// second "to the top", a frame after the swap, is for a move without one
+/// (`to_the_top`, src/islands.rs). A scroll made in the frame the swap
+/// lands stands with the `#`, and goes back to the top without it.
+#[tokio::test]
+async fn a_move_to_an_anchor_is_left_where_it_went() {
+    browse(|page| async move {
+        page.viewport(800, 300).await?;
+        for (href, anchored) in [
+            (format!("{RESET}#password"), true),
+            (RESET.to_owned(), false),
+        ] {
+            page.open("/").await?;
+            page.add_link(&href).await?;
+            // Registered before `Navigation`'s frame, so it runs first.
+            page.eval(
+                "document.addEventListener('htmx:after:swap', () => requestAnimationFrame(() => {
+                     document.documentElement.style.scrollBehavior = 'auto';
+                     window.scrollTo(0, document.documentElement.scrollHeight);
+                 }), { once: true })",
+            )
+            .await?;
+            page.move_to("#e2e-link", RESET).await?;
+            let deepest = page
+                .eval("return document.documentElement.scrollHeight - window.innerHeight")
+                .await?;
+            if deepest.as_f64().unwrap_or_default() < 1.0 && page.browser.screen().is_some() {
+                page.skip("the reset page fits this device's screen: no scroll to keep");
+                return Ok(());
+            }
+            if anchored {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                assert!(
+                    page.eval("return location.hash === '#password' && window.scrollY > 0")
+                        .await?
+                        == Value::Bool(true),
+                    "the move with a # left where it went"
+                );
+            } else {
+                page.until(
+                    "the move without a # at its top",
+                    "return window.scrollY === 0",
+                )
+                .await?;
+            }
+        }
+        Ok(())
     })
     .await;
 }
@@ -345,17 +545,9 @@ async fn a_second_press_sends_no_second_post() {
         page.allow_failed_load(400, "/reset");
         page.open(RESET).await?;
         page.mark().await?;
-        // Every POST htmx sends, counted where it leaves: htmx binds
-        // `window.fetch` per request, a queued one too.
+        count_posts(&page).await?;
         page.eval(
-            "window.__posts = 0;
-             const fetchFirst = window.fetch;
-             window.fetch = (...args) => {
-                 const method = (args[1]?.method ?? args[0]?.method ?? 'GET').toUpperCase();
-                 if (method === 'POST') window.__posts++;
-                 return fetchFirst(...args);
-             };
-             const field = document.getElementById('password');
+            "const field = document.getElementById('password');
              field.value = 'long enough to pass';
              field.form.requestSubmit();
              field.form.requestSubmit()",

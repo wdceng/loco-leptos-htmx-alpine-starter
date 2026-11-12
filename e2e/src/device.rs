@@ -93,6 +93,15 @@ impl Page {
         .map_err(WebDriverError::RequestFailed)
     }
 
+    /// The device's airplane mode on or off: no network for the app, adb
+    /// still reaching the device.
+    pub async fn airplane(&self, on: bool) -> WebDriverResult<()> {
+        let mode = if on { "enable" } else { "disable" };
+        self.on_device(&["shell", "cmd", "connectivity", "airplane-mode", mode])
+            .await
+            .map(drop)
+    }
+
     /// Android's Back, as the system's own button or gesture.
     pub async fn system_back(&self) -> WebDriverResult<()> {
         self.on_device(&["shell", "input", "keyevent", "KEYCODE_BACK"])

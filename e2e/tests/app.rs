@@ -39,6 +39,35 @@ async fn the_app_opens_the_site_from_its_start_page() {
     .await;
 }
 
+/// With no network the start page says so, and goes on to the site once
+/// the network is back (src-tauri/offline/index.html): the start page
+/// opened again in the app's webview, the device's airplane mode on, and
+/// off again whatever happened.
+#[tokio::test]
+async fn the_start_page_says_no_internet_and_goes_on_once_its_back() {
+    browse_app(|page| async move {
+        arrives(&page, "/").await?;
+        page.airplane(true).await?;
+        let offline = async {
+            page.eval("setTimeout(() => location.assign('http://tauri.localhost/index.html'))")
+                .await?;
+            page.until_within(
+                "the start page saying no internet",
+                "const problem = document.getElementById('problem');
+                 return !!problem && !problem.hidden
+                     && document.getElementById('problem-title').textContent === 'No internet connection'",
+                Duration::from_secs(30),
+            )
+            .await
+        }
+        .await;
+        page.airplane(false).await?;
+        offline?;
+        arrives(&page, "/").await
+    })
+    .await;
+}
+
 /// Another site's link goes to the system, Android's browser on top, and
 /// the app stays on its page: Back brings the app back as it was (src/lib.rs,
 /// `destination`; `links.sh` taps the rest by hand).

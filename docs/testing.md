@@ -415,7 +415,10 @@ started; the chromedriver of the webview's own version
 (`com.google.android.webview`) attaches to the running app
 (`androidUseRunningApp`, `Browser::App`), and the system's side goes
 through adb (`e2e/src/device.rs`). It runs the boot test and
-`e2e/tests/app.rs` alone, which every other lane leaves out; in no family.
+`e2e/tests/app.rs` alone, which every other lane leaves out; in no family:
+the start page handing over, its "No internet connection" in airplane
+mode and its handover once the network is back, and another site's link
+going to the system.
 As an islands app on this stack tests its own.
 
 - **The emulator draws in software there** (`-gpu swiftshader_indirect`):
@@ -480,16 +483,21 @@ and an emulator's is the one of its Chrome's version
   first); Back restores the scroll; a 404 and a 500 show in the region; a
   refused form swaps in, keeps the address and keeps the focus in its
   field; a second press sends no second post; a sent form looks busy until
-  its slow answer; a newer build and a gateway's 502 load plainly; a move
-  fetches no WASM again and starts the page at its top, never passing
-  below; a desktop's move is asked for at the mouse's press, a hover
+  its slow answer; a newer build and a gateway's 502 load a link plainly,
+  while a post answered in place swaps in and goes once; Back with no
+  answer at all loads plainly; a reload comes back where it was scrolled;
+  a move fetches no WASM again and starts the page at its top, never
+  passing below, unless its address has a `#`; a desktop's move is asked for at the mouse's press, a hover
   asking nothing.
 - **Accounts** (`e2e/tests/accounts.rs`): a visitor signs up, verifies
   through the welcome mail's link and signs in in place, the session's
   cookie from htmx's answer signing the next page in; a wrong password
   refused in the region, the field marked and focused; an admin's mailed
   code typed; the account's deletion asked in a dialog, the focus on
-  Cancel; a large photo shrunk to a JPEG under 1 MB before it goes. Each
+  Cancel; a large photo shrunk to a JPEG under 1 MB before it goes, a
+  small JPEG or an unreadable file left as it was, the last of two chosen
+  going, the form's buttons out of use meanwhile; a newer build's answer to
+  a sign-in loads its page plainly. Each
   test signs up an account of its own (`mailbox`, a retry's its own), an
   admin made one by its role in the lane's database (`make_admin`).
 - **Blocked** (`e2e/tests/blocked.rs`, Chrome and Edge): with htmx refused

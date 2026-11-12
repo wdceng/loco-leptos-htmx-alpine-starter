@@ -186,3 +186,147 @@ async fn a_chosen_photo_is_shrunk_before_it_goes() {
     })
     .await;
 }
+
+/// A chosen picture the shrink can't better goes as it was, and of two
+/// chosen one after the other the last goes (src/islands/shrink.rs): a
+/// JPEG already within its side and bytes is left as it is, a file the
+/// browser can't read as a picture (an iPhone's HEIC in Chrome) stays the
+/// original for the server to judge, and an earlier run still working puts
+/// nothing in the field. Each time the form's buttons are out of use while
+/// it works, and back in use once it's done.
+#[tokio::test]
+async fn a_picture_the_shrink_cant_better_goes_as_it_was_and_the_last_chosen_goes() {
+    browse(|page| async move {
+        let email = mailbox("pictures");
+        page.sign_up("Ana", &email).await?;
+        page.sign_in(&email, PASSWORD).await?;
+        page.open("/account").await?;
+        // Each time the buttons go out of use and back, counted; a picture
+        // put in the field as a person's choice is, its change sent.
+        page.eval(
+            "window.__held = 0; window.__freed = 0;
+             const button = document.querySelector(\"form[action='/account/avatar'] button[type=submit]\");
+             // A change of state, not of the attribute: a second picture
+             // sets `disabled` again on a button already out of use.
+             let held = button.disabled;
+             new MutationObserver(() => {
+                 if (button.disabled === held) return;
+                 held = button.disabled;
+                 if (held) window.__held++; else window.__freed++;
+             }).observe(button, { attributes: true, attributeFilter: ['disabled'] });
+             window.__choose = (...files) => {
+                 const field = document.getElementById('avatar');
+                 for (const file of files) {
+                     const chosen = new DataTransfer();
+                     chosen.items.add(file);
+                     field.files = chosen.files;
+                     field.dispatchEvent(new Event('change', { bubbles: true }));
+                 }
+             };
+             window.__picture = (width, height, type) => new Promise((done) => {
+                 const canvas = document.createElement('canvas');
+                 canvas.width = width; canvas.height = height;
+                 const drawing = canvas.getContext('2d');
+                 const noise = drawing.createImageData(width, height);
+                 for (let i = 0; i < noise.data.length; i++) {
+                     noise.data[i] = i % 4 === 3 ? 255 : (Math.random() * 256) | 0;
+                 }
+                 drawing.putImageData(noise, 0, 0);
+                 canvas.toBlob(done, type, 0.8);
+             })",
+        )
+        .await?;
+        let field = "document.getElementById('avatar').files[0]";
+        let button = "document.querySelector(\"form[action='/account/avatar'] button[type=submit]\")";
+        let done = |freed: u32| {
+            format!("return window.__held === {freed} && window.__freed === {freed} && !{button}.disabled")
+        };
+
+        // A small JPEG, left as it is.
+        page.eval(
+            "window.__picture(400, 300, 'image/jpeg').then((blob) => {
+                 window.__small = blob.size;
+                 window.__choose(new File([blob], 'small.jpg', { type: 'image/jpeg' }));
+             })",
+        )
+        .await?;
+        page.until("the small JPEG looked at", &done(1)).await?;
+        assert_eq!(
+            page.eval(&format!(
+                "return {field}.name === 'small.jpg' && {field}.size === window.__small"
+            ))
+            .await?,
+            Value::Bool(true),
+            "the small JPEG left as it was"
+        );
+
+        // No picture the browser can read: the original stays.
+        page.eval(
+            "window.__choose(new File([new Uint8Array([0, 1, 2, 3])], 'phone.heic', { type: 'image/heic' }))",
+        )
+        .await?;
+        page.until("the unreadable file looked at", &done(2)).await?;
+        assert_eq!(
+            page.eval(&format!("return {field}.name")).await?,
+            Value::from("phone.heic"),
+            "the unreadable file left as it was"
+        );
+
+        // Two large pictures, one right after the other: the second goes,
+        // the buttons back in use once both are done.
+        page.eval(
+            "Promise.all([window.__picture(2400, 1600, 'image/png'), window.__picture(2400, 1600, 'image/png')])
+                 .then(([first, second]) => window.__choose(
+                     new File([first], 'first.png', { type: 'image/png' }),
+                     new File([second], 'second.png', { type: 'image/png' })))",
+        )
+        .await?;
+        page.until("both pictures shrunk", &done(3)).await?;
+        assert_eq!(
+            page.eval(&format!("return {field}.name")).await?,
+            Value::from("second.jpg"),
+            "the last chosen goes"
+        );
+        Ok(())
+    })
+    .await;
+}
+
+/// A newer build's answer to a sign-in, whose post led on to a page, loads
+/// that page plainly: the post's redirect was followed, so a GET goes
+/// again, never the post (`newer_build`, src/islands.rs). The made answer
+/// keeps the post's address ([`Page::answer_with`]), so the page loaded is
+/// `/login`, already signed in.
+#[tokio::test]
+async fn a_newer_builds_answer_to_a_sign_in_loads_its_page_plainly() {
+    browse(|page| async move {
+        let email = mailbox("newer");
+        page.sign_up("Ana", &email).await?;
+        page.open("/login").await?;
+        page.mark().await?;
+        page.answer_with(
+            "/login",
+            "const real = await original(...args);
+             const headers = new Headers(real.headers);
+             headers.set('X-Build', 'e2e-newer');
+             const made = new Response(await real.text(), { status: real.status, headers });
+             Object.defineProperty(made, 'redirected', { value: real.redirected });
+             return made;",
+        )
+        .await?;
+        page.type_into("#email", &email).await?;
+        page.type_into("#password", PASSWORD).await?;
+        page.press("form[action='/login'] button[type=submit]")
+            .await?;
+        page.until(
+            "a page loaded plainly",
+            "return window.__e2eMark !== true && document.readyState === 'complete'",
+        )
+        .await?;
+        page.ready().await?;
+        page.open("/account").await?;
+        assert_eq!(page.path().await?, "/account", "signed in by the one post");
+        Ok(())
+    })
+    .await;
+}
