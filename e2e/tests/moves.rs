@@ -480,6 +480,95 @@ async fn a_link_with_no_answer_loads_its_page_plainly() {
     .await;
 }
 
+/// Every `htmx:error` from now on noted in `window.__errored`; one from a
+/// link already off the page reaches `document`, and so the window too.
+async fn note_errors(page: &Page) -> WebDriverResult<()> {
+    page.eval(
+        "window.__errored = false;
+         addEventListener('htmx:error', () => { window.__errored = true; })",
+    )
+    .await
+    .map(drop)
+}
+
+/// A link a later move took off the page is left alone when its own
+/// request fails late: the visitor stays on the page they moved to
+/// (`link_plainly`, src/islands.rs). The failure is held back until the
+/// later move is in.
+#[tokio::test]
+async fn a_late_failure_of_a_link_a_move_took_off_the_page_is_left_alone() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        note_errors(&page).await?;
+        page.answer_with(
+            RESET,
+            "await new Promise(done => setTimeout(done, 3000));
+             throw new TypeError('Failed to fetch');",
+        )
+        .await?;
+        page.add_link(RESET).await?;
+        page.press("#e2e-link").await?;
+        page.press(HOME_LINK).await?;
+        page.until(
+            "the link taken off the page by the move home",
+            "return !document.getElementById('e2e-link')",
+        )
+        .await?;
+        page.until(
+            "the link's own request failed",
+            "return window.__errored === true",
+        )
+        .await?;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(page.in_place().await?, "left in place, not loaded plainly");
+        assert_eq!(page.path().await?, "/", "the address the later move's");
+        Ok(())
+    })
+    .await;
+}
+
+/// A link with a request of another method (`hx-delete`) is never loaded
+/// plainly when that request gets no answer: a plain load would ask its
+/// address with a GET (`link_plainly`, src/islands.rs). htmx gives such a
+/// link its own request in place of the boost, so it's made with the
+/// attribute already on it.
+#[tokio::test]
+async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        note_errors(&page).await?;
+        page.answer_with(
+            RESET,
+            "window.__method = args[1]?.method;
+             throw new TypeError('Failed to fetch');",
+        )
+        .await?;
+        page.eval(&format!(
+            "const a = document.createElement('a');
+             a.href = {RESET:?}; a.id = 'e2e-link'; a.textContent = 'e2e';
+             a.setAttribute('hx-delete', {RESET:?});
+             document.querySelector('main').append(a);
+             htmx.process(a)"
+        ))
+        .await?;
+        page.press("#e2e-link").await?;
+        page.until("the request failed", "return window.__errored === true")
+            .await?;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(
+            page.eval("return window.__method").await?,
+            Value::from("DELETE"),
+            "the link's own method sent"
+        );
+        assert!(page.in_place().await?, "left in place, not loaded plainly");
+        assert_eq!(page.path().await?, "/", "the address unchanged");
+        Ok(())
+    })
+    .await;
+}
+
 /// A reload comes back where the page was scrolled: the scroll kept in the
 /// history entry once scrolling rests, and put back as the page loads
 /// (`take_scroll_over`, src/islands.rs), the browser's own restoration off.

@@ -499,7 +499,9 @@ and an emulator's is the one of its Chrome's version
   while a post answered in place swaps in and goes once; a post failed by
   the server's error, a gateway's or no answer keeps the form, what was
   typed and the address, and says so until the next try; a link or Back
-  with no answer at all loads plainly; a reload comes back where it was scrolled;
+  with no answer at all loads plainly, but not a link a later move took off
+  the page, nor one of another method (`hx-delete`); a reload comes back
+  where it was scrolled;
   a move fetches no WASM again and starts the page at its top, never
   passing below, unless its address has a `#`; a desktop's move is asked for at the mouse's press, a hover
   asking nothing.
