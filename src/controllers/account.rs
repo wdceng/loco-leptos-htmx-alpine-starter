@@ -222,7 +222,9 @@ async fn avatar_field(form: &mut Multipart) -> std::result::Result<Vec<u8>, &'st
 }
 
 /// `jpeg` kept and made `user_id`'s avatar, the one it replaced taken away
-/// once nobody shows it. Run in the uploads' turn (`uploads::in_turn`).
+/// once nobody shows it. Run in the uploads' turn (`uploads::in_turn`). The
+/// file kept goes too where no row names it after all: the write refused,
+/// or the account deleted meanwhile.
 async fn replace_avatar(
     pool: &SqlitePool,
     folder: &std::path::Path,
@@ -230,13 +232,17 @@ async fn replace_avatar(
     jpeg: &[u8],
 ) -> Result<()> {
     let name = uploads::keep(folder, jpeg).await.map_err(Error::wrap)?;
-    let before = avatars::set(pool, user_id, Some(&name))
-        .await
-        .map_err(Error::wrap)?;
+    let before = match avatars::set(pool, user_id, Some(&name)).await {
+        Ok(before) => before,
+        Err(e) => {
+            forget_unused(pool, folder, &name).await?;
+            return Err(Error::wrap(e));
+        }
+    };
     if let Some(before) = before.filter(|before| *before != name) {
         forget_unused(pool, folder, &before).await?;
     }
-    Ok(())
+    forget_unused(pool, folder, &name).await
 }
 
 /// The avatar `name` taken away from `folder` once no user shows it. Run in

@@ -330,12 +330,18 @@ fn every_blocking_work_is_capped_one_way() {
     );
 }
 
-/// An avatar's file is written and taken away only in the one controller
-/// that runs it in the uploads' turn: two saves took each other's file
-/// until 2026-11-17.
+/// An avatar's file is written and taken away, and an account deleted with
+/// it, only in the one controller that runs them in the uploads' turn: two
+/// saves took each other's file until 2026-11-17. It pins the file, not
+/// the turn: a call there outside `in_turn` passes.
 #[test]
 fn every_avatar_file_change_is_in_the_turn() {
-    for pattern in ["uploads::keep(", "uploads::forget(", "avatars::set("] {
+    for pattern in [
+        "uploads::keep(",
+        "uploads::forget(",
+        "avatars::set(",
+        "users::Entity::delete_by_id(",
+    ] {
         assert_one_home(
             pattern,
             &["controllers/account.rs"],
