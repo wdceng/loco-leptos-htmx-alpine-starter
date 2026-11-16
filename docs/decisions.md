@@ -303,9 +303,10 @@ change of mind gets a new line, and the old one moves to
   welcome mail's text part repeats it to any address, so a line break
   there writes the sender's own lines into the app's mail. A control
   character is refused with the name's rule. A tab, a line or paragraph
-  separator becomes a space and the direction marks are dropped, as a
-  paste from a chat or a contacts app brings them. As in an islands app
-  on this stack.
+  separator becomes a space and the marks that turn text around (U+202A
+  to U+202E, U+2066 to U+2069) are dropped, as a paste from a chat or a
+  contacts app brings them; the plain marks (U+200E, U+200F) stay, as
+  they turn nothing beside them. As in an islands app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
