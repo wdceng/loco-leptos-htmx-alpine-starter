@@ -23,6 +23,7 @@ use axum::{
 use leptos::view;
 use loco_rs::prelude::*;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 use crate::{
     app::stored,
@@ -153,7 +154,8 @@ async fn page(State(ctx): State<AppContext>, signed: Signed, req: Request) -> Re
 
 /// `POST /account/avatar`: the picture sent made into the avatar
 /// (src/uploads.rs), off the async threads, a few at a time
-/// (`uploads::Place`), then the page again; the one
+/// (`uploads::Place`), kept and named in the uploads' turn
+/// (`uploads::in_turn`), then the page again; the one
 /// it replaces gone once nobody shows it. Refused, the page with the
 /// reason, its title starting "Error: ".
 async fn avatar(
@@ -189,14 +191,8 @@ async fn avatar(
         }
     };
     let Avatars(folder) = stored(&ctx)?;
-    let name = uploads::keep(&folder, &jpeg).await.map_err(Error::wrap)?;
-    let pool = sql::pool(&ctx);
-    let before = avatars::set(pool, signed.user.id, Some(&name))
-        .await
-        .map_err(Error::wrap)?;
-    if let Some(before) = before.filter(|before| *before != name) {
-        forget_unused(&ctx, &folder, &before).await?;
-    }
+    let (pool, user_id) = (sql::pool(&ctx).clone(), signed.user.id);
+    uploads::in_turn(async move { replace_avatar(&pool, &folder, user_id, &jpeg).await }).await??;
     tracing::info!(pid = signed.user.pid.to_string(), "avatar changed");
     let said = "Your picture is changed.";
     answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
@@ -222,12 +218,28 @@ async fn avatar_field(form: &mut Multipart) -> std::result::Result<Vec<u8>, &'st
     Ok(upload)
 }
 
-/// The avatar `name` taken away from `folder` once no user shows it.
-async fn forget_unused(ctx: &AppContext, folder: &std::path::Path, name: &str) -> Result<()> {
-    if !avatars::in_use(sql::pool(ctx), name)
+/// `jpeg` kept and made `user_id`'s avatar, the one it replaced taken away
+/// once nobody shows it. Run in the uploads' turn (`uploads::in_turn`).
+async fn replace_avatar(
+    pool: &SqlitePool,
+    folder: &std::path::Path,
+    user_id: i64,
+    jpeg: &[u8],
+) -> Result<()> {
+    let name = uploads::keep(folder, jpeg).await.map_err(Error::wrap)?;
+    let before = avatars::set(pool, user_id, Some(&name))
         .await
-        .map_err(Error::wrap)?
-    {
+        .map_err(Error::wrap)?;
+    if let Some(before) = before.filter(|before| *before != name) {
+        forget_unused(pool, folder, &before).await?;
+    }
+    Ok(())
+}
+
+/// The avatar `name` taken away from `folder` once no user shows it. Run in
+/// the uploads' turn.
+async fn forget_unused(pool: &SqlitePool, folder: &std::path::Path, name: &str) -> Result<()> {
+    if !avatars::in_use(pool, name).await.map_err(Error::wrap)? {
         uploads::forget(folder, name).await.map_err(Error::wrap)?;
     }
     Ok(())
@@ -353,18 +365,19 @@ async fn delete(
         )
         .await;
     }
-    let pool = sql::pool(&ctx);
-    let avatar = avatars::of(pool, signed.user.id)
-        .await
-        .map_err(Error::wrap)?;
-    users::Entity::delete_by_id(signed.user.id)
-        .exec(&ctx.db)
-        .await?;
-    // The picture with the account, once nobody else shows it.
-    if let Some(avatar) = avatar {
-        let Avatars(folder) = stored(&ctx)?;
-        forget_unused(&ctx, &folder, &avatar).await?;
-    }
+    let Avatars(folder) = stored(&ctx)?;
+    let (pool, db, user_id) = (sql::pool(&ctx).clone(), ctx.db.clone(), signed.user.id);
+    // In the uploads' turn: no save of the same picture keeps its file meanwhile.
+    uploads::in_turn(async move {
+        let avatar = avatars::of(&pool, user_id).await.map_err(Error::wrap)?;
+        users::Entity::delete_by_id(user_id).exec(&db).await?;
+        // The picture with the account, once nobody else shows it.
+        if let Some(avatar) = avatar {
+            forget_unused(&pool, &folder, &avatar).await?;
+        }
+        Ok::<_, Error>(())
+    })
+    .await??;
     tracing::info!(pid = signed.user.pid.to_string(), "account deleted");
     let mut res = (StatusCode::SEE_OTHER, [(LOCATION, DELETED)]).into_response();
     cookies::store(&mut res, &Session::cookie_deleted(cookies::secure(&ctx)))?;

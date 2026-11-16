@@ -330,6 +330,20 @@ fn every_blocking_work_is_capped_one_way() {
     );
 }
 
+/// An avatar's file is written and taken away only in the one controller
+/// that runs it in the uploads' turn: two saves took each other's file
+/// until 2026-11-17.
+#[test]
+fn every_avatar_file_change_is_in_the_turn() {
+    for pattern in ["uploads::keep(", "uploads::forget(", "avatars::set("] {
+        assert_one_home(
+            pattern,
+            &["controllers/account.rs"],
+            "`uploads::in_turn` (src/uploads.rs)",
+        );
+    }
+}
+
 /// The template is public and code is copied into it from other apps on
 /// this stack, so no tracked file, comments included, names the
 /// maintainer: they are "the maintainer" (the maintainer's call,

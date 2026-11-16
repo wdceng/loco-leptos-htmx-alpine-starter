@@ -16,6 +16,9 @@
 //!   [`MAX_DECODED`] decoded is refused from its header. The work runs off
 //!   the async threads, [`AT_ONCE`] uploads at most, the rest waiting
 //!   before their bodies are read ([`Place`]).
+//! - An avatar's file kept, its row set and the old file taken away run
+//!   one at a time, in a task of their own ([`in_turn`]), an account's
+//!   deletion with them.
 //! - The file is named by its contents' hash ([`name_of`]), so a new avatar
 //!   has a new address and every file can be cached for a year
 //!   ([`PREFIX`], controllers/uploads.rs).
@@ -32,7 +35,8 @@ use image::{
 };
 use loco_rs::{Error, Result};
 use sha2::{Digest, Sha256};
-use tokio::sync::{Semaphore, SemaphorePermit};
+use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
+use tracing::Instrument;
 
 use crate::settings::UploadsSettings;
 
@@ -197,6 +201,31 @@ pub async fn make_avatar(
     .map_err(Error::wrap)
 }
 
+/// One avatar's save or one account's deletion at a time ([`in_turn`]).
+static TURN: Mutex<()> = Mutex::const_new(());
+
+/// `work` in the uploads' turn and a task of its own: an avatar's file
+/// kept, its row set and the one it replaced taken away, or an account
+/// deleted with its file. One at a time, so a file one save keeps is never
+/// taken away by another; a task, so a request dropped or timed out never
+/// leaves it half done.
+///
+/// # Errors
+/// The task was lost.
+pub async fn in_turn<T: Send + 'static>(
+    work: impl Future<Output = T> + Send + 'static,
+) -> Result<T> {
+    tokio::spawn(
+        async move {
+            let _turn = TURN.lock().await;
+            work.await
+        }
+        .instrument(tracing::Span::current()),
+    )
+    .await
+    .map_err(|e| Error::Message(format!("uploads: a save's task was lost: {e}")))
+}
+
 /// A file's name from its contents: their SHA-256 as hex, the JPEG's
 /// ending. The same picture is one file, whoever sent it.
 #[must_use]
@@ -221,7 +250,7 @@ pub fn is_name(name: &str) -> bool {
 /// its hash is always whole: one cut short by a full disk or a crash would
 /// otherwise stay, found there the next time, and be cached for a year.
 /// Each write's own name ([`PARTS`]), so two sending the same picture at
-/// once never write into one file.
+/// once never write into one file. Called in [`in_turn`].
 ///
 /// # Errors
 /// The file can't be written.
@@ -334,6 +363,47 @@ mod tests {
         let made = make_avatar(place, png(10, 10)).await.expect("the task");
         assert!(made.is_ok(), "{made:?}");
         assert_eq!(PLACES.available_permits(), AT_ONCE);
+    }
+
+    /// Saves take turns, and one runs to its end once the request waiting
+    /// for it is gone.
+    #[tokio::test]
+    async fn saves_take_turns_and_finish_without_their_request() {
+        use std::{
+            sync::{
+                Arc,
+                atomic::{AtomicUsize, Ordering},
+            },
+            time::Duration,
+        };
+        let (now, most, done) = (
+            Arc::new(AtomicUsize::new(0)),
+            Arc::new(AtomicUsize::new(0)),
+            Arc::new(AtomicUsize::new(0)),
+        );
+        let asked: Vec<_> = (0..3)
+            .map(|_| {
+                let (now, most, done) = (Arc::clone(&now), Arc::clone(&most), Arc::clone(&done));
+                tokio::spawn(in_turn(async move {
+                    let running = now.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(running, Ordering::SeqCst);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    now.fetch_sub(1, Ordering::SeqCst);
+                    done.fetch_add(1, Ordering::SeqCst);
+                }))
+            })
+            .collect();
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        for request in &asked {
+            request.abort();
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(most.load(Ordering::SeqCst), 1, "two saves at once");
+        assert_eq!(
+            done.load(Ordering::SeqCst),
+            3,
+            "a save given up with its request"
+        );
     }
 
     /// The refusals name the limits they say.

@@ -299,6 +299,13 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-17: **One avatar is saved at a time, in a task of its own,** as
+  an islands app on this stack saves its photos. Its file kept, its row
+  set and the old file taken away, and an account's deletion with its
+  file, run in one turn (`uploads::in_turn`). Before, a save could find
+  its file there, skip the write, and lose it to another save's clean-up
+  before its own row named it; a request timed out midway left a file
+  nobody shows.
 - 2026-11-17: **An upload's memory is bounded,** as an islands app on
   this stack bounds its photos. `image` holds only a picture's sides, so
   a 16-bit PNG at 6000 pixels a side decoded to 288 MB. A picture is now
