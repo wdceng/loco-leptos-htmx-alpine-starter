@@ -308,7 +308,9 @@ change of mind gets a new line, and the old one moves to
   before their bodies are read. The place goes into the blocking work
   with the bytes, as a password hash's permit now does
   (`src/hashing.rs`): a dropped request never frees one while its work
-  runs.
+  runs. The peak is about twice the decoded picture, the crop or the
+  turn copying it, so up to about 1.2 GB with four at once; four slow
+  senders can hold every place until the request's timeout.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which

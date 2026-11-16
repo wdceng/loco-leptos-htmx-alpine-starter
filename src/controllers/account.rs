@@ -169,9 +169,12 @@ async fn avatar(
     // A place among the uploads at once, taken before the body is read.
     let place = uploads::Place::wait().await?;
     let made = match avatar_field(&mut form).await {
-        Ok(upload) if upload.is_empty() => Err("Choose a picture first."),
-        Ok(upload) => uploads::make_avatar(place, upload).await?,
-        Err(reason) => Err(reason),
+        Ok(upload) if !upload.is_empty() => uploads::make_avatar(place, upload).await?,
+        // Refused: the place given back before the page is drawn.
+        refused => {
+            drop(place);
+            refused.and(Err("Choose a picture first."))
+        }
     };
     let jpeg = match made {
         Ok(jpeg) => jpeg,
