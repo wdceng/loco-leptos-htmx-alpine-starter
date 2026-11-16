@@ -44,11 +44,7 @@ use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use crate::{
     middleware::rate_limit,
     render::{accepts_html, render_page},
-    views::{
-        layout::PageMeta,
-        not_found::NotFoundPage,
-        pages,
-    },
+    views::{layout::PageMeta, not_found::NotFoundPage, pages},
 };
 
 /// A miss: the page for a browser, one line for anything else, never cached.
