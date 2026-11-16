@@ -106,8 +106,8 @@ Alpine's CSP build are vendored byte for byte in `public/vendor/`, versioned
 like every public file. Leptos is 0.9's release candidate, whose island
 loader has a timeout for when Chrome gives no idle time. Two glues:
 `public/js/htmx-islands.js` wakes the islands htmx swaps in, frees the
-ones it takes out, hands htmx the links and forms put in later (htmx 4
-boosts only what it processes) (and
+ones it takes out, hands htmx the links and forms put in later, which
+htmx 4 boosts only once processed (and
 works around Chrome's `parseHTMLUnsafe` losing the comments Leptos
 hydrates by, htmx #4147, by removing it, so htmx parses with DOMParser),
 and htmx's Alpine extension

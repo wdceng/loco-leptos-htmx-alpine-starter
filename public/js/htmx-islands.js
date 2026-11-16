@@ -59,9 +59,11 @@ delete Document.parseHTMLUnsafe;
 
   // 4. htmx 4 doesn't watch the page: process hx-* added later, and the
   //    links and forms added later (an island's), which htmx boosts only
-  //    then; a second process of what a swap brings does nothing. Wake
-  //    islands added later (the swap event may fire on a removed
-  //    element), and free the islands removed.
+  //    then; a second process of what a swap brings does nothing. Not
+  //    while the page parses: a form would be set up before its fields
+  //    are there, and htmx sets up the parsed page itself. Wake islands
+  //    added later (the swap event may fire on a removed element), and
+  //    free the islands removed.
   const HX =
     "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger],a[href],form";
   new MutationObserver((records) => {
@@ -71,7 +73,11 @@ delete Document.parseHTMLUnsafe;
       for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;
         // Not where htmx was blocked: the page works as plain links then.
-        if (window.htmx && (node.matches(HX) || node.querySelector(HX)))
+        if (
+          window.htmx &&
+          document.readyState !== "loading" &&
+          (node.matches(HX) || node.querySelector(HX))
+        )
           window.htmx.process(node);
         islands ||=
           node.matches("leptos-island") ||
