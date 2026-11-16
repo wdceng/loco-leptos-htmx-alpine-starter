@@ -641,11 +641,22 @@ fn each_server_takes_its_port_in_the_block_the_loopback_rule_closes() {
             .find_map(|line| line.trim().strip_prefix("Environment=PORT="))
             .and_then(|port| port.trim().parse().ok())
             .unwrap_or_else(|| panic!("{path}: no `Environment=PORT=`"));
-        assert_eq!(port % 10, digit, "{path}: {port} is not its environment's port");
+        assert_eq!(
+            port % 10,
+            digit,
+            "{path}: {port} is not its environment's port"
+        );
         let first = *block.get_or_insert(port - digit);
-        assert_eq!(port - digit, first, "{path}: {port} outside the block {first}");
+        assert_eq!(
+            port - digit,
+            first,
+            "{path}: {port} outside the block {first}"
+        );
         let rule = format!("tcp dport {first}-{} ", first + 9);
-        assert!(text.contains(&rule), "{path}: the loopback rule doesn't close `{rule}`");
+        assert!(
+            text.contains(&rule),
+            "{path}: the loopback rule doesn't close `{rule}`"
+        );
     }
 }
 
