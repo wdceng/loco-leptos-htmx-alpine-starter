@@ -66,12 +66,25 @@ fn files() -> Vec<(String, String)> {
 /// The code lines under `src/` holding `pattern`, as `src/path:line`,
 /// outside the files of `home` (paths from `src/`).
 fn outside_home(pattern: &str, home: &[&str]) -> Vec<String> {
+    outside_home_by(home, |line| line.contains(pattern))
+}
+
+/// [`outside_home`] in any case, for a name read in any case: a header's
+/// (`Sec-Fetch-Site` and `sec-fetch-site` alike).
+fn outside_home_any_case(pattern: &str, home: &[&str]) -> Vec<String> {
+    let pattern = pattern.to_lowercase();
+    outside_home_by(home, |line| line.to_lowercase().contains(&pattern))
+}
+
+/// The code lines under `src/` that `holds` picks, outside the files of
+/// `home`.
+fn outside_home_by(home: &[&str], holds: impl Fn(&str) -> bool) -> Vec<String> {
     files()
         .into_iter()
         .filter(|(relative, _)| !home.contains(&relative.as_str()))
         .flat_map(|(relative, text)| {
             code_lines(&text)
-                .filter(|(_, line)| line.contains(pattern))
+                .filter(|(_, line)| holds(line))
                 .map(|(number, line)| format!("src/{relative}:{number}: {}", line.trim()))
                 .collect::<Vec<_>>()
         })
@@ -81,7 +94,16 @@ fn outside_home(pattern: &str, home: &[&str]) -> Vec<String> {
 /// Fails with every line holding `pattern` outside `home`, and the row to
 /// build from instead.
 fn assert_one_home(pattern: &str, home: &[&str], row: &str) {
-    let found = outside_home(pattern, home);
+    assert_none_outside(pattern, &outside_home(pattern, home), row);
+}
+
+/// [`assert_one_home`] in any case ([`outside_home_any_case`]).
+fn assert_one_home_any_case(pattern: &str, home: &[&str], row: &str) {
+    assert_none_outside(pattern, &outside_home_any_case(pattern, home), row);
+}
+
+/// The one failure message of both.
+fn assert_none_outside(pattern: &str, found: &[String], row: &str) {
     assert!(
         found.is_empty(),
         "`{pattern}` outside its one implementation; build it from {row} (docs/one-job.md):\n{}",
@@ -293,10 +315,12 @@ fn every_sqlx_transaction_begins_one_way() {
 }
 
 /// Whether another site's page sent a post is read in one place, which
-/// every form's target calls first.
+/// every form's target calls first. In any case, as a header's name is
+/// read: `Sec-Fetch-Site` slipped past a case-sensitive guard in an
+/// islands app on this stack.
 #[test]
 fn every_form_refuses_a_cross_site_post_one_way() {
-    assert_one_home(
+    assert_one_home_any_case(
         "sec-fetch-site",
         &["controllers/cross_site.rs"],
         "`cross_site::refused` (src/controllers/cross_site.rs)",
@@ -365,6 +389,10 @@ fn the_check_finds_code_and_leaves_comments_and_the_home() {
     assert!(
         !outside_home("pub const TITLE", &[]).is_empty(),
         "the constant's own line not found"
+    );
+    assert!(
+        !outside_home_any_case("PUB CONST TITLE", &[]).is_empty(),
+        "the constant's own line not found in any case"
     );
     assert!(
         outside_home("pub const TITLE", &["views/layout.rs"]).is_empty(),

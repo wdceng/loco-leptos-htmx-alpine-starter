@@ -1,6 +1,7 @@
 //! The parts of `views/parts.rs` in a real browser, on their page
 //! (`/e2e/parts`, the browser tests' environment alone): a dialog opens
-//! from its button, and Escape and its Cancel each close it, the browser's
+//! from its button, and Escape and its Cancel each close it, the focus
+//! handed back to its button, the browser's
 //! own popover with no script of the site's, Cancel inside a form as a real
 //! dialog's is; a fold opens from its heading.
 
@@ -64,6 +65,45 @@ async fn a_dialog_opens_and_escape_or_cancel_closes_it() {
         )
         .await?;
         Ok(())
+    })
+    .await;
+}
+
+/// Opened from the keyboard, the dialog takes the focus onto its Cancel,
+/// and Escape hands it back to the button that opened it, the browser's
+/// own popover (WAI-ARIA's dialog pattern).
+#[tokio::test]
+async fn a_dialog_hands_the_focus_back_to_its_button() {
+    browse(|page| async move {
+        if page.browser.is_safari() || page.browser.screen().is_some() {
+            page.skip("no keyboard to open and close the dialog with");
+            return Ok(());
+        }
+        page.open(PARTS).await?;
+        page.eval("document.querySelector('button[popovertarget=parts-dialog]').focus()")
+            .await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Enter)
+            .perform()
+            .await?;
+        page.until("the dialog open", OPEN).await?;
+        page.until(
+            "the focus on Cancel",
+            "return document.activeElement?.matches('#parts-dialog button[popovertargetaction=hide]')",
+        )
+        .await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Escape)
+            .perform()
+            .await?;
+        page.until(
+            "the focus back on the opening button",
+            "return !document.getElementById('parts-dialog').matches(':popover-open')
+                 && document.activeElement?.matches('button[popovertarget=parts-dialog]')",
+        )
+        .await
     })
     .await;
 }
