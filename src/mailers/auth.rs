@@ -16,7 +16,8 @@ use crate::{
     views::{
         layout::APP_NAME,
         mail::{
-            self, CodeFailuresMail, ForgotPasswordMail, MagicLinkMail, SignInCodeMail, WelcomeMail,
+            self, CodeFailuresMail, ForgotPasswordMail, MagicLinkMail, PasswordChangedMail,
+            SignInCodeMail, WelcomeMail,
         },
     },
 };
@@ -163,6 +164,32 @@ impl AuthMailer {
                 "{tries} wrong sign-in codes in a row were typed for your account, in {browser}. The password was right each time.\n\nIf that wasn't you, someone has your password: change it on your account page.\n"
             ),
             view! { <CodeFailuresMail tries=tries browser=browser.to_string() /> },
+        )
+        .await
+    }
+
+    /// The person told their password changed, in `browser` (`label_of`),
+    /// on the account page or through the reset link, with the way to a new
+    /// one: a change nobody asked for is someone else's (OWASP ASVS 4.0.3,
+    /// 2.2.3).
+    ///
+    /// # Errors
+    ///
+    /// When email sending is failed
+    pub async fn password_changed(
+        ctx: &AppContext,
+        user: &users::Model,
+        browser: &str,
+    ) -> Result<()> {
+        let link = format!("{}{}", Self::origin(ctx), crate::controllers::forgot::PATH);
+        Self::send(
+            ctx,
+            user,
+            format!("Your {APP_NAME} password was changed"),
+            format!(
+                "The password of your account was changed, in {browser}. Browsers signed in with the old one are signed out.\n\nIf that wasn't you, choose a new password now:\n\n{link}\n"
+            ),
+            view! { <PasswordChangedMail browser=browser.to_string() forgot_link=link.clone() /> },
         )
         .await
     }

@@ -28,10 +28,11 @@ use crate::{
     app::stored,
     controllers::{cross_site, signed::Signed},
     cookies,
+    mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::{
         avatars::{self, Avatars},
-        sessions::{self, Session},
+        sessions::{self, Session, label_of},
         users::{self, password_problem},
     },
     render::render_private_page,
@@ -285,6 +286,7 @@ async fn password(
     if let Some(forbidden) = cross_site::refused(&parts.headers, "new password") {
         return Ok(forbidden);
     }
+    let browser = label_of(&parts.headers);
     let req = Request::from_parts(parts, Body::empty());
     let refused = if signed.user.verify_password(&form.current).await {
         password_problem(&form.password).map(Problem::New)
@@ -321,6 +323,8 @@ async fn password(
         pid = user.pid.to_string(),
         "password changed on the account page"
     );
+    // Told by mail, with the way to a new one (OWASP ASVS 4.0.3, 2.2.3).
+    AuthMailer::password_changed(&ctx, &user, &browser).await?;
     let said = "Your password is changed, and every other browser is signed out.";
     answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
 }

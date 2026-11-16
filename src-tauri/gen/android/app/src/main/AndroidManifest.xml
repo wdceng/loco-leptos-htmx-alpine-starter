@@ -5,7 +5,12 @@
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- Nothing of the app's in a cloud backup or carried to another phone:
+         its webview keeps the session's cookie. Android 12 and up ignore
+         allowBackup for a transfer, so their rules too. -->
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.app_native"

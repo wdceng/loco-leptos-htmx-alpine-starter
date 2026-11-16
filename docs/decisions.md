@@ -299,6 +299,14 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-17: **A new password is mailed to the person,** from the
+  account page and the reset link alike, with the browser named and a
+  link to choose another: a change nobody asked for is someone else's
+  (OWASP ASVS 4.0.3, 2.2.3). As an islands app on this stack.
+- 2026-11-17: **The Android app's data stays off backups and new
+  phones:** `allowBackup` off, plus `data_extraction_rules.xml` for
+  Android 12 and up, whose phone-to-phone transfer ignores the flag. The
+  webview keeps the session's cookie. As an islands app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which

@@ -81,6 +81,23 @@ pub fn CodeFailuresMail(tries: i64, browser: String) -> impl IntoView {
     }
 }
 
+/// A new password on the account (`AuthMailer::password_changed`): in which
+/// browser, and the way to another if it wasn't the person.
+#[component]
+pub fn PasswordChangedMail(browser: String, forgot_link: String) -> impl IntoView {
+    view! {
+        <p>
+            {format!(
+                "The password of your account was changed, in {browser}. Browsers signed in with the old one are signed out.",
+            )}
+        </p>
+        <p>"If that wasn't you, choose a new password now:"</p>
+        <p>
+            <a href=forgot_link>"Choose a new password"</a>
+        </p>
+    }
+}
+
 #[component]
 pub fn MagicLinkMail(login_link: String) -> impl IntoView {
     view! {
@@ -94,6 +111,16 @@ pub fn MagicLinkMail(login_link: String) -> impl IntoView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The password's mail names the browser and links to a new password.
+    #[test]
+    fn the_password_mail_links_to_a_new_one() {
+        let html = document(view! {
+            <PasswordChangedMail browser="Firefox on a Mac".to_string() forgot_link="https://example.com/forgot".to_string() />
+        });
+        assert!(html.contains("in Firefox on a Mac"), "{html}");
+        assert!(html.contains("href=\"https://example.com/forgot\""), "{html}");
+    }
 
     fn welcome(name: &str) -> String {
         document(view! {

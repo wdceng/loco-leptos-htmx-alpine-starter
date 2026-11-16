@@ -401,6 +401,35 @@ mod tests {
         );
     }
 
+    /// Nothing of the Android app's in a backup or carried to a new phone:
+    /// its webview keeps the session's cookie. `allowBackup` off, and
+    /// Android 12's rules, whose transfer ignores it; a manifest Tauri
+    /// writes again would lose both.
+    #[test]
+    fn the_android_apps_data_stays_off_backups() {
+        let manifest = include_str!("../gen/android/app/src/main/AndroidManifest.xml");
+        for wanted in [
+            "android:allowBackup=\"false\"",
+            "android:dataExtractionRules=\"@xml/data_extraction_rules\"",
+        ] {
+            assert!(manifest.contains(wanted), "the manifest's {wanted}");
+        }
+        let rules = include_str!("../gen/android/app/src/main/res/xml/data_extraction_rules.xml");
+        for section in ["cloud-backup", "device-transfer"] {
+            let body = rules
+                .split_once(&format!("<{section}>"))
+                .and_then(|(_, rest)| rest.split_once(&format!("</{section}>")))
+                .map(|(body, _)| body)
+                .unwrap_or_else(|| panic!("no {section} in the rules"));
+            for domain in ["root", "file", "database", "sharedpref", "external", "device_root"] {
+                assert!(
+                    body.contains(&format!("<exclude domain=\"{domain}\" path=\".\" />")),
+                    "{section} leaves out {domain}"
+                );
+            }
+        }
+    }
+
     /// The phones' release library is stripped by Cargo's profile, before
     /// Gradle sees it: Tauri's Android template strips nothing itself, its
     /// `keepDebugSymbols` reaching every build type (tauri#15884) and

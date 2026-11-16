@@ -16,7 +16,10 @@ use chrono::{Duration, Utc};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
-use super::prepare_data::{PASSWORD, WantsPage, session_cookie, signs_in, user};
+use super::{
+    mails::{assert_from_the_configured_sender, subject, unfolded},
+    prepare_data::{PASSWORD, WantsPage, session_cookie, signs_in, user},
+};
 
 const EMAIL: &str = "account@example.com";
 const MAC: &str =
@@ -126,6 +129,35 @@ async fn another_users_browser_is_not_yours_to_sign_out() {
             .await;
         let still = request.get("/account").add_header("cookie", theirs).await;
         assert_eq!(still.status_code(), 200, "their session stays");
+    })
+    .await;
+}
+
+/// A new password is told by mail, naming the browser and the way to
+/// another: a change nobody asked for is someone else's (OWASP ASVS 4.0.3,
+/// 2.2.3).
+#[tokio::test]
+#[serial]
+async fn a_new_password_is_told_by_mail() {
+    request::<App, _, _>(|request, ctx| async move {
+        user(&ctx, EMAIL, true).await;
+        let here = session_cookie(&request, EMAIL, MAC).await;
+        let mailer = ctx.mailer.as_ref().expect("stub mailer");
+        let before = mailer.deliveries().count;
+        let done = request
+            .post("/account/password")
+            .add_header("cookie", here)
+            .add_header("user-agent", MAC)
+            .form(&serde_json::json!({ "current": PASSWORD, "password": "a-new-password" }))
+            .await;
+        assert_eq!(done.status_code(), 200);
+        let deliveries = mailer.deliveries();
+        assert_eq!(deliveries.count, before + 1, "the password's mail");
+        let mail = unfolded(&deliveries.messages[before]);
+        assert_from_the_configured_sender(&mail);
+        assert!(subject(&mail).contains("password was changed"), "{mail}");
+        assert!(mail.contains("Firefox on a Mac"), "{mail}");
+        assert!(mail.contains("http://localhost:5150/forgot"), "{mail}");
     })
     .await;
 }
