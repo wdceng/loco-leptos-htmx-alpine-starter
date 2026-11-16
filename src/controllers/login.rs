@@ -352,11 +352,7 @@ async fn tell_of_failures(
 /// `POST /login/code/again`: a new code mailed, unless the account waits
 /// after wrong codes or one went within the last minute; the form again,
 /// saying which.
-async fn code_again(
-    _: SameSite,
-    State(ctx): State<AppContext>,
-    parts: Parts,
-) -> Result<Response> {
+async fn code_again(_: SameSite, State(ctx): State<AppContext>, parts: Parts) -> Result<Response> {
     let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
         return to_password(&ctx);
     };
