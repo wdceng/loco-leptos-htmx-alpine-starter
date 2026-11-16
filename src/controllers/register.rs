@@ -28,6 +28,7 @@ use crate::{
     render::render_private_page,
     views::{
         layout::PageMeta,
+        pages,
         register::{RegisterForm, RegisterSent},
     },
 };
@@ -49,7 +50,7 @@ pub struct Submitted {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Sign up".into(),
+        title: pages::SIGN_UP.into(),
         description: "Make an account.".into(),
         robots: None,
         canonical: None,

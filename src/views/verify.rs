@@ -11,7 +11,10 @@ use crate::{
         verify::{PATH, RESEND},
     },
     models::users::EMAIL_VERIFICATION_EXPIRATION_HOURS,
-    views::layout::{APP_NAME, BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
+    views::{
+        layout::{APP_NAME, BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
+        pages,
+    },
 };
 
 /// The button: the token from the mail's link in a hidden field. Opening
@@ -21,7 +24,7 @@ use crate::{
 #[component]
 pub fn VerifyForm(token: String) -> impl IntoView {
     view! {
-        <h1 class=TITLE>"Verify your email"</h1>
+        <h1 class=TITLE>{pages::VERIFY_EMAIL}</h1>
         <p class=LEAD>
             {format!(
                 "Press the button to finish signing up to {APP_NAME}. If you didn't sign up, close this page: nothing happens.",

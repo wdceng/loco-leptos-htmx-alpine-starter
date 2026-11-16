@@ -7,14 +7,17 @@ use leptos::prelude::*;
 use crate::{
     controllers::{forgot::PATH, login},
     models::users::RESET_TOKEN_EXPIRATION_MIN,
-    views::layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
+    views::{
+        layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, TITLE},
+        pages,
+    },
 };
 
 /// The form: the account's email. Sent as every form is (`BusyForm`).
 #[component]
 pub fn ForgotForm() -> impl IntoView {
     view! {
-        <h1 class=TITLE>"Forgot your password?"</h1>
+        <h1 class=TITLE>{pages::FORGOT_PASSWORD}</h1>
         <p class=LEAD>"We'll mail you a link to choose a new one."</p>
         <BusyForm action=PATH>
             <label for="email" class="block font-semibold">"Email"</label>

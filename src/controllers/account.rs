@@ -39,6 +39,7 @@ use crate::{
     views::{
         account::{AccountDeleted, AccountPage, Browsers, Problem},
         layout::PageMeta,
+        pages,
     },
 };
 
@@ -91,7 +92,7 @@ pub struct Deletion {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Your account".into(),
+        title: pages::ACCOUNT.into(),
         description: "Your account: where you are signed in, your password.".into(),
         // A page of one signed-in person, never a search's.
         robots: Some("noindex"),
