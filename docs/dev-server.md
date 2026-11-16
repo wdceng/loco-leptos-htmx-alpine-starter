@@ -239,8 +239,9 @@ The server's glibc:
 ssh <server> "ldd --version | head -1"
 ```
 
-A different port goes in two places only: `PORT=` in the unit and
-`reverse_proxy` in Caddy. For glibc, see Step 0 in `docs/production.md`.
+A different port goes in two places: `PORT=` in the unit and
+`reverse_proxy` in Caddy. It stays inside the project's block, 5150 to
+5159, which the loopback rule names ("The app's ports on loopback"). For glibc, see Step 0 in `docs/production.md`.
 
 ### Step 1: Directory, user, files
 
@@ -518,6 +519,93 @@ ssh <server> "caddy validate --config /etc/caddy/Caddyfile && systemctl reload c
 
 - **Never grep Caddy's journal for a header and print the lines.** Before
   this change they hold the key. Count them (`grep -c`).
+
+### The app's ports on loopback
+
+Once per server, for every site on it: the app keys each visitor on the
+`CF-Connecting-IP` Caddy hands it, so any process on the box that opens
+`127.0.0.1:5150` itself names whatever address it likes to the rate
+limiter. A table of nftables' own lets only root and Caddy open the
+project's ports, 5150 to 5159 (its block, `docs/decisions.md`).
+
+Check, a running site `root 200, nobody 000` once it is on, `nobody 200`
+before:
+
+```bash
+ssh <server> 'for p in 5150 5151 5152; do printf "%s root %s, nobody %s\n" $p "$(curl -s -o /dev/null -m 3 -w "%{http_code}" http://127.0.0.1:$p/)" "$(runuser -u nobody -- curl -s -o /dev/null -m 3 -w "%{http_code}" http://127.0.0.1:$p/)"; done'
+```
+
+On a box without it, first a table that only counts, refusing nothing,
+gone at the next reboot; it prints the table, `packets 0`:
+
+```bash
+ssh <server> 'nft add table inet app_count && nft add chain inet app_count output "{ type filter hook output priority 0; policy accept; }" && nft add rule inet app_count output oif lo tcp dport 5150-5159 meta skuid != "{ root, caddy }" counter && nft list table inet app_count'
+```
+
+A day later, what it counted (`packets 0`: only root and Caddy opened the
+ports):
+
+```bash
+ssh <server> "nft list table inet app_count | grep -o 'packets [0-9]*'"
+```
+
+Then the rule's file:
+
+```bash
+ssh <server> -t "nano /etc/nftables-app.nft"
+```
+
+```
+table inet app_loopback
+delete table inet app_loopback
+
+table inet app_loopback {
+	chain output {
+		type filter hook output priority 0; policy accept;
+		oif "lo" tcp dport 5150-5159 meta skuid != { root, caddy } counter reject with tcp reset
+	}
+}
+```
+
+And its unit, which loads it at every boot:
+
+```bash
+ssh <server> -t "nano /etc/systemd/system/app-loopback.service"
+```
+
+```ini
+[Unit]
+Description=app: only root and Caddy open the app's ports
+After=nftables.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables-app.nft
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Load it only while the count is 0, Caddy runs as `caddy` and the file
+reads right; it prints the table:
+
+```bash
+ssh <server> 'if nft list table inet app_count | grep -q "packets 0 " && [ "$(ps -o user= -C caddy | sort -u)" = caddy ] && nft -c -f /etc/nftables-app.nft; then nft -f /etc/nftables-app.nft && nft delete table inet app_count && systemctl daemon-reload && systemctl enable app-loopback && nft list table inet app_loopback; else echo "app-loopback: nothing changed"; fi'
+```
+
+Then the check above, and each site through Caddy ("Caddy's hardening").
+
+- **A new service that must reach the app** (a monitor, a backup's check)
+  runs as root, or its user goes into the rule's set.
+- **A second app on the box** takes a block of its own, and a table and
+  unit named after it.
+- **A `flush ruleset` drops it too,** as Debian's own `/etc/nftables.conf`
+  does at its start: the unit loads after `nftables.service`; after a flush
+  by hand, `systemctl restart app-loopback`.
+- The app's answers leave from its ports, not to them, so the rule never
+  meets them.
+- If the check fails: `nft delete table inet app_loopback && systemctl disable app-loopback`.
 
 ## Manual run (without systemd)
 

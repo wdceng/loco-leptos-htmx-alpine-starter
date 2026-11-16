@@ -299,6 +299,12 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-17: **Only root and Caddy open the app's ports,** 5150 to 5159,
+  by a table of nftables' own (`app_loopback`, loaded at boot by
+  `app-loopback.service`). The app keys each visitor on the
+  `CF-Connecting-IP` Caddy hands it, so any other process on the box could
+  name its own address to the rate limiter. Counted for a day first, then
+  loaded only while the count is 0. As an islands app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
