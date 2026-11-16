@@ -14,7 +14,7 @@ pub const SIGN_UP: &str = "Sign up";
 /// to it.
 pub const FORGOT_PASSWORD: &str = "Forgot your password?";
 
-/// The welcome mail's verify button (views/verify.rs).
+/// The page the welcome mail's link opens (views/verify.rs).
 pub const VERIFY_EMAIL: &str = "Verify your email";
 
 /// The account page (views/account.rs), and the signed-in page's link to
