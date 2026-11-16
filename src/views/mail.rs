@@ -88,7 +88,7 @@ pub fn PasswordChangedMail(browser: String, forgot_link: String) -> impl IntoVie
     view! {
         <p>
             {format!(
-                "The password of your account was changed, in {browser}. Browsers signed in with the old one are signed out.",
+                "The password of your account was changed, in {browser}. Every other browser signed in to the account is signed out.",
             )}
         </p>
         <p>"If that wasn't you, choose a new password now:"</p>

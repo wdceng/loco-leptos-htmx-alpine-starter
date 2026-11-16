@@ -187,7 +187,7 @@ impl AuthMailer {
             user,
             format!("Your {APP_NAME} password was changed"),
             format!(
-                "The password of your account was changed, in {browser}. Browsers signed in with the old one are signed out.\n\nIf that wasn't you, choose a new password now:\n\n{link}\n"
+                "The password of your account was changed, in {browser}. Every other browser signed in to the account is signed out.\n\nIf that wasn't you, choose a new password now:\n\n{link}\n"
             ),
             view! { <PasswordChangedMail browser=browser.to_string() forgot_link=link.clone() /> },
         )
