@@ -161,7 +161,11 @@ async fn a_name_of_two_lines_is_refused_and_a_pasted_one_made_one_line() {
             ))
             .await;
         assert_eq!(res.status_code(), 400);
-        assert!(res.text().contains("Name must be one line."), "{}", res.text());
+        assert!(
+            res.text().contains("Name must be one line."),
+            "{}",
+            res.text()
+        );
         assert!(
             users::Model::find_by_email(&ctx.db, "two@example.com")
                 .await
