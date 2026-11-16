@@ -12,6 +12,11 @@ Replace `<server>` and `<domain>` in the commands below. The directory, unit,
 user and port are suggestions; if you change one, change it everywhere in
 this file.
 
+The port is the project's block of ten, its last digit the environment:
+production 5150, staging 5151, the dev-server 5152, a release build tried
+locally 5153 (`docs/decisions.md`). A second app on the box takes a block
+of its own.
+
 Deployed: the `app` binary, `hash.txt` next to it, `config/dev-server.yaml`,
 `site/`, `secrets.env`.
 
