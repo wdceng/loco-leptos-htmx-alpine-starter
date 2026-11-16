@@ -64,7 +64,9 @@ fn commands(dialog: String, command: &'static str) -> Vec<AnyAttribute> {
 /// (`closedby`; islands/dialogs.rs where the browser lacks it) or Cancel.
 /// Opened, the focus goes to Cancel (islands/dialogs.rs), so Enter never
 /// does the step that can't be undone and no field's keyboard comes up on
-/// a phone; closed, the browser hands it back to the opening button. No
+/// a phone; closed, the browser hands it back to where it was: the opening
+/// button when the keyboard opened it (Safari focuses no button a press
+/// opened, so there it goes back to the page). No
 /// `autofocus` inside: htmx focuses the first `[autofocus]` a swap brings,
 /// a closed dialog's included.
 #[component]
