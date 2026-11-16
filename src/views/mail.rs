@@ -119,7 +119,10 @@ mod tests {
             <PasswordChangedMail browser="Firefox on a Mac".to_string() forgot_link="https://example.com/forgot".to_string() />
         });
         assert!(html.contains("in Firefox on a Mac"), "{html}");
-        assert!(html.contains("href=\"https://example.com/forgot\""), "{html}");
+        assert!(
+            html.contains("href=\"https://example.com/forgot\""),
+            "{html}"
+        );
     }
 
     fn welcome(name: &str) -> String {

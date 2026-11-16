@@ -421,7 +421,14 @@ mod tests {
                 .and_then(|(_, rest)| rest.split_once(&format!("</{section}>")))
                 .map(|(body, _)| body)
                 .unwrap_or_else(|| panic!("no {section} in the rules"));
-            for domain in ["root", "file", "database", "sharedpref", "external", "device_root"] {
+            for domain in [
+                "root",
+                "file",
+                "database",
+                "sharedpref",
+                "external",
+                "device_root",
+            ] {
                 assert!(
                     body.contains(&format!("<exclude domain=\"{domain}\" path=\".\" />")),
                     "{section} leaves out {domain}"
