@@ -145,8 +145,7 @@ async fn no_page_has_an_id_twice() {
 #[serial]
 async fn every_post_refuses_another_sites_page() {
     request::<App, _, _>(|request, ctx| async move {
-        // Signed in, so a post behind `Signed` reaches the handler's own
-        // first line.
+        // Signed in, so `Signed` lets a post through to `SameSite`.
         let email = user(&ctx, "canary@example.com", true).await.email;
         let cookie = session_cookie(&request, &email, "Firefox on a Mac").await;
         let server = server(&ctx);
@@ -155,9 +154,8 @@ async fn every_post_refuses_another_sites_page() {
             if !methods.contains(&Method::POST) {
                 continue;
             }
-            // The body kind the route reads: a form's, or a photo's
-            // multipart, whose extractor refuses a form before the
-            // handler runs.
+            // Both body kinds, a form's and a photo's multipart: each must
+            // get the extractor's 403 before any body extractor runs.
             let mut statuses = Vec::new();
             for kind in [
                 "application/x-www-form-urlencoded",
