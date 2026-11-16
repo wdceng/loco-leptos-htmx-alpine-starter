@@ -102,6 +102,25 @@ impl Page {
             .map(drop)
     }
 
+    /// The device's scheme switched to the night's (`night`) or the day's,
+    /// as the system's schedule does while the app runs.
+    pub async fn night(&self, night: bool) -> WebDriverResult<()> {
+        let mode = if night { "yes" } else { "no" };
+        self.on_device(&["shell", "cmd", "uimode", "night", mode])
+            .await
+            .map(drop)
+    }
+
+    /// Whether the app's window asks for the system's buttons at the foot
+    /// in their day look, dark on light (`dumpsys window`'s `apr`).
+    pub async fn light_buttons(&self) -> WebDriverResult<bool> {
+        let dump = self
+            .on_device(&["shell", "dumpsys", "window", "windows"])
+            .await?;
+        lit_buttons(&dump, &app_package())
+            .ok_or_else(|| WebDriverError::RequestFailed("the app's window not in dumpsys".into()))
+    }
+
     /// Android's Back, as the system's own button or gesture.
     pub async fn system_back(&self) -> WebDriverResult<()> {
         self.on_device(&["shell", "input", "keyevent", "KEYCODE_BACK"])
@@ -154,9 +173,51 @@ fn top_of(activities: &str) -> String {
         .to_owned()
 }
 
+/// Android's `WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS`.
+const LIGHT_NAVIGATION_BARS: u32 = 1 << 4;
+
+/// Whether `app`'s main window in `dump` asks for light system buttons: its
+/// `apr`, a hex number or the flags' names by Android's version, none
+/// printed where it asks for nothing. None where the window isn't there.
+fn lit_buttons(dump: &str, app: &str) -> Option<bool> {
+    let window = dump
+        .split("  Window #")
+        .find(|window| window.contains(&format!("{app}/{app}.MainActivity")))?;
+    let Some(apr) = window.split("apr=").nth(1) else {
+        return Some(false);
+    };
+    let apr = apr.lines().next().unwrap_or_default();
+    let number = apr.split_whitespace().next().unwrap_or_default();
+    Some(match u32::from_str_radix(number, 16) {
+        Ok(flags) => flags & LIGHT_NAVIGATION_BARS != 0,
+        Err(_) => apr.contains("LIGHT_NAVIGATION_BARS"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::top_of;
+    use super::{lit_buttons, top_of};
+
+    /// The system's buttons' look read from the app's window alone, as a
+    /// number or by the flags' names, none for nothing.
+    #[test]
+    fn the_buttons_look_is_the_apps_windows() {
+        let app = "com.example.app";
+        let other = "  Window #3 Window{1 u0 other/other.Main}:\n    mAttrs={ fl=1\n      apr=18\n";
+        let numbered = format!(
+            "  Window #9 Window{{2 u0 {app}/{app}.MainActivity}}:\n    mAttrs={{ fl=1\n      apr=18\n      bhv=1\n"
+        );
+        let named = format!(
+            "  Window #9 Window{{2 u0 {app}/{app}.MainActivity}}:\n      apr=LIGHT_STATUS_BARS|LIGHT_NAVIGATION_BARS\n"
+        );
+        let dark = format!("  Window #9 Window{{2 u0 {app}/{app}.MainActivity}}:\n      apr=8\n");
+        let none = format!("  Window #9 Window{{2 u0 {app}/{app}.MainActivity}}:\n      bhv=1\n");
+        assert_eq!(lit_buttons(other, app), None);
+        assert_eq!(lit_buttons(&format!("{other}{numbered}"), app), Some(true));
+        assert_eq!(lit_buttons(&named, app), Some(true));
+        assert_eq!(lit_buttons(&dark, app), Some(false));
+        assert_eq!(lit_buttons(&none, app), Some(false));
+    }
 
     #[test]
     fn the_top_is_the_resumed_activitys_package() {
