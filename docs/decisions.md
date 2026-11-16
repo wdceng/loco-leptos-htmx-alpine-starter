@@ -296,6 +296,13 @@ change of mind gets a new line, and the old one moves to
   measure: it keeps every element an entry names, and Chrome's notice
   about the reset form kept one old `<main>` per Back. Without DevTools,
   Chrome kept none (a probe).
+- 2026-11-17: **The islands script hands htmx every link and form put in
+  later**, not only `hx-*` (`public/js/htmx-islands.js`): htmx 4 watches
+  nothing and boosts a link or form only when it processes it, so one an
+  island renders would load the whole page. Processing again what a swap
+  brings does nothing, as htmx skips what it has set up.
+  `Page::add_link` no longer processes the region itself. As an islands
+  app on this stack.
 
 ## Security
 

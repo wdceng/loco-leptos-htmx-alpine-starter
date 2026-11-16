@@ -57,11 +57,13 @@ delete Document.parseHTMLUnsafe;
   };
   document.addEventListener("htmx:after:swap", wake);
 
-  // 4. htmx 4 doesn't watch the page: process hx-* added later, wake
-  //    islands added later (the swap event may fire on a removed element),
-  //    and free the islands removed.
+  // 4. htmx 4 doesn't watch the page: process hx-* added later, and the
+  //    links and forms added later (an island's), which htmx boosts only
+  //    then; a second process of what a swap brings does nothing. Wake
+  //    islands added later (the swap event may fire on a removed
+  //    element), and free the islands removed.
   const HX =
-    "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger]";
+    "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger],a[href],form";
   new MutationObserver((records) => {
     let islands = false;
     for (const record of records) {

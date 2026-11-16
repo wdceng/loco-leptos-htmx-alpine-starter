@@ -500,14 +500,15 @@ impl Page {
     }
 
     /// A link to `href` added to `<main>` as `#e2e-link`, boosted as the
-    /// page's own links are: htmx processes the region again, where htmx is
-    /// there (a test may have refused it).
+    /// page's own links are: the islands script hands htmx every link put
+    /// in later (public/js/htmx-islands.js), where htmx is there (a test
+    /// may have refused it). Its observer runs before the script's answer
+    /// comes back.
     pub async fn add_link(&self, href: &str) -> WebDriverResult<()> {
         self.eval(&format!(
             "const a = document.createElement('a');
              a.href = {href:?}; a.id = 'e2e-link'; a.textContent = 'e2e';
-             document.querySelector('main').append(a);
-             window.htmx?.process(document.getElementById('page'))"
+             document.querySelector('main').append(a)"
         ))
         .await
         .map(drop)
