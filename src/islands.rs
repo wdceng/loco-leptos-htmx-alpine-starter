@@ -62,6 +62,7 @@ use web_sys::{
     js_sys::{Function, Object, Reflect},
 };
 
+mod dialogs;
 mod shrink;
 
 /// The page's region, the part a move between pages replaces (the shell's
@@ -235,6 +236,8 @@ fn with_jobs(schedule: impl FnOnce(&Jobs)) {
 ///   `<body>`, out of the region's `hx-status`. Not while the page is being
 ///   left: Firefox and Safari call off its requests then, as if the network
 ///   were gone ([`watch_leaving`]).
+/// - **A dialog's button** shows its dialog modal, the focus on Cancel, or
+///   closes it, and a press outside closes it ([`dialogs`]).
 ///
 /// The listeners are removed with the island's owner, and its jobs dropped.
 #[island]
@@ -320,8 +323,15 @@ pub fn Navigation() -> impl IntoView {
             shrink::chosen(field);
         }
     });
+    // A dialog's button, or a press outside an open dialog (dialogs.rs):
+    // on every page, as this island is.
+    let press_began =
+        window_event_listener_untyped("pointerdown", |ev| dialogs::press_began(&ev));
+    let pressed = window_event_listener_untyped("click", |ev| dialogs::pressed(&ev));
     on_cleanup(move || {
         chosen.remove();
+        press_began.remove();
+        pressed.remove();
         fresher.remove();
         swapped.remove();
         settled.remove();
@@ -465,11 +475,16 @@ fn arrive() {
             .get_element_by_id("content")
             .and_then(|main| main.dyn_into::<web_sys::HtmlElement>().ok())
     {
-        let options = web_sys::FocusOptions::new();
-        options.set_prevent_scroll(true);
-        let _ = main.focus_with_options(&options);
+        focus_quietly(&main);
     }
     with_jobs(|jobs| jobs.announce.after(Duration::ZERO));
+}
+
+/// `element` focused without scrolling the page.
+fn focus_quietly(element: &web_sys::HtmlElement) {
+    let options = web_sys::FocusOptions::new();
+    options.set_prevent_scroll(true);
+    let _ = element.focus_with_options(&options);
 }
 
 /// The page's title into the live region ([`PAGE_ANNOUNCE`]), a tick after

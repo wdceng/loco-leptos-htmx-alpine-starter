@@ -329,6 +329,19 @@ fn every_cross_site_check_is_the_extractor() {
     );
 }
 
+/// A dialog opens and closes by its button's command, written one way
+/// (`opens`, `closes`, views/parts.rs) and taken over in every browser by
+/// `Navigation` (islands/dialogs.rs): an islands app on this stack had its
+/// openers write their attribute themselves until its dialogs went modal.
+#[test]
+fn every_dialog_opens_by_the_one_command() {
+    assert_one_home(
+        "commandfor",
+        &["views/parts.rs", "islands/dialogs.rs"],
+        "`opens` and `closes` (src/views/parts.rs)",
+    );
+}
+
 /// No page of the site's own opens a new tab: a second window in the desktop
 /// app (src-tauri's `new_window` denies it) and nothing at all in the
 /// phones' apps. Adding from where one stands is a `Dialog` over the form

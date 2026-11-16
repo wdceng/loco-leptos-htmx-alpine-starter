@@ -3,6 +3,11 @@
 What was tried and reverted, and why. Nothing here is suggested again
 without a new reason.
 
+- **A dialog as a native popover** (2026-11-04, dropped 2026-11-17). It
+  opened and closed with no script at all, but the page under it stayed
+  reachable: Tab left the dialog for the page under the veil. A modal
+  `<dialog>` keeps that page inert (`decisions.md`).
+
 - **Passing options to `parseHTMLUnsafe`** for htmx #4147 (2026-10-19,
   dropped 2026-10-29), the htmx maintainer's way. A Chrome without the
   options overload (145 on the Android emulator, no Sanitizer API) threw

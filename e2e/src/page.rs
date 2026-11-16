@@ -71,6 +71,20 @@ pub struct Page {
     pub(crate) watcher: Option<AbortHandle>,
 }
 
+/// A script returning whether the dialog `id` is open, shown modal
+/// (`Dialog`, views/parts.rs).
+#[must_use]
+pub fn dialog_open(id: &str) -> String {
+    format!("return document.getElementById('{id}').matches('dialog:modal')")
+}
+
+/// The button that opens the dialog `id` (`opens`, views/parts.rs), as a
+/// selector.
+#[must_use]
+pub fn opener(id: &str) -> String {
+    format!("button[commandfor='{id}'][command='show-modal']")
+}
+
 impl Page {
     /// The site's full address of `path`.
     #[must_use]

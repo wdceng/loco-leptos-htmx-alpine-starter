@@ -296,6 +296,16 @@ change of mind gets a new line, and the old one moves to
   measure: it keeps every element an entry names, and Chrome's notice
   about the reset form kept one old `<main>` per Back. Without DevTools,
   Chrome kept none (a probe).
+- 2026-11-17: **A dialog is a modal `<dialog>`, opened by its button's
+  command,** not a popover. A popover left the page under it reachable:
+  Tab went past Cancel to the page under the veil. `opens` and `closes`
+  write the browser's command (`commandfor`, `command`), and `Navigation`
+  takes it over in every browser: the focus on Cancel, a press outside
+  closing it where `closedby` is missing. An island, not Alpine: the CSP
+  build refuses to touch `document`, so a button can't reach a dialog by
+  its id. The cost: below Chrome 135, Firefox 144 and Safari 26.2, the
+  low bar included, a dialog opens only once the WASM runs. As an islands
+  app on this stack.
 
 ## Security
 

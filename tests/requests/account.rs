@@ -198,7 +198,8 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         let pool = sql::pool(&ctx);
 
         // Fresh from the sign-in: no password field. The step asked in a
-        // dialog (views/parts.rs), its button opening it.
+        // modal dialog (views/parts.rs), its button opening it by its
+        // command.
         let page = request
             .get("/account")
             .add_header("cookie", here.clone())
@@ -206,11 +207,11 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         let body = page.text();
         assert!(!body.contains(r#"id="delete-password""#));
         for wanted in [
-            r#"popovertarget="delete-account""#,
-            r#"id="delete-account" popover="auto" role="dialog""#,
-            // Cancel with no form owner, so Safari 17 runs its popovertarget
-            // inside the dialog's form (views/parts.rs, `DialogCancel`).
-            r#"form="" popovertarget="delete-account" popovertargetaction="hide""#,
+            r#"commandfor="delete-account" command="show-modal""#,
+            r#"<dialog id="delete-account" closedby="any""#,
+            // Cancel, where the focus goes as it opens (views/parts.rs).
+            r#"commandfor="delete-account" command="close""#,
+            r#"data-cancel="""#,
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }
@@ -229,7 +230,13 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
             .get("/account")
             .add_header("cookie", here.clone())
             .await;
-        assert!(page.text().contains(r#"id="delete-password""#));
+        let body = page.text();
+        let field = body
+            .split(r#"id="delete-password""#)
+            .nth(1)
+            .and_then(|rest| rest.split('>').next())
+            .expect("the password field");
+        assert!(!field.contains("autofocus"), "no autofocus in a dialog: {field}");
         let wrong = request
             .post("/account/delete")
             .add_header("cookie", here.clone())

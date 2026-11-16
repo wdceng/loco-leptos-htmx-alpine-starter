@@ -16,7 +16,7 @@ use crate::{
     uploads::{SHRINK_SIDE, SHRINK_UNDER},
     views::{
         layout::{BUTTON, BusyForm, FIELD, LEAD, Notice, ProblemLine, SaidLine, TITLE},
-        parts::{DANGER_BUTTON, Dialog, DialogCancel},
+        parts::{DANGER_BUTTON, Dialog, DialogCancel, opens},
     },
 };
 
@@ -256,7 +256,7 @@ pub fn AccountPage(
             "Your account and everything signed in with it are gone, at once and for good."
         </p>
         <ProblemLine id=DELETE_PROBLEM problem=delete_problem />
-        <button type="button" popovertarget=DELETE_DIALOG class=DANGER_BUTTON>
+        <button type="button" {..opens(DELETE_DIALOG)} class=DANGER_BUTTON>
             "Delete my account"
         </button>
         <Dialog id=DELETE_DIALOG title="Delete your account?">
@@ -272,7 +272,6 @@ pub fn AccountPage(
                             name="password"
                             type="password"
                             autocomplete="current-password"
-                            autofocus
                             required
                             aria-invalid=delete_refused.then_some("true")
                             aria-describedby=delete_refused.then_some(DELETE_PROBLEM)
@@ -294,9 +293,7 @@ pub fn AccountPage(
                 <button type="submit" class=DANGER_BUTTON>
                     "Delete it for good"
                 </button>
-                // The focus on Cancel where no password is asked, never on
-                // the step that can't be undone.
-                <DialogCancel target=DELETE_DIALOG autofocus=proven />
+                <DialogCancel target=DELETE_DIALOG />
             </div>
         </BusyForm>
         </Dialog>

@@ -29,7 +29,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
 | A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers, "check your mail"). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
-| A dialog over the page, and the step it asks; its Cancel; a step beside a form, never a new tab (`no_page_opens_a_new_tab`) | `Dialog`, `DialogCancel` (a native popover, Cancel owned by no form for Safari 17), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs` |
+| A dialog over the page, and the step it asks; its Cancel; a step beside a form, never a new tab (`no_page_opens_a_new_tab`) | `Dialog`, `DialogCancel`, opened and closed only by `opens` and `closes` (a modal `<dialog>`, its buttons' command taken over by `Navigation`'s `dialogs`; guarded by `every_dialog_opens_by_the_one_command`), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs`, `src/islands/dialogs.rs` |
 | A part folded under its heading | `Fold` (`<details>`) | `src/views/parts.rs` |
 | A count beside what it counts | `Badge` | `src/views/parts.rs` |
 | What floats over what: every `z-` | the scale in `docs/look.md` | `docs/look.md` |
@@ -133,6 +133,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A query of the app's own | `sqlx::query!` on `sql::pool(&ctx)` | `src/sql.rs` |
 | A transaction of the app's own. Guarded | `sql::write`: `BEGIN IMMEDIATE`, a connection a full disk left stuck closed (sqlx #4434) | `src/sql.rs` |
 | A picture someone uploads: checked, made with fixed settings, kept outside the site's folder, named by its hash, served for a year | `uploads::avatar`, `keep`, `forget`, `name_of`; `settings.uploads.path`; served by `controllers::uploads` | `src/uploads.rs`, `src/controllers/uploads.rs` |
+| An element focused without scrolling the page | `focus_quietly` | `src/islands.rs` |
 | A photo shrunk in the browser before it goes | a file field's `data-shrink` and `data-shrink-under`, the `shrink` the `Navigation` island arms | `src/islands/shrink.rs` |
 | A user's avatar | `avatars::of`, `set`, `in_use`; the folder `Avatars` | `src/models/avatars.rs` |
 | A secret handed to a browser, kept as its digest | `secret::fresh`, `digest`, `is_secret` | `src/secret.rs` |
