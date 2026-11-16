@@ -142,7 +142,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The app's typed settings | `Settings` | `src/settings.rs` |
 | A rate-limit bucket | `site_bucket`, `auth_bucket`, `files_bucket`; on an auth form's POST alone, `auth_limited` | `src/middleware/rate_limit.rs` |
 | Who is signed in | `Signed`, a handler's extractor (nobody: to `/login`); `signed_in` where a page shows a visitor something else | `src/controllers/signed.rs` |
-| A post another site's page sent, refused | `cross_site::refused`, first in every form's target | `src/controllers/cross_site.rs` |
+| A post another site's page sent, refused, logged by its route's pattern. Guarded | The extractor `SameSite`, taken by every post's handler (after `Signed` where it has one); never a check in a handler's body | `src/controllers/cross_site.rs` |
 | A visitor's address, behind the proxy or not | `VisitorIp`, `key_source` | `src/middleware/rate_limit.rs` |
 
 ## Mail

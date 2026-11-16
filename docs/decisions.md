@@ -299,6 +299,12 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-17: **A cross-site post is refused by one extractor,
+  `SameSite`,** not a check written first in each handler. The check ran
+  after the body was read, so a bad body answered 422 before it, and a
+  new handler was free to forget it; the extractor answers before the
+  body, and the canary holds every POST to its plain 403. As an islands
+  app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which

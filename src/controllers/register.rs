@@ -21,7 +21,7 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    controllers::cross_site,
+    controllers::cross_site::SameSite,
     mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::users::{self, RegisterParams, name_or_email_problem, password_problem},
@@ -70,13 +70,11 @@ async fn page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
 /// Otherwise the account is made and its welcome mail sent, and the page
 /// says to check the mail, as it does for a taken address.
 async fn submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Submitted>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "register") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     if let Some(problem) =
         password_problem(&form.password).or_else(|| name_or_email_problem(&form.name, &form.email))

@@ -314,16 +314,18 @@ fn every_sqlx_transaction_begins_one_way() {
     assert_one_home("pool.begin", &["sql.rs"], "`write` (src/sql.rs)");
 }
 
-/// Whether another site's page sent a post is read in one place, which
-/// every form's target calls first. In any case, as a header's name is
-/// read: `Sec-Fetch-Site` slipped past a case-sensitive guard in an
-/// islands app on this stack.
+/// Whether another site's page sent a post is read in one place, the
+/// extractor `SameSite` every form's target takes: a check in a handler's
+/// body ran after its body was read and was free to be forgotten, until
+/// 2026-11-17 (`tests/requests/canaries.rs` posts to every route). In any
+/// case, as a header's name is read: `Sec-Fetch-Site` slipped past a
+/// case-sensitive guard in an islands app on this stack.
 #[test]
-fn every_form_refuses_a_cross_site_post_one_way() {
+fn every_cross_site_check_is_the_extractor() {
     assert_one_home_any_case(
         "sec-fetch-site",
         &["controllers/cross_site.rs"],
-        "`cross_site::refused` (src/controllers/cross_site.rs)",
+        "`SameSite` (src/controllers/cross_site.rs)",
     );
 }
 

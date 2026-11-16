@@ -27,7 +27,7 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    controllers::cross_site,
+    controllers::cross_site::SameSite,
     mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::users,
@@ -95,13 +95,11 @@ async fn page(
 /// gets the welcome mail again, with a fresh link that replaces the old
 /// one; every post gets the same page.
 async fn resend(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Resend>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "resend") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     let unverified = users::Model::find_by_email(&ctx.db, &form.email)
         .await
@@ -124,13 +122,11 @@ async fn resend(
 /// `POST /verify`: the token verifies the address, or says it no longer
 /// works. An address verified already is said to be verified.
 async fn submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Link>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "verify") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     let Ok(user) = users::Model::find_by_verification_token(&ctx.db, &form.token).await else {
         return render_token_page(

@@ -4,7 +4,7 @@
 |---|---|
 | 1 | [docs/one-job.md](../docs/one-job.md), `tests/one_job.rs`; helpers `render_page`, `Notice`, `FIELD`, `TITLE`, `paths::assets`, `sql::pool`, `settings::is_local`, `hashing`, `Page::answer_with` |
 | 3 | `hx-sync="this:drop"`, `open = true`; `sqlx::query!` on `sql::pool`, `sql::write`; English; `paths::assets`; `src/islands.rs`, `--split`; `e2e/run.sh`, `src-tauri/*.sh`, `tools/` |
-| 4 | [docs/security.md](../docs/security.md); `Signed`, `Admin` (`src/controllers/signed.rs`); `cross_site::refused`; `site_bucket`, `auth_bucket`, `files_bucket` |
+| 4 | [docs/security.md](../docs/security.md); `Signed`, `Admin` (`src/controllers/signed.rs`); the `SameSite` extractor (`src/controllers/cross_site.rs`); `site_bucket`, `auth_bucket`, `files_bucket` |
 | 5 | `Job`, `HELPERS` (`src/islands.rs`); `$$dispose` (`public/js/htmx-islands.js`); `run.sh`, `screens.sh`, `links.sh` |
 | 6 | `public/js/htmx-islands.js`, `public/js/safe-area.js`; `hx-boost:inherited` (`src/views/layout.rs`) |
 | 7 | `Navigation`; `min-h-11`; `PageMeta::refused` |

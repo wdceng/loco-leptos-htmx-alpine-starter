@@ -2,7 +2,7 @@
 //! (`Hooks::routes`), so a route added later is checked the day it is,
 //! with nobody having to remember a test for it: every account page asks
 //! for a signed-in person (`Signed`, controllers/signed.rs), and every POST
-//! refuses another site's page (controllers/cross_site.rs).
+//! refuses another site's page (`SameSite`, controllers/cross_site.rs).
 //!
 //! The routes are served without the site-wide middleware, each request
 //! from a visitor of its own ([`server`]): the site's bucket would answer
@@ -180,16 +180,14 @@ async fn every_post_refuses_another_sites_page() {
                 let start: String = res.text().chars().take(40).collect();
                 statuses.push((res.status_code(), start));
             }
-            // `cross_site::refused`'s own answer, a plain 403, for the kind
-            // the route reads: the handler checks it first (no extractor
-            // does), so the other kind is its body extractor's 4xx, and
-            // neither gets through.
+            // The extractor's own answer for both kinds, a plain 403: it
+            // runs before the body is read, so no body extractor's 4xx and
+            // no handler's 403 page passes for it.
             assert!(
                 statuses
                     .iter()
-                    .any(|(status, body)| *status == StatusCode::FORBIDDEN && body == "Forbidden")
-                    && statuses.iter().all(|(status, _)| status.is_client_error()),
-                "POST {uri} from another site's page: {statuses:?}, not refused as cross-site"
+                    .all(|(status, body)| *status == StatusCode::FORBIDDEN && body == "Forbidden"),
+                "POST {uri} from another site's page: {statuses:?}, not refused by `SameSite`"
             );
             checked += 1;
         }
