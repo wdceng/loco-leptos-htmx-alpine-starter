@@ -652,7 +652,11 @@ fn each_server_takes_its_port_in_the_block_the_loopback_rule_closes() {
             first,
             "{path}: {port} outside the block {first}"
         );
-        let rule = format!("tcp dport {first}-{} ", first + 9);
+        // The rule file's own line, not the counting table's.
+        let rule = format!(
+            "oif \"lo\" tcp dport {first}-{} meta skuid != {{ root, caddy }} counter reject",
+            first + 9
+        );
         assert!(
             text.contains(&rule),
             "{path}: the loopback rule doesn't close `{rule}`"
