@@ -586,7 +586,7 @@ The phones:
   generated. Their names and ids come from `tauri.conf.json` at that
   moment: after a rename, generate them again.
 - **Two Android files aren't as generated:** `MainActivity.kt` (the
-  status bar's colour) and `core-ktx` in `app/build.gradle.kts`. A new
+  status bar's colour, the system's buttons at a day-night switch) and `core-ktx` in `app/build.gradle.kts`. A new
   `android init` overwrites them: bring both back.
 - **The identifier: letters, digits and dots only.** Tauri turns a `-`
   into `_` for Android and a `_` into `-` for iOS, so either gives the app

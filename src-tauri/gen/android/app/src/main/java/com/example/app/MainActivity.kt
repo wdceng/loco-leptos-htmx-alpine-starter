@@ -53,10 +53,13 @@ class MainActivity : TauriActivity() {
     super.setContentView(layout)
   }
 
-  // A turn or a day-night switch: the page's media queries answer anew once
-  // the webview has taken its new size and scheme, a moment later.
+  // A turn or a day-night switch: the system's buttons set again for the
+  // scheme, and the page's media queries answer anew once the webview has
+  // taken its new size and scheme, a moment later.
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
+    // The system's buttons for the new scheme: enableEdgeToEdge reads it once a call.
+    enableEdgeToEdge()
     webView?.postDelayed({ paintStatusBar() }, RESETTLE_MS)
   }
 

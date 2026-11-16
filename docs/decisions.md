@@ -509,6 +509,12 @@ change of mind gets a new line, and the old one moves to
   down, with Google's `GradientProtection`: a scrolled page ran on under
   the see-through bar. The colour is read from the page's `theme-color`,
   so the app holds no copy. From an islands app on this stack.
+- 2026-11-17: **Android's system buttons follow a day-night switch**
+  while the app runs: `enableEdgeToEdge` again in
+  `onConfigurationChanged`. It reads the scheme once a call, and the
+  activity outlives the switch (`uiMode` in `configChanges`), so the
+  buttons stayed light under a dark page. From an islands app on this
+  stack.
 - 2026-10-29: **The app hands calls, mails and texts to the system.** On
   Android the webview opened a footer's phone number itself and showed
   its error page with no way back. `tauri-plugin-opener`, used from Rust
