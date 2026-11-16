@@ -491,7 +491,8 @@ the CLI for `loco new`, which is done.
 - Nothing blocks an async thread: no `std::fs`, `std::thread::sleep` or
   long-held `std::sync::Mutex` in a handler, or every request on that
   thread waits. Use `tokio::fs` and `tokio::time::sleep`; CPU work goes
-  through `spawn_blocking` (`src/hashing.rs`). A lock held across an
+  through `spawn_blocking` under a cap, its permit moved into the blocking
+  task (`src/hashing.rs`, `src/uploads.rs`). A lock held across an
   `.await` is a `tokio::sync::Mutex`. Reads at boot (`src/assets.rs`) are
   fine.
 

@@ -299,6 +299,16 @@ change of mind gets a new line, and the old one moves to
 
 ## Security
 
+- 2026-11-17: **An upload's memory is bounded,** as an islands app on
+  this stack bounds its photos. `image` holds only a picture's sides, so
+  a 16-bit PNG at 6000 pixels a side decoded to 288 MB. A picture is now
+  refused from its header past an 8-bit one with transparency at the
+  largest sides, about 144 MB (`uploads::MAX_DECODED`). Four uploads at
+  most are read and made at once (`uploads::Place`), the rest waiting
+  before their bodies are read. The place goes into the blocking work
+  with the bytes, as a password hash's permit now does
+  (`src/hashing.rs`): a dropped request never frees one while its work
+  runs.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
