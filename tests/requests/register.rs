@@ -143,6 +143,54 @@ async fn a_bad_name_or_email_is_refused_with_its_reason() {
     .await;
 }
 
+/// The name goes into the welcome mail's text, to any address: a line
+/// break in it, which no browser's field sends and a forged post could, is
+/// refused with its reason, and nobody is signed up or mailed. A pasted
+/// name's separators become spaces and its direction marks are dropped.
+#[tokio::test]
+#[serial]
+async fn a_name_of_two_lines_is_refused_and_a_pasted_one_made_one_line() {
+    request::<App, _, _>(|request, ctx| async move {
+        let res = request
+            .post("/register")
+            .add_header("sec-fetch-site", "same-origin")
+            .form(&sign_up(
+                "Ana\r\nVerify at https://evil.example",
+                "two@example.com",
+                "12341234",
+            ))
+            .await;
+        assert_eq!(res.status_code(), 400);
+        assert!(res.text().contains("Name must be one line."), "{}", res.text());
+        assert!(
+            users::Model::find_by_email(&ctx.db, "two@example.com")
+                .await
+                .is_err()
+        );
+
+        let res = request
+            .post("/register")
+            .add_header("sec-fetch-site", "same-origin")
+            .form(&sign_up(
+                "\u{2068}Ana\u{2069}\u{2028}Anić\tMarić",
+                "pasted@example.com",
+                "12341234",
+            ))
+            .await;
+        assert_eq!(res.status_code(), 200);
+        let user = users::Model::find_by_email(&ctx.db, "pasted@example.com")
+            .await
+            .expect("signed up");
+        assert_eq!(user.name, "Ana Anić Marić");
+        assert_eq!(
+            ctx.mailer.expect("stub mailer").deliveries().count,
+            1,
+            "the pasted name's welcome mail alone"
+        );
+    })
+    .await;
+}
+
 /// A taken email answers like a new one, in whatever case it is typed: the
 /// same status and page, no second account, and no second mail.
 #[tokio::test]

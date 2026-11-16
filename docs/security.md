@@ -38,6 +38,7 @@ updates it in the same commit.
 | Secrets when deployed | Production's mail account required, and refused at boot while empty or a placeholder, its security contact too; no signing key anywhere to leak | `src/deploy_checks.rs`, `config/*.yaml` | `src/deploy_checks.rs`, `tests/config.rs` |
 | Personal data in logs | No email address in any log line, and no token: a request is logged by its route; the journal keeps 30 days | `src/controllers/`, `src/middleware/request_log.rs`, `production.md` | `src/middleware/request_log.rs`, by hand |
 | The welcome mail as someone's message | Its subject is the app's, never the name the visitor typed | `src/mailers/auth.rs` | `tests/requests/register.rs` |
+| Lines of someone else's in a mail | The name, the one field a visitor types that a mail repeats, is one line: a line break or another control character is refused with the name's rule; a tab or a pasted line or paragraph separator becomes a space, and the marks that turn text around (U+202A to U+202E, U+2066 to U+2069) are dropped, before the check and the save | `src/models/users.rs` | `src/models/users.rs`, `tests/requests/register.rs` |
 | A link in the app opening a file or another app | The app hands the system only the schemes it names; any other goes nowhere | `src-tauri/src/lib.rs` | `src-tauri/src/lib.rs` |
 | Known-vulnerable crates | `cargo audit` as the production deploy's first gate (`production.md`), and in CI when Actions is on | `.cargo/audit.toml` | the deploy chain |
 
