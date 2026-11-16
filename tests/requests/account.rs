@@ -236,7 +236,10 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
             .nth(1)
             .and_then(|rest| rest.split('>').next())
             .expect("the password field");
-        assert!(!field.contains("autofocus"), "no autofocus in a dialog: {field}");
+        assert!(
+            !field.contains("autofocus"),
+            "no autofocus in a dialog: {field}"
+        );
         let wrong = request
             .post("/account/delete")
             .add_header("cookie", here.clone())

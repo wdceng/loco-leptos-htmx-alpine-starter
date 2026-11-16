@@ -325,8 +325,7 @@ pub fn Navigation() -> impl IntoView {
     });
     // A dialog's button, or a press outside an open dialog (dialogs.rs):
     // on every page, as this island is.
-    let press_began =
-        window_event_listener_untyped("pointerdown", |ev| dialogs::press_began(&ev));
+    let press_began = window_event_listener_untyped("pointerdown", |ev| dialogs::press_began(&ev));
     let pressed = window_event_listener_untyped("click", |ev| dialogs::pressed(&ev));
     on_cleanup(move || {
         chosen.remove();
