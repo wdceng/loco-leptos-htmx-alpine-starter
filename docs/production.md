@@ -646,8 +646,9 @@ Then the check above, and each site through Caddy ("Caddy's hardening").
 - **A second app on the box** takes a block of its own, and a table and
   unit named after it.
 - **A `flush ruleset` drops it too,** as Debian's own `/etc/nftables.conf`
-  does at its start: the unit loads after `nftables.service`; after a flush
-  by hand, `systemctl restart app-loopback`.
+  does at its start: the unit loads after `nftables.service` at boot;
+  after any restart or reload of nftables, or a flush by hand,
+  `systemctl restart app-loopback`.
 - The app's answers leave from its ports, not to them, so the rule never
   meets them.
 - If the check fails: `nft delete table inet app_loopback && systemctl disable app-loopback`.
