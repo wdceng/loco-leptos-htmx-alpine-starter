@@ -214,7 +214,7 @@ tower-http = { version = "0.6.11", features = [
 # server logs in to SMTP once at boot (src/deploy_checks.rs). The version
 # and the features loco-rs uses, already in the graph, so no extra
 # compile. Server only.
-lettre = { version = "0.11.23", default-features = false, features = [
+lettre = { version = "0.11.24", default-features = false, features = [
   "builder",
   "hostname",
   "smtp-transport",
