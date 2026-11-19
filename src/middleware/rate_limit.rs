@@ -22,8 +22,9 @@
 //! ([`auth_limited`]).
 //!
 //! An answer let through carries no `x-ratelimit-*` header: a bot would
-//! read its tries left from it and pace itself just under the limit (ecs's
-//! security review of 2026-10-31). Only the 429 says how long to wait.
+//! read its tries left from it and pace itself just under the limit (the
+//! security review of an islands app on this stack, 2026-10-31). Only the
+//! 429 says how long to wait.
 
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},

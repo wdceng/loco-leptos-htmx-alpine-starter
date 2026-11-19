@@ -418,7 +418,8 @@ async fn listen(driver: &WebDriver, heard: Shared) -> WebDriverResult<AbortHandl
 /// Where a BiDi log entry came from: each of its stack's frames on a line
 /// of its own, `at function (url:line:column)`, counted from 1 (BiDi counts
 /// from 0). Nothing when Firefox captured no stack. Without it an error
-/// under load on the M1 said only its message, no script (2026-10-31).
+/// under load on the test machine said only its message, no script
+/// (2026-10-31).
 fn frames(stack: &serde_json::Value) -> String {
     stack["callFrames"]
         .as_array()

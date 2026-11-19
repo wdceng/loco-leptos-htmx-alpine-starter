@@ -368,19 +368,20 @@ fn no_tracked_file_names_the_maintainer() {
     assert!(found.is_empty(), "the maintainer named: {found:?}");
 }
 
-/// The skills and their lists under `.claude/` are public and copied into
-/// every new project, so none names another project, a client or a
-/// machine: a sibling app is "an islands app on this stack", a machine its
-/// role, its name and address in the git-ignored `CLAUDE.local.md` (the
-/// maintainer's call, 2026-11-19). The names are kept in halves so this
-/// file doesn't hold them.
+/// The template is public and copied into every new project, so no tracked
+/// file names another project, a client or a machine: a sibling app is "an
+/// islands app on this stack", a machine its role, its name and address in
+/// the git-ignored `CLAUDE.local.md` (the maintainer's call, 2026-11-19).
+/// The skills' lists under `.claude/` hold no address either; the deploy
+/// docs' example addresses are the documentation ranges. The names are
+/// kept in halves so this file doesn't hold them.
 #[test]
-fn no_skill_names_another_project_or_a_machine() {
+fn no_tracked_file_names_another_project_or_a_machine() {
     let words: Vec<String> = [["e", "cs"], ["l", "js"], ["ecq", "ta"], ["w", "dc"]]
         .iter()
         .map(|halves| halves.concat())
         .collect();
-    // A machine as the maintainer calls it ("the M1"), never `grep -m1`.
+    // A machine by its short name after "the" or "ssh", never `grep -m1`.
     let parts: Vec<String> = [
         ["pharm", "ac"],
         ["ljek", "arn"],
@@ -392,16 +393,17 @@ fn no_skill_names_another_project_or_a_machine() {
     .iter()
     .map(|halves| halves.concat())
     .collect();
-    let found = tracked_lines(".claude/", |line| {
+    let named = |line: &str| {
         let line = line.to_lowercase();
         line.split(|c: char| !c.is_ascii_alphanumeric())
             .any(|word| words.iter().any(|named| named == word))
             || parts.iter().any(|part| line.contains(part))
-            || holds_an_address(&line)
-    });
+    };
+    let mut found = tracked_lines("", named);
+    found.extend(tracked_lines(".claude/", holds_an_address));
     assert!(
         found.is_empty(),
-        "another project, a client or a machine named under .claude/: {found:?}"
+        "another project, a client, a machine or an address named: {found:?}"
     );
 }
 
