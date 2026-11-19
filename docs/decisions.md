@@ -454,6 +454,12 @@ change of mind gets a new line, and the old one moves to
 
 ## Working
 
+- 2026-11-19: **The two helpers in `public/js/` are type-checked.**
+  TypeScript (`typescript` 7.0.2) checks them in `npm run lint`, with
+  JSDoc types and `jsconfig.json` (`checkJs`, `strict`); the globals they
+  read from Leptos and htmx are in `jsconfig.types.d.ts`, which no browser
+  loads. A wrong event field or a `null` element fails the lint, not a
+  browser run. Node still runs checks only.
 - 2026-11-02: **One command a block, a hint above it, no `#` comment on
   it.** The copy button copies a block, and it should copy the command
   alone. A pipeline split over lines by `&&` stays one block, and so does

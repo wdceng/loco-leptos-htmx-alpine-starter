@@ -20,6 +20,7 @@
   // Which angle puts the camera on which side, seen on an iPhone in
   // Safari, Chrome, Firefox and Edge (an islands app on this stack,
   // 2026-10-28).
+  /** @type {Record<number, "left" | "right" | undefined>} */
   const SIDE = { 90: "left", 270: "right" };
   const mark = () => {
     const turned = SIDE[screen.orientation?.angle];

@@ -14,7 +14,7 @@
 //    argument, which Chrome 124 to 145 refuse, every swap then failing
 //    (htmx #4182); gone, htmx never calls it. Remove only once Chrome 156
 //    is below the low bar and an htmx release has #4182's fix.
-delete Document.parseHTMLUnsafe;
+delete /** @type {{ parseHTMLUnsafe?: unknown }} */ (Document).parseHTMLUnsafe;
 
 // In blocks, so these consts stay out of the page's global scope.
 {
@@ -24,14 +24,16 @@ delete Document.parseHTMLUnsafe;
   //    outer island first, and only for an element off the page when the
   //    observer below looks: one a swap moves within one task (a morph,
   //    hx-preserve) is back by then and kept.
+  /** @param {Element} island */
   const dispose = (island) => {
     const free = island.$$dispose;
     if (!free) return;
     delete island.$$dispose;
     free();
   };
+  /** @param {Node} node */
   const disposeGone = (node) => {
-    if (node.nodeType !== 1 || node.isConnected) return;
+    if (!(node instanceof Element) || node.isConnected) return;
     if (node.matches("leptos-island")) dispose(node);
     for (const island of node.querySelectorAll("leptos-island"))
       dispose(island);
@@ -71,7 +73,7 @@ delete Document.parseHTMLUnsafe;
     for (const record of records) {
       for (const node of record.removedNodes) disposeGone(node);
       for (const node of record.addedNodes) {
-        if (node.nodeType !== 1) continue;
+        if (!(node instanceof Element)) continue;
         // Not where htmx was blocked: the page works as plain links then.
         if (
           window.htmx &&
