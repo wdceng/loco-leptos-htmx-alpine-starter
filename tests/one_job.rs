@@ -364,6 +364,64 @@ fn no_page_opens_a_new_tab() {
 #[test]
 fn no_tracked_file_names_the_maintainer() {
     let name = ["dav", "or"].concat();
+    let found = tracked_lines("", |line| line.to_lowercase().contains(&name));
+    assert!(found.is_empty(), "the maintainer named: {found:?}");
+}
+
+/// The skills and their lists under `.claude/` are public and copied into
+/// every new project, so none names another project, a client or a
+/// machine: a sibling app is "an islands app on this stack", a machine its
+/// role, its name and address in the git-ignored `CLAUDE.local.md` (the
+/// maintainer's call, 2026-11-19). The names are kept in halves so this
+/// file doesn't hold them.
+#[test]
+fn no_skill_names_another_project_or_a_machine() {
+    let words: Vec<String> = [["e", "cs"], ["l", "js"], ["ecq", "ta"], ["w", "dc"]]
+        .iter()
+        .map(|halves| halves.concat())
+        .collect();
+    // A machine as the maintainer calls it ("the M1"), never `grep -m1`.
+    let parts: Vec<String> = [
+        ["pharm", "ac"],
+        ["ljek", "arn"],
+        ["summa", "-con"],
+        ["the m", "1"],
+        ["the m", "5"],
+        ["ssh m", "1"],
+    ]
+    .iter()
+    .map(|halves| halves.concat())
+    .collect();
+    let found = tracked_lines(".claude/", |line| {
+        let line = line.to_lowercase();
+        line.split(|c: char| !c.is_ascii_alphanumeric())
+            .any(|word| words.iter().any(|named| named == word))
+            || parts.iter().any(|part| line.contains(part))
+            || holds_an_address(&line)
+    });
+    assert!(
+        found.is_empty(),
+        "another project, a client or a machine named under .claude/: {found:?}"
+    );
+}
+
+/// An IPv4 address other than the loopback's: four numbers joined by dots.
+fn holds_an_address(line: &str) -> bool {
+    line.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .any(|word| {
+            let numbers: Vec<&str> = word.split('.').collect();
+            numbers.len() == 4
+                && numbers
+                    .iter()
+                    .all(|n| !n.is_empty() && n.len() <= 3 && n.parse::<u8>().is_ok())
+                && !word.starts_with("127.")
+                && word != "0.0.0.0"
+        })
+}
+
+/// Every line, as `file:line`, of the tracked text files under `under`
+/// (`""` for all) that `holds`. A binary file has no text to read.
+fn tracked_lines(under: &str, holds: impl Fn(&str) -> bool) -> Vec<String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let listed = std::process::Command::new("git")
         .args(["ls-files", "-z"])
@@ -373,23 +431,32 @@ fn no_tracked_file_names_the_maintainer() {
     assert!(listed.status.success(), "git ls-files failed");
     let files: Vec<String> = String::from_utf8_lossy(&listed.stdout)
         .split('\0')
-        .filter(|file| !file.is_empty())
+        .filter(|file| !file.is_empty() && file.starts_with(under))
         .map(str::to_owned)
         .collect();
-    assert!(files.len() > 100, "too few files listed: {}", files.len());
+    assert!(files.len() > 10, "too few files listed: {}", files.len());
     let mut found = Vec::new();
     for file in &files {
-        // A binary file (an icon, a picture) has no text to read.
         let Ok(text) = fs::read_to_string(root.join(file)) else {
             continue;
         };
         for (at, line) in text.lines().enumerate() {
-            if line.to_lowercase().contains(&name) {
+            if holds(line) {
                 found.push(format!("{file}:{}", at + 1));
             }
         }
     }
-    assert!(found.is_empty(), "the maintainer named: {found:?}");
+    found
+}
+
+/// The address check: a box's address found, the loopback and a version
+/// number left alone.
+#[test]
+fn an_address_is_found_and_a_version_is_not() {
+    assert!(holds_an_address("ssh root@203.0.113.7 \"ls\""));
+    assert!(!holds_an_address("http://127.0.0.1:5150"));
+    assert!(!holds_an_address("sqlx 0.9.1 and tauri 2.12.7"));
+    assert!(!holds_an_address("listen on 0.0.0.0"));
 }
 
 /// The check itself: a code line holding the pattern is found, a comment

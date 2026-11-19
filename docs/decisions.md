@@ -463,6 +463,15 @@ change of mind gets a new line, and the old one moves to
 
 ## Working
 
+- 2026-11-19: **The maintainer's skills live here too, generic.**
+  `.claude/skills/` holds the review, the audits (security, UX, native),
+  the dependency and upgrade checks, the tools check and the coverage
+  check, each the method alone; what is the starter's own is in a list
+  beside them (`.claude/review.md`, `security.md`, `ux.md`, `native.md`,
+  `deps.md`, `tools.md`, `coverage.md`), which a new project rewrites for
+  itself. Public and copied, so a guard keeps other projects' names,
+  machines and addresses out (`tests/one_job.rs`); those stay in the
+  git-ignored `CLAUDE.local.md`.
 - 2026-11-02: **One command a block, a hint above it, no `#` comment on
   it.** The copy button copies a block, and it should copy the command
   alone. A pipeline split over lines by `&&` stays one block, and so does

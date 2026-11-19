@@ -16,6 +16,6 @@ How Loco's migrations work: the loco skill (`.claude/skills/loco/`). Which queri
    ```
    `DATABASE_URL` on the one command, never exported (every config reads it, so `cargo test` would wipe that database). Always `-- --all-targets`. First check the copy has the newest migration: `sqlite3 -readonly <copy> "SELECT version FROM seaql_migrations ORDER BY version DESC LIMIT 1"` against the newest file in `migration/src/`. The maintainer's own command, the file itself, is in `docs/development.md`.
 4. **The queries**: the app's own through `sqlx::query!` on `sql::pool(&ctx)`, every value bound; Loco's own models stay on Sea-ORM. A wrong column shows with `SQLX_OFFLINE=false DATABASE_URL=sqlite://app_development.sqlite cargo check --all-targets`.
-5. **Tests**: a request test in `tests/requests/`, a model test in `tests/models/` (`sql_pool.rs` runs an own query on the test database); then fmt, both clippys, and nextest on the M1 with its own test database.
+5. **Tests**: a request test in `tests/requests/`, a model test in `tests/models/` (`sql_pool.rs` runs an own query on the test database); then fmt, both clippys, and nextest on the test machine with its own test database.
 6. **Docs**: a sentence the change made false in `docs/architecture.md`; a choice of schema with its dated line in `docs/decisions.md`.
 7. **The commit line**, `.sqlx/` and the migration in it.
