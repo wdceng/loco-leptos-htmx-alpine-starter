@@ -6,9 +6,9 @@
 //! the system's side through adb (e2e/src/device.rs). Skipped in every
 //! other lane. As an islands app on this stack tests its own.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use app_e2e::{Page, WebDriverResult, app_package, browse_app};
+use app_e2e::{Page, WebDriverError, WebDriverResult, app_package, browse_app};
 
 /// The page at `path` on the lane's site, its islands awake: where the
 /// app's start page hands over to.
@@ -100,4 +100,36 @@ async fn another_sites_link_goes_to_the_system_and_the_app_stays() {
         Ok(())
     })
     .await;
+}
+
+/// Android's buttons at the foot follow a day-night switch while the app
+/// runs, as they are at a start (`MainActivity.onConfigurationChanged`).
+/// The emulator back on the day's after, whatever the result.
+#[tokio::test]
+async fn the_system_buttons_follow_the_night() {
+    browse_app(|page| async move {
+        arrives(&page, "/").await?;
+        let checked = buttons_through_the_night(&page).await;
+        page.night(false).await?;
+        checked
+    })
+    .await;
+}
+
+/// Day, night, day: the buttons' look within 10 s of each switch.
+async fn buttons_through_the_night(page: &Page) -> WebDriverResult<()> {
+    for night in [false, true, false] {
+        page.night(night).await?;
+        let started = Instant::now();
+        while page.light_buttons().await? == night {
+            if started.elapsed() > Duration::from_secs(10) {
+                let scheme = if night { "night's" } else { "day's" };
+                return Err(WebDriverError::FatalError(format!(
+                    "the system's buttons not in the {scheme} look 10 s after the switch"
+                )));
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+    Ok(())
 }

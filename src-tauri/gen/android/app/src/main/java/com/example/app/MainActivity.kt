@@ -27,7 +27,11 @@ class MainActivity : TauriActivity() {
   // Transparent, as Android draws it, until the first page says its colour.
   private var color = Color.TRANSPARENT
 
+  // The scheme the system's buttons were last set for (UI_MODE_NIGHT_*).
+  private var night = Configuration.UI_MODE_NIGHT_UNDEFINED
+
   override fun onCreate(savedInstanceState: Bundle?) {
+    night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
   }
@@ -53,10 +57,19 @@ class MainActivity : TauriActivity() {
     super.setContentView(layout)
   }
 
-  // A turn or a day-night switch: the page's media queries answer anew once
-  // the webview has taken its new size and scheme, a moment later.
+  // A turn or a day-night switch: the system's buttons set again for the
+  // scheme, and the page's media queries answer anew once the webview has
+  // taken its new size and scheme, a moment later.
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
+    // The system's buttons for the new scheme, at a day-night switch alone:
+    // enableEdgeToEdge reads the scheme once a call, and sets the status
+    // bar too, which paintStatusBar sets back below.
+    val nightNow = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
+    if (nightNow != night) {
+      night = nightNow
+      enableEdgeToEdge()
+    }
     webView?.postDelayed({ paintStatusBar() }, RESETTLE_MS)
   }
 
