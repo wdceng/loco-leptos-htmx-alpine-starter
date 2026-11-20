@@ -152,7 +152,8 @@ async fn page(State(ctx): State<AppContext>, signed: Signed, req: Request) -> Re
 }
 
 /// `POST /account/avatar`: the picture sent made into the avatar
-/// (src/uploads.rs), off the async threads, then the page again; the one
+/// (src/uploads.rs), off the async threads, a few at a time
+/// (`uploads::Place`), then the page again; the one
 /// it replaces gone once nobody shows it. Refused, the page with the
 /// reason, its title starting "Error: ".
 async fn avatar(
@@ -165,12 +166,15 @@ async fn avatar(
         return Ok(forbidden);
     }
     let req = Request::from_parts(parts, Body::empty());
+    // A place among the uploads at once, taken before the body is read.
+    let place = uploads::Place::wait().await?;
     let made = match avatar_field(&mut form).await {
-        Ok(upload) if upload.is_empty() => Err("Choose a picture first."),
-        Ok(upload) => tokio::task::spawn_blocking(move || uploads::avatar(&upload))
-            .await
-            .map_err(Error::wrap)?,
-        Err(reason) => Err(reason),
+        Ok(upload) if !upload.is_empty() => uploads::make_avatar(place, upload).await?,
+        // Refused: the place given back before the page is drawn.
+        refused => {
+            drop(place);
+            refused.and(Err("Choose a picture first."))
+        }
     };
     let jpeg = match made {
         Ok(jpeg) => jpeg,

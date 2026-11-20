@@ -1,5 +1,6 @@
 //! Password hashing, the one way: Argon2id through Loco's `hash`, run on
-//! Tokio's blocking threads, at most four at a time.
+//! Tokio's blocking threads, at most four at a time, each permit held until
+//! its hash ends.
 //!
 //! An Argon2id hash or check takes tens of milliseconds of CPU and about
 //! 19 MB of memory. Run on the async threads, a burst of sign-ins would stall
@@ -29,13 +30,27 @@ static DUMMY_HASH: LazyLock<Option<String>> =
 
 /// Runs `work` on a blocking thread, once one of the permits is free.
 async fn run<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Result<T> {
-    let _permit = PERMITS
+    run_under(&PERMITS, work).await
+}
+
+/// [`run`] under `permits`: the site's, or a test's own. The permit goes
+/// into the blocking task with the work, so a request dropped mid-hash
+/// never lets a fifth hash start beside the four still running.
+async fn run_under<T: Send + 'static>(
+    permits: &'static Semaphore,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Result<T> {
+    let permit = permits
         .acquire()
         .await
         .map_err(|e| Error::Message(format!("hashing: {e}")))?;
-    tokio::task::spawn_blocking(work)
-        .await
-        .map_err(|e| Error::Message(format!("hashing: {e}")))
+    tokio::task::spawn_blocking(move || {
+        let done = work();
+        drop(permit);
+        done
+    })
+    .await
+    .map_err(|e| Error::Message(format!("hashing: {e}")))
 }
 
 /// The Argon2id hash of `password`, for storing.
@@ -84,6 +99,28 @@ mod tests {
         assert!(verify("correct horse", &hashed).await);
         assert!(!verify("wrong horse", &hashed).await);
         assert!(!verify("correct horse", "not a hash").await);
+    }
+
+    /// A hash still running once its request is gone keeps its permit
+    /// until it ends: the cap counts what runs, not who waits.
+    #[tokio::test]
+    async fn a_dropped_request_keeps_its_permit_while_its_hash_runs() {
+        use std::time::Duration;
+
+        static PERMITS: Semaphore = Semaphore::const_new(AT_ONCE);
+        let asked = tokio::spawn(run_under(&PERMITS, || {
+            std::thread::sleep(Duration::from_millis(300));
+        }));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        asked.abort();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            PERMITS.available_permits(),
+            AT_ONCE - 1,
+            "given back while the hash runs"
+        );
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        assert_eq!(PERMITS.available_permits(), AT_ONCE, "never given back");
     }
 
     #[test]

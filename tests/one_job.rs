@@ -318,6 +318,18 @@ fn no_page_opens_a_new_tab() {
     );
 }
 
+/// CPU work off the async threads goes through a capped helper, its permit
+/// moved into the blocking task: the avatar's handler called
+/// `spawn_blocking` itself, uncapped, until 2026-11-17.
+#[test]
+fn every_blocking_work_is_capped_one_way() {
+    assert_one_home(
+        "spawn_blocking",
+        &["hashing.rs", "uploads.rs"],
+        "`hashing::run` or `uploads::make_avatar`",
+    );
+}
+
 /// The template is public and code is copied into it from other apps on
 /// this stack, so no tracked file, comments included, names the
 /// maintainer: they are "the maintainer" (the maintainer's call,
