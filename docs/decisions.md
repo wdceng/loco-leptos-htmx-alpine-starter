@@ -103,6 +103,15 @@ change of mind gets a new line, and the old one moves to
   production's exact binary. Only the dev server uses the fast profile,
   renamed `dev-server` from `staging`. Every deployed profile is fully
   stripped: with Zig's linker, line tables made a 2 GB binary.
+- 2026-11-17: **A block of ten ports a project, the last digit the
+  environment:** production X0, staging X1, the dev-server X2, a trial X3.
+  Here 5150 to 5159: production 5150, Loco's default, staging 5151, the
+  dev-server 5152, a release build tried locally 5153; the browser tests'
+  lanes from 5160 and the live reload's 3001 stay on the Mac. Apps share
+  a box: a block an app keeps their ports apart and lets one loopback rule
+  name them all ("The app's ports on loopback" in the deploy docs). A
+  project made from this template takes a block of its own. As an islands
+  app on this stack.
 
 ## Islands
 
@@ -318,6 +327,12 @@ change of mind gets a new line, and the old one moves to
   runs. The peak is about twice the decoded picture, the crop or the
   turn copying it, so up to about 1.2 GB with four at once; four slow
   senders can hold every place until the request's timeout.
+- 2026-11-17: **Only root and Caddy open the app's ports,** 5150 to 5159,
+  by a table of nftables' own (`app_loopback`, loaded at boot by
+  `app-loopback.service`). The app keys each visitor on the
+  `CF-Connecting-IP` Caddy hands it, so any other process on the box could
+  name its own address to the rate limiter. Counted for a day first, then
+  loaded only while the count is 0. As an islands app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
