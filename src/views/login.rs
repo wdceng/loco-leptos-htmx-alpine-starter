@@ -13,6 +13,7 @@ use crate::{
     models::sign_ins::CODE_MINUTES,
     views::{
         layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, ProblemLine, SaidLine, TITLE},
+        pages,
         parts::QUIET_BUTTON,
     },
 };
@@ -29,7 +30,7 @@ const SIGN_IN_PROBLEM: &str = "sign-in-problem";
 pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
     let refused = problem.is_some();
     view! {
-        <h1 class=TITLE>"Sign in"</h1>
+        <h1 class=TITLE>{pages::SIGN_IN}</h1>
         <p class=LEAD>"With the email and password you signed up with."</p>
         <ProblemLine id=SIGN_IN_PROBLEM problem />
         <BusyForm action=PATH>
@@ -60,7 +61,7 @@ pub fn LoginForm(email: String, problem: Option<String>) -> impl IntoView {
             </button>
         </BusyForm>
         <NextSteps links=vec![
-            (forgot::PATH, "Forgot your password?"),
+            (forgot::PATH, pages::FORGOT_PASSWORD),
             (register::PATH, "No account yet? Sign up"),
             (verify::PATH, "No welcome mail? Send it again"),
         ] />
@@ -107,7 +108,7 @@ pub fn CodeForm(
         "Mail me a code"
     };
     view! {
-        <h1 class=TITLE>"Your sign-in code"</h1>
+        <h1 class=TITLE>{pages::SIGN_IN_CODE}</h1>
         <p class=LEAD>{lead}</p>
         <ProblemLine id=CODE_PROBLEM problem />
         <SaidLine said />
@@ -157,6 +158,6 @@ pub fn SignedIn(name: String) -> impl IntoView {
                 "Sign out"
             </button>
         </BusyForm>
-        <NextSteps links=vec![(account::PATH, "Your account")] />
+        <NextSteps links=vec![(account::PATH, pages::ACCOUNT)] />
     }
 }

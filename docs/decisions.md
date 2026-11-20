@@ -535,6 +535,12 @@ change of mind gets a new line, and the old one moves to
   read from Leptos and htmx are in `jsconfig.types.d.ts`, which no browser
   loads. A wrong event field or a `null` element fails the lint, not a
   browser run. Node still runs checks only.
+- 2026-11-17: **A page's name is written once, in `views/pages.rs`,**
+  its title and its heading read from it, and a link that names the
+  page. Six pages wrote it twice and the forgotten password's page named
+  itself two ways (its title now has the heading's "?"); two kept it in
+  a module of their own. A button's words stay the button's. As an
+  islands app on this stack.
 - 2026-11-02: **One command a block, a hint above it, no `#` comment on
   it.** The copy button copies a block, and it should copy the command
   alone. A pipeline split over lines by `&&` stays one block, and so does

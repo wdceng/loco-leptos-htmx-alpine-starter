@@ -11,10 +11,10 @@
 
 use leptos::prelude::*;
 
-use super::layout::{BODY, COLUMN, Notice, full_title};
-
-/// The page's heading and its name in the title.
-const HEADING: &str = "Too many requests";
+use super::{
+    layout::{BODY, COLUMN, Notice, full_title},
+    pages,
+};
 
 /// Stands in for the wait in the rendered page, replaced per refusal.
 pub const WAIT: &str = "{wait}";
@@ -31,7 +31,7 @@ pub fn document(stylesheet: String) -> String {
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>{full_title(HEADING)}</title>
+                <title>{full_title(pages::TOO_MANY_REQUESTS)}</title>
                 <meta name="robots" content="noindex" />
                 <link rel="stylesheet" href=stylesheet />
             </head>
@@ -39,7 +39,7 @@ pub fn document(stylesheet: String) -> String {
                 // Below a status bar lying over the page, as the shell's
                 // header (`--safe-area-top`).
                 <main class=format!("{COLUMN} pt-[calc(4rem+var(--safe-area-top))] pb-16")>
-                    <Notice heading=HEADING lead=LEAD />
+                    <Notice heading=pages::TOO_MANY_REQUESTS lead=LEAD />
                 </main>
             </body>
         </html>
@@ -62,7 +62,10 @@ mod tests {
         );
         assert!(page.contains("<h1"), "{page}");
         assert!(
-            page.contains(&format!("<title>{}</title>", full_title(HEADING))),
+            page.contains(&format!(
+                "<title>{}</title>",
+                full_title(pages::TOO_MANY_REQUESTS)
+            )),
             "{page}"
         );
         // No script of any kind: the fallback CSP would block it.

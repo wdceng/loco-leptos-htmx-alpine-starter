@@ -16,6 +16,7 @@ use crate::{
     uploads::{SHRINK_SIDE, SHRINK_UNDER},
     views::{
         layout::{BUTTON, BusyForm, FIELD, LEAD, Notice, ProblemLine, SaidLine, TITLE},
+        pages,
         parts::{DANGER_BUTTON, Dialog, DialogCancel, opens},
     },
 };
@@ -107,7 +108,7 @@ pub fn AccountPage(
     let (avatar_refused, delete_refused) = (avatar_problem.is_some(), delete_problem.is_some());
     let others = browsers.0.iter().filter(|(_, here)| !here).count();
     view! {
-        <h1 class=TITLE>"Your account"</h1>
+        <h1 class=TITLE>{pages::ACCOUNT}</h1>
         <p class=LEAD>{format!("{name}, {email}.")}</p>
         <SaidLine said />
 

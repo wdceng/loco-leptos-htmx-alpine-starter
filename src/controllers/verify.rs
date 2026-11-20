@@ -34,6 +34,7 @@ use crate::{
     render::{render_private_page, render_token_page},
     views::{
         layout::PageMeta,
+        pages,
         verify::{ResendForm, ResendSent, VerifyDone, VerifyExpired, VerifyForm},
     },
 };
@@ -61,7 +62,7 @@ pub struct Resend {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Verify your email".into(),
+        title: pages::VERIFY_EMAIL.into(),
         description: "Finish signing up by verifying your email address.".into(),
         // A page reached from a mail, never from a search.
         robots: Some("noindex"),

@@ -17,7 +17,7 @@ use loco_rs::{environment::Environment, prelude::*};
 use crate::{
     render::render_private_page,
     settings,
-    views::{layout::PageMeta, parts::PartsPage},
+    views::{layout::PageMeta, pages, parts::PartsPage},
 };
 
 /// The page's address.
@@ -34,7 +34,7 @@ pub fn mounted_in(env: &Environment) -> bool {
 async fn page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
     let meta = PageMeta {
         lang: "en",
-        title: "Parts".into(),
+        title: pages::PARTS.into(),
         description: "The template's parts, for the browser tests.".into(),
         robots: Some("noindex"),
         canonical: None,

@@ -27,6 +27,7 @@ use crate::{
     views::{
         forgot::{ForgotForm, ForgotSent},
         layout::PageMeta,
+        pages,
     },
 };
 
@@ -43,7 +44,7 @@ pub struct Submitted {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Forgot your password".into(),
+        title: pages::FORGOT_PASSWORD.into(),
         description: "Get a link to choose a new password.".into(),
         robots: None,
         canonical: None,

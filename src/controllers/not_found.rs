@@ -44,10 +44,7 @@ use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use crate::{
     middleware::rate_limit,
     render::{accepts_html, render_page},
-    views::{
-        layout::PageMeta,
-        not_found::{HEADING, NotFoundPage},
-    },
+    views::{layout::PageMeta, not_found::NotFoundPage, pages},
 };
 
 /// A miss: the page for a browser, one line for anything else, never cached.
@@ -62,7 +59,7 @@ async fn miss(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
     }
     let meta = PageMeta {
         lang: "en",
-        title: HEADING.into(),
+        title: pages::NOT_FOUND.into(),
         description: "The page you asked for does not exist.".into(),
         // The 404 status keeps it out of the index already; the tag says
         // so in the page too.

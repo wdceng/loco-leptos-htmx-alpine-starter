@@ -15,7 +15,10 @@ use leptos::{
     prelude::*,
 };
 
-use crate::views::layout::{BUTTON, LEAD, TITLE};
+use crate::views::{
+    layout::{BUTTON, LEAD, TITLE},
+    pages,
+};
 
 /// The dialog's box: centred by the browser in the top layer over a dim
 /// veil, a form's width, 384px at most, 16px inside the screen; taller than
@@ -122,7 +125,7 @@ pub fn Fold(#[prop(into)] summary: String, children: Children) -> impl IntoView 
 pub fn PartsPage() -> impl IntoView {
     const DIALOG_ID: &str = "parts-dialog";
     view! {
-        <h1 class=TITLE>"Parts"</h1>
+        <h1 class=TITLE>{pages::PARTS}</h1>
         <p class=LEAD>"Messages " <Badge count=3 what="unread" /></p>
         <button type="button" {..opens(DIALOG_ID)} class=BUTTON>
             "Open the dialog"

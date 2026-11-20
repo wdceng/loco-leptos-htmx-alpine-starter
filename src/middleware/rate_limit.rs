@@ -567,7 +567,7 @@ mod tests {
             .await
             .expect("body");
         let body = String::from_utf8(body.to_vec()).expect("utf-8");
-        assert!(body.contains("Too many requests"));
+        assert!(body.contains(crate::views::pages::TOO_MANY_REQUESTS));
         assert!(
             body.contains("in 6 seconds"),
             "the page says what the header says"

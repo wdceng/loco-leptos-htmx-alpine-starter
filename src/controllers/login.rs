@@ -39,6 +39,7 @@ use crate::{
     views::{
         layout::PageMeta,
         login::{CodeForm, CodeProblem, LoginForm, SignedIn},
+        pages,
     },
 };
 
@@ -69,7 +70,7 @@ pub struct Submitted {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Sign in".into(),
+        title: pages::SIGN_IN.into(),
         description: "Sign in to your account.".into(),
         robots: None,
         canonical: None,
@@ -190,7 +191,7 @@ async fn waiting(ctx: &AppContext, headers: &HeaderMap) -> Result<Option<(String
 
 fn code_meta() -> PageMeta {
     PageMeta {
-        title: "Your sign-in code".into(),
+        title: pages::SIGN_IN_CODE.into(),
         description: "The code we mailed you, to finish signing in.".into(),
         ..meta()
     }

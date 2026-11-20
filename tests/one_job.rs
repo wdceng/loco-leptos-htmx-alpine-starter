@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use app::views::pages;
+
 /// The project's `src/`.
 fn src() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -385,6 +387,29 @@ fn every_avatar_file_change_is_in_the_turn() {
             pattern,
             &["controllers/account.rs"],
             "`uploads::in_turn` (src/uploads.rs)",
+        );
+    }
+}
+
+/// A page's name, its title and its heading (and a link to it), from
+/// `pages`: six pages wrote it twice and one named itself two ways until
+/// 2026-11-17. "Sign in" and "Sign up" are a button's words too, so they
+/// are not looked for.
+#[test]
+fn every_pages_name_is_its_constant() {
+    for name in [
+        pages::SIGN_IN_CODE,
+        pages::FORGOT_PASSWORD,
+        pages::VERIFY_EMAIL,
+        pages::ACCOUNT,
+        pages::NOT_FOUND,
+        pages::TOO_MANY_REQUESTS,
+        pages::PARTS,
+    ] {
+        assert_one_home(
+            &format!("\"{name}\""),
+            &["views/pages.rs"],
+            "`pages` (src/views/pages.rs)",
         );
     }
 }
