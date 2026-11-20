@@ -4,6 +4,7 @@ use loco_rs::{auth::jwt, hash, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
+use validator::ValidationError;
 
 pub use super::_entities::users::{self, ActiveModel, Entity, Model};
 use crate::hashing;
@@ -21,6 +22,38 @@ pub const EMAIL_VERIFICATION_EXPIRATION_HOURS: i64 = 24;
 #[must_use]
 pub fn normalized_email(email: &str) -> String {
     email.to_lowercase()
+}
+
+/// A name as a paste brings it, made one line: a tab, a line or a
+/// paragraph separator (U+2028, U+2029) a space, the direction marks a
+/// chat or a contacts app wraps a name in (U+202A to U+202E, U+2066 to
+/// U+2069) dropped, so none splits the welcome mail's line or turns the
+/// words beside it around. A line break is left for [`one_line`] to refuse.
+#[must_use]
+pub fn one_line_text(text: &str) -> String {
+    text.chars()
+        .filter(|c| !matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
+        .map(|c| {
+            if matches!(c, '\t' | '\u{2028}' | '\u{2029}') {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+/// A name with no control character: no browser's field sends a line
+/// break, and a forged post could use one to write lines of its own into
+/// the welcome mail's text.
+///
+/// # Errors
+/// A control character in it.
+pub fn one_line(text: &str) -> Result<(), ValidationError> {
+    if text.chars().any(char::is_control) {
+        return Err(ValidationError::new("one_line"));
+    }
+    Ok(())
 }
 
 /// A password's length in characters: at least 8, as NIST SP 800-63B asks,
@@ -42,11 +75,11 @@ pub fn password_problem(password: &str) -> Option<String> {
 /// Why a new account's name or email is refused, or `None`: the rules
 /// [`Validator`] holds, which `before_save` applies too. Checked first, like
 /// [`password_problem`], so the answer says nothing about whether the email
-/// is taken.
+/// is taken. The name as [`one_line_text`] makes it, as it is saved.
 #[must_use]
 pub fn name_or_email_problem(name: &str, email: &str) -> Option<String> {
     let details = Validator {
-        name: name.to_owned(),
+        name: one_line_text(name),
         email: email.to_owned(),
     };
     let errors = Validate::validate(&details).err()?;
@@ -76,8 +109,12 @@ pub struct RegisterParams {
 #[derive(Debug, Validate, Deserialize)]
 pub struct Validator {
     // Capped: the name is chosen by whoever registers and goes into the
-    // welcome mail, which is sent to any address they give.
-    #[validate(length(min = 2, max = 100, message = "Name must be 2 to 100 characters long."))]
+    // welcome mail, which is sent to any address they give. One line, so
+    // it can't add lines to that mail's text.
+    #[validate(
+        length(min = 2, max = 100, message = "Name must be 2 to 100 characters long."),
+        custom(function = "one_line", message = "Name must be one line.")
+    )]
     pub name: String,
     #[validate(email(message = "invalid email"))]
     pub email: String,
@@ -327,7 +364,7 @@ impl Model {
         let user = users::ActiveModel {
             email: ActiveValue::set(email),
             password: ActiveValue::set(password_hash),
-            name: ActiveValue::set(params.name.clone()),
+            name: ActiveValue::set(one_line_text(&params.name)),
             ..Default::default()
         }
         .insert(&txn)
@@ -470,5 +507,39 @@ impl ActiveModel {
         self.magic_link_token = ActiveValue::set(None);
         self.magic_link_expiration = ActiveValue::set(None);
         self.update(db).await.map_err(ModelError::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A paste's separators made spaces and its direction marks dropped,
+    /// the name then one line; a line break left for `one_line` to refuse.
+    #[test]
+    fn a_pasted_name_is_made_one_line() {
+        let pasted = "\u{2068}Ana\u{2069}\u{2028}Anić\tMarić\u{2029}\u{202E}Jr";
+        let made = one_line_text(pasted);
+        assert_eq!(made, "Ana Anić Marić Jr");
+        assert!(one_line(&made).is_ok());
+        assert_eq!(one_line_text("Ana\nAnić"), "Ana\nAnić");
+        for refused in ["Ana\nAnić", "Ana\r\nAnić", "Ana\u{7}", "Ana\u{85}"] {
+            assert!(one_line(refused).is_err(), "{refused:?}");
+        }
+    }
+
+    /// The rule as the forms see it: a name of two lines refused with its
+    /// reason, a pasted one taken.
+    #[test]
+    fn a_name_of_two_lines_is_refused_with_its_reason() {
+        assert_eq!(
+            name_or_email_problem("Ana\nVerify at https://evil.example", "ana@example.com")
+                .as_deref(),
+            Some("Name must be one line.")
+        );
+        assert_eq!(
+            name_or_email_problem("\u{2068}Ana\u{2069}\u{2028}Anić", "ana@example.com"),
+            None
+        );
     }
 }
