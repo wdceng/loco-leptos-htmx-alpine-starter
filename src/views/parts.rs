@@ -1,14 +1,24 @@
 //! The template's parts beyond a page's text: a dialog, a fold and a
 //! badge, in Tailwind's default look, each the one way its job is done
-//! (docs/one-job.md). HTML first, no island: a dialog is a native popover
-//! the browser opens, closes on Escape or a tap outside and keeps in the
-//! top layer, with or without the islands bundle; a fold is `<details>`.
+//! (docs/one-job.md). HTML first: a dialog is the browser's modal
+//! `<dialog>`, opened and closed by its buttons' commands, which the
+//! `Navigation` island takes over (islands/dialogs.rs); a fold is
+//! `<details>`.
 //! What floats over what: `docs/look.md`. As an islands app on this stack
 //! builds its own, in its look.
 
-use leptos::prelude::*;
+use leptos::{
+    attr::{
+        any_attribute::{AnyAttribute, IntoAnyAttribute},
+        custom::custom_attribute,
+    },
+    prelude::*,
+};
 
-use crate::views::layout::{BUTTON, LEAD, TITLE};
+use crate::views::{
+    layout::{BUTTON, LEAD, TITLE},
+    pages,
+};
 
 /// The dialog's box: centred by the browser in the top layer over a dim
 /// veil, a form's width, 384px at most, 16px inside the screen; taller than
@@ -27,16 +37,41 @@ pub const QUIET_BUTTON: &str =
 /// danger colour, its busy look too.
 pub const DANGER_BUTTON: &str = "mt-6 min-h-11 rounded-md bg-danger px-4 py-2 font-semibold text-white transition-opacity busy:pointer-events-none busy:opacity-60 busy:delay-200";
 
-/// A small dialog, `id` what its opening button's `popovertarget` names and
+/// The attributes of a button that opens `dialog`, the one way a [`Dialog`]
+/// opens: the browser's own command, modal (`commandfor`,
+/// `command="show-modal"`), which `Navigation` takes over in every browser,
+/// the focus then on the dialog's Cancel (islands/dialogs.rs).
+pub fn opens(dialog: impl Into<String>) -> Vec<AnyAttribute> {
+    commands(dialog.into(), "show-modal")
+}
+
+/// The attributes of a button that closes `dialog` ([`opens`]):
+/// [`DialogCancel`].
+pub fn closes(dialog: impl Into<String>) -> Vec<AnyAttribute> {
+    commands(dialog.into(), "close")
+}
+
+/// A button's command `command` on `dialog`.
+fn commands(dialog: String, command: &'static str) -> Vec<AnyAttribute> {
+    vec![
+        custom_attribute("commandfor", dialog).into_any_attr(),
+        custom_attribute("command", command).into_any_attr(),
+    ]
+}
+
+/// A small dialog, `id` what its opening button names ([`opens`]) and
 /// `title` its heading, `children` what it holds, a form as a rule, its
-/// buttons ending with [`DialogCancel`]. A native popover (`popover="auto"`):
-/// the browser centres it over a veil and closes it on Escape, a tap
-/// outside or the cancel button, no script of the site's. The focus goes in
-/// only to an `autofocus` element inside, so one is always marked: the
-/// first field, or Cancel where there is none, never the step that can't be
-/// undone. Without it the focus stayed on the opening button, outside what
-/// `aria-modal` lets a screen reader reach (Chrome, Firefox, Edge, the
-/// browser tests, 2026-11-04).
+/// buttons ending with [`DialogCancel`]. The browser's modal `<dialog>`:
+/// centred in the top layer over a veil, the page under it inert to the
+/// keyboard and a screen reader alike, closed by Escape, a press outside
+/// (`closedby`; islands/dialogs.rs where the browser lacks it) or Cancel.
+/// Opened, the focus goes to Cancel (islands/dialogs.rs), so Enter never
+/// does the step that can't be undone and no field's keyboard comes up on
+/// a phone; closed, the browser hands it back to where it was: the opening
+/// button when the keyboard opened it (Safari focuses no button a press
+/// opened, so there it goes back to the page). No
+/// `autofocus` inside: htmx focuses the first `[autofocus]` a swap brings,
+/// a closed dialog's included.
 #[component]
 pub fn Dialog(
     #[prop(into)] id: String,
@@ -46,43 +81,22 @@ pub fn Dialog(
     let heading = format!("{id}-title");
     let labelled_by = heading.clone();
     view! {
-        <div
-            id=id
-            popover="auto"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby=labelled_by
-            class=DIALOG
-        >
+        <dialog id=id closedby="any" aria-labelledby=labelled_by class=DIALOG>
             <h2 id=heading class=DIALOG_TITLE>
                 {title}
             </h2>
             {children()}
-        </div>
+        </dialog>
     }
 }
 
-/// The button that closes the dialog `target` without doing its step.
-///
-/// No form owner (`form=""`): it sits inside the dialog's form as a rule,
-/// and Safari 17 runs no `popovertarget` on a button inside a form, so
-/// Cancel did nothing on iOS 17.5, the low bar; the others follow the spec
-/// either way (an islands app on this stack, a probe, 2026-11-04).
-/// `autofocus` where the dialog has no field to take the focus ([`Dialog`]).
+/// The button that closes the dialog `target` without doing its step,
+/// where the focus goes as the dialog opens (`data-cancel`,
+/// islands/dialogs.rs).
 #[component]
-pub fn DialogCancel(
-    #[prop(into)] target: String,
-    #[prop(optional)] autofocus: bool,
-) -> impl IntoView {
+pub fn DialogCancel(#[prop(into)] target: String) -> impl IntoView {
     view! {
-        <button
-            type="button"
-            form=""
-            popovertarget=target
-            popovertargetaction="hide"
-            autofocus=autofocus
-            class=QUIET_BUTTON
-        >
+        <button type="button" data-cancel="" {..closes(target)} class=QUIET_BUTTON>
             "Cancel"
         </button>
     }
@@ -105,21 +119,21 @@ pub fn Fold(#[prop(into)] summary: String, children: Children) -> impl IntoView 
 
 /// Every part on one page, for the browser tests (`/e2e/parts`,
 /// controllers/parts.rs): a badge, a dialog with its opening button, a
-/// fold. The dialog's Cancel inside a form, as a real dialog's is (Safari
-/// 17, [`DialogCancel`]); the form is never sent.
+/// fold. The dialog's Cancel inside a form, as a real dialog's is; the
+/// form is never sent.
 #[component]
 pub fn PartsPage() -> impl IntoView {
     const DIALOG_ID: &str = "parts-dialog";
     view! {
-        <h1 class=TITLE>"Parts"</h1>
+        <h1 class=TITLE>{pages::PARTS}</h1>
         <p class=LEAD>"Messages " <Badge count=3 what="unread" /></p>
-        <button type="button" popovertarget=DIALOG_ID class=BUTTON>
+        <button type="button" {..opens(DIALOG_ID)} class=BUTTON>
             "Open the dialog"
         </button>
         <Dialog id=DIALOG_ID title="A dialog">
             <form method="post" hx-sync="this:drop">
                 <p class="mt-4">"What it asks."</p>
-                <DialogCancel target=DIALOG_ID autofocus=true />
+                <DialogCancel target=DIALOG_ID />
             </form>
         </Dialog>
         <Fold summary="A fold">

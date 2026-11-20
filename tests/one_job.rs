@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use app::views::pages;
+
 /// The project's `src/`.
 fn src() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -66,12 +68,25 @@ fn files() -> Vec<(String, String)> {
 /// The code lines under `src/` holding `pattern`, as `src/path:line`,
 /// outside the files of `home` (paths from `src/`).
 fn outside_home(pattern: &str, home: &[&str]) -> Vec<String> {
+    outside_home_by(home, |line| line.contains(pattern))
+}
+
+/// [`outside_home`] in any case, for a name read in any case: a header's
+/// (`Sec-Fetch-Site` and `sec-fetch-site` alike).
+fn outside_home_any_case(pattern: &str, home: &[&str]) -> Vec<String> {
+    let pattern = pattern.to_lowercase();
+    outside_home_by(home, |line| line.to_lowercase().contains(&pattern))
+}
+
+/// The code lines under `src/` that `holds` picks, outside the files of
+/// `home`.
+fn outside_home_by(home: &[&str], holds: impl Fn(&str) -> bool) -> Vec<String> {
     files()
         .into_iter()
         .filter(|(relative, _)| !home.contains(&relative.as_str()))
         .flat_map(|(relative, text)| {
             code_lines(&text)
-                .filter(|(_, line)| line.contains(pattern))
+                .filter(|(_, line)| holds(line))
                 .map(|(number, line)| format!("src/{relative}:{number}: {}", line.trim()))
                 .collect::<Vec<_>>()
         })
@@ -81,7 +96,16 @@ fn outside_home(pattern: &str, home: &[&str]) -> Vec<String> {
 /// Fails with every line holding `pattern` outside `home`, and the row to
 /// build from instead.
 fn assert_one_home(pattern: &str, home: &[&str], row: &str) {
-    let found = outside_home(pattern, home);
+    assert_none_outside(pattern, &outside_home(pattern, home), row);
+}
+
+/// [`assert_one_home`] in any case ([`outside_home_any_case`]).
+fn assert_one_home_any_case(pattern: &str, home: &[&str], row: &str) {
+    assert_none_outside(pattern, &outside_home_any_case(pattern, home), row);
+}
+
+/// The one failure message of both.
+fn assert_none_outside(pattern: &str, found: &[String], row: &str) {
     assert!(
         found.is_empty(),
         "`{pattern}` outside its one implementation; build it from {row} (docs/one-job.md):\n{}",
@@ -292,14 +316,31 @@ fn every_sqlx_transaction_begins_one_way() {
     assert_one_home("pool.begin", &["sql.rs"], "`write` (src/sql.rs)");
 }
 
-/// Whether another site's page sent a post is read in one place, which
-/// every form's target calls first.
+/// Whether another site's page sent a post is read in one place, the
+/// extractor `SameSite` every form's target takes: a check in a handler's
+/// body ran after its body was read and was free to be forgotten, until
+/// 2026-11-17 (`tests/requests/canaries.rs` posts to every route). In any
+/// case, as a header's name is read: `Sec-Fetch-Site` slipped past a
+/// case-sensitive guard in an islands app on this stack.
 #[test]
-fn every_form_refuses_a_cross_site_post_one_way() {
-    assert_one_home(
+fn every_cross_site_check_is_the_extractor() {
+    assert_one_home_any_case(
         "sec-fetch-site",
         &["controllers/cross_site.rs"],
-        "`cross_site::refused` (src/controllers/cross_site.rs)",
+        "`SameSite` (src/controllers/cross_site.rs)",
+    );
+}
+
+/// A dialog opens and closes by its button's command, written one way
+/// (`opens`, `closes`, views/parts.rs) and taken over in every browser by
+/// `Navigation` (islands/dialogs.rs): an islands app on this stack had its
+/// openers write their attribute themselves until its dialogs went modal.
+#[test]
+fn every_dialog_opens_by_the_one_command() {
+    assert_one_home(
+        "commandfor",
+        &["views/parts.rs", "islands/dialogs.rs"],
+        "`opens` and `closes` (src/views/parts.rs)",
     );
 }
 
@@ -330,6 +371,49 @@ fn every_blocking_work_is_capped_one_way() {
     );
 }
 
+/// An avatar's file is written and taken away, and an account deleted with
+/// it, only in the one controller that runs them in the uploads' turn: two
+/// saves took each other's file until 2026-11-17. It pins the file, not
+/// the turn: a call there outside `in_turn` passes.
+#[test]
+fn every_avatar_file_change_is_in_the_turn() {
+    for pattern in [
+        "uploads::keep(",
+        "uploads::forget(",
+        "avatars::set(",
+        "users::Entity::delete_by_id(",
+    ] {
+        assert_one_home(
+            pattern,
+            &["controllers/account.rs"],
+            "`uploads::in_turn` (src/uploads.rs)",
+        );
+    }
+}
+
+/// A page's name, its title and its heading (and a link to it), from
+/// `pages`: six pages wrote it twice and one named itself two ways until
+/// 2026-11-17. "Sign in" and "Sign up" are a button's words too, so they
+/// are not looked for.
+#[test]
+fn every_pages_name_is_its_constant() {
+    for name in [
+        pages::SIGN_IN_CODE,
+        pages::FORGOT_PASSWORD,
+        pages::VERIFY_EMAIL,
+        pages::ACCOUNT,
+        pages::NOT_FOUND,
+        pages::TOO_MANY_REQUESTS,
+        pages::PARTS,
+    ] {
+        assert_one_home(
+            &format!("\"{name}\""),
+            &["views/pages.rs"],
+            "`pages` (src/views/pages.rs)",
+        );
+    }
+}
+
 /// The template is public and code is copied into it from other apps on
 /// this stack, so no tracked file, comments included, names the
 /// maintainer: they are "the maintainer" (the maintainer's call,
@@ -337,6 +421,66 @@ fn every_blocking_work_is_capped_one_way() {
 #[test]
 fn no_tracked_file_names_the_maintainer() {
     let name = ["dav", "or"].concat();
+    let found = tracked_lines("", |line| line.to_lowercase().contains(&name));
+    assert!(found.is_empty(), "the maintainer named: {found:?}");
+}
+
+/// The template is public and copied into every new project, so no tracked
+/// file names another project, a client or a machine: a sibling app is "an
+/// islands app on this stack", a machine its role, its name and address in
+/// the git-ignored `CLAUDE.local.md` (the maintainer's call, 2026-11-19).
+/// The skills' lists under `.claude/` hold no address either; the deploy
+/// docs' example addresses are the documentation ranges. The names are
+/// kept in halves so this file doesn't hold them.
+#[test]
+fn no_tracked_file_names_another_project_or_a_machine() {
+    let words: Vec<String> = [["e", "cs"], ["l", "js"], ["ecq", "ta"], ["w", "dc"]]
+        .iter()
+        .map(|halves| halves.concat())
+        .collect();
+    // A machine by its short name after "the" or "ssh", never `grep -m1`.
+    let parts: Vec<String> = [
+        ["pharm", "ac"],
+        ["ljek", "arn"],
+        ["summa", "-con"],
+        ["the m", "1"],
+        ["the m", "5"],
+        ["ssh m", "1"],
+    ]
+    .iter()
+    .map(|halves| halves.concat())
+    .collect();
+    let named = |line: &str| {
+        let line = line.to_lowercase();
+        line.split(|c: char| !c.is_ascii_alphanumeric())
+            .any(|word| words.iter().any(|named| named == word))
+            || parts.iter().any(|part| line.contains(part))
+    };
+    let mut found = tracked_lines("", named);
+    found.extend(tracked_lines(".claude/", holds_an_address));
+    assert!(
+        found.is_empty(),
+        "another project, a client, a machine or an address named: {found:?}"
+    );
+}
+
+/// An IPv4 address other than the loopback's: four numbers joined by dots.
+fn holds_an_address(line: &str) -> bool {
+    line.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .any(|word| {
+            let numbers: Vec<&str> = word.split('.').collect();
+            numbers.len() == 4
+                && numbers
+                    .iter()
+                    .all(|n| !n.is_empty() && n.len() <= 3 && n.parse::<u8>().is_ok())
+                && !word.starts_with("127.")
+                && word != "0.0.0.0"
+        })
+}
+
+/// Every line, as `file:line`, of the tracked text files under `under`
+/// (`""` for all) that `holds`. A binary file has no text to read.
+fn tracked_lines(under: &str, holds: impl Fn(&str) -> bool) -> Vec<String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let listed = std::process::Command::new("git")
         .args(["ls-files", "-z"])
@@ -346,23 +490,32 @@ fn no_tracked_file_names_the_maintainer() {
     assert!(listed.status.success(), "git ls-files failed");
     let files: Vec<String> = String::from_utf8_lossy(&listed.stdout)
         .split('\0')
-        .filter(|file| !file.is_empty())
+        .filter(|file| !file.is_empty() && file.starts_with(under))
         .map(str::to_owned)
         .collect();
-    assert!(files.len() > 100, "too few files listed: {}", files.len());
+    assert!(files.len() > 10, "too few files listed: {}", files.len());
     let mut found = Vec::new();
     for file in &files {
-        // A binary file (an icon, a picture) has no text to read.
         let Ok(text) = fs::read_to_string(root.join(file)) else {
             continue;
         };
         for (at, line) in text.lines().enumerate() {
-            if line.to_lowercase().contains(&name) {
+            if holds(line) {
                 found.push(format!("{file}:{}", at + 1));
             }
         }
     }
-    assert!(found.is_empty(), "the maintainer named: {found:?}");
+    found
+}
+
+/// The address check: a box's address found, the loopback and a version
+/// number left alone.
+#[test]
+fn an_address_is_found_and_a_version_is_not() {
+    assert!(holds_an_address("ssh root@203.0.113.7 \"ls\""));
+    assert!(!holds_an_address("http://127.0.0.1:5150"));
+    assert!(!holds_an_address("sqlx 0.9.1 and tauri 2.12.7"));
+    assert!(!holds_an_address("listen on 0.0.0.0"));
 }
 
 /// The check itself: a code line holding the pattern is found, a comment
@@ -377,6 +530,10 @@ fn the_check_finds_code_and_leaves_comments_and_the_home() {
     assert!(
         !outside_home("pub const TITLE", &[]).is_empty(),
         "the constant's own line not found"
+    );
+    assert!(
+        !outside_home_any_case("PUB CONST TITLE", &[]).is_empty(),
+        "the constant's own line not found in any case"
     );
     assert!(
         outside_home("pub const TITLE", &["views/layout.rs"]).is_empty(),

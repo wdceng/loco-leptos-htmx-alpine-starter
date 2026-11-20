@@ -2,8 +2,8 @@
 
 It's all Rust to build and run, no Node.js. Tailwind, wasm-bindgen and
 wasm-opt are standalone binaries that cargo-leptos downloads on first use.
-Node 24+ runs two checks only: the stylesheet's lint (`npm install` once,
-then `npm run lint`) and `src-tauri/links.sh`, which reads the app's page
+Node 24+ runs two checks only: the lint of the stylesheet and of
+`public/js/` (`npm install` once, then `npm run lint`) and `src-tauri/links.sh`, which reads the app's page
 with Node's WebSocket.
 
 Install commands are each tool's own. Your package manager works too.
@@ -450,8 +450,8 @@ When (`docs/decisions.md`, Working):
   SDK (emulator, images, platform tools), Xcode and its Simulators.
 - **A release at least two weeks old.** A newer one waits for next month.
 - **Security fixes at once**, outside the month: a crate's advisory, macOS.
-- **The M5 first**, then one Android lane (`e2e/run.sh android`), then the
-  M1.
+- **The development Mac first**, then one Android lane
+  (`e2e/run.sh android`), then the test machine.
 - **One major upgrade at a time**, each its own commit; the versions within
   a major together.
 - **Never while the browser lanes run.**

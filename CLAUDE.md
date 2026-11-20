@@ -125,6 +125,7 @@ Act as an experienced senior Rust developer delivering production code:
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
+npm run lint
 cargo test
 ```
 

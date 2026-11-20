@@ -23,15 +23,17 @@ use axum::{
 use leptos::view;
 use loco_rs::prelude::*;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 use crate::{
     app::stored,
-    controllers::{cross_site, signed::Signed},
+    controllers::{cross_site::SameSite, signed::Signed},
     cookies,
+    mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::{
         avatars::{self, Avatars},
-        sessions::{self, Session},
+        sessions::{self, Session, label_of},
         users::{self, password_problem},
     },
     render::render_private_page,
@@ -39,6 +41,7 @@ use crate::{
     views::{
         account::{AccountDeleted, AccountPage, Browsers, Problem},
         layout::PageMeta,
+        pages,
     },
 };
 
@@ -91,7 +94,7 @@ pub struct Deletion {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Your account".into(),
+        title: pages::ACCOUNT.into(),
         description: "Your account: where you are signed in, your password.".into(),
         // A page of one signed-in person, never a search's.
         robots: Some("noindex"),
@@ -153,18 +156,17 @@ async fn page(State(ctx): State<AppContext>, signed: Signed, req: Request) -> Re
 
 /// `POST /account/avatar`: the picture sent made into the avatar
 /// (src/uploads.rs), off the async threads, a few at a time
-/// (`uploads::Place`), then the page again; the one
+/// (`uploads::Place`), kept and named in the uploads' turn
+/// (`uploads::in_turn`), then the page again; the one
 /// it replaces gone once nobody shows it. Refused, the page with the
 /// reason, its title starting "Error: ".
 async fn avatar(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     parts: Parts,
     mut form: Multipart,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "avatar") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     // A place among the uploads at once, taken before the body is read.
     let place = uploads::Place::wait().await?;
@@ -192,14 +194,8 @@ async fn avatar(
         }
     };
     let Avatars(folder) = stored(&ctx)?;
-    let name = uploads::keep(&folder, &jpeg).await.map_err(Error::wrap)?;
-    let pool = sql::pool(&ctx);
-    let before = avatars::set(pool, signed.user.id, Some(&name))
-        .await
-        .map_err(Error::wrap)?;
-    if let Some(before) = before.filter(|before| *before != name) {
-        forget_unused(&ctx, &folder, &before).await?;
-    }
+    let (pool, user_id) = (sql::pool(&ctx).clone(), signed.user.id);
+    uploads::in_turn(async move { replace_avatar(&pool, &folder, user_id, &jpeg).await }).await??;
     tracing::info!(pid = signed.user.pid.to_string(), "avatar changed");
     let said = "Your picture is changed.";
     answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
@@ -225,12 +221,34 @@ async fn avatar_field(form: &mut Multipart) -> std::result::Result<Vec<u8>, &'st
     Ok(upload)
 }
 
-/// The avatar `name` taken away from `folder` once no user shows it.
-async fn forget_unused(ctx: &AppContext, folder: &std::path::Path, name: &str) -> Result<()> {
-    if !avatars::in_use(sql::pool(ctx), name)
-        .await
-        .map_err(Error::wrap)?
-    {
+/// `jpeg` kept and made `user_id`'s avatar, the one it replaced taken away
+/// once nobody shows it. Run in the uploads' turn (`uploads::in_turn`). The
+/// file kept goes too where no row names it after all: the write refused,
+/// or the account deleted meanwhile.
+async fn replace_avatar(
+    pool: &SqlitePool,
+    folder: &std::path::Path,
+    user_id: i64,
+    jpeg: &[u8],
+) -> Result<()> {
+    let name = uploads::keep(folder, jpeg).await.map_err(Error::wrap)?;
+    let before = match avatars::set(pool, user_id, Some(&name)).await {
+        Ok(before) => before,
+        Err(e) => {
+            forget_unused(pool, folder, &name).await?;
+            return Err(Error::wrap(e));
+        }
+    };
+    if let Some(before) = before.filter(|before| *before != name) {
+        forget_unused(pool, folder, &before).await?;
+    }
+    forget_unused(pool, folder, &name).await
+}
+
+/// The avatar `name` taken away from `folder` once no user shows it. Run in
+/// the uploads' turn.
+async fn forget_unused(pool: &SqlitePool, folder: &std::path::Path, name: &str) -> Result<()> {
+    if !avatars::in_use(pool, name).await.map_err(Error::wrap)? {
         uploads::forget(folder, name).await.map_err(Error::wrap)?;
     }
     Ok(())
@@ -241,12 +259,9 @@ async fn forget_unused(ctx: &AppContext, folder: &std::path::Path, name: &str) -
 async fn close(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     Path(id): Path<i64>,
-    parts: Parts,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "close a browser") {
-        return Ok(forbidden);
-    }
     if Session::close_of(sql::pool(&ctx), signed.user.id, id)
         .await
         .map_err(Error::wrap)?
@@ -261,11 +276,8 @@ async fn close(
 async fn close_others(
     State(ctx): State<AppContext>,
     signed: Signed,
-    parts: Parts,
+    _: SameSite,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "close the other browsers") {
-        return Ok(forbidden);
-    }
     Session::close_others(sql::pool(&ctx), signed.user.id, signed.session.id)
         .await
         .map_err(Error::wrap)?;
@@ -283,12 +295,11 @@ async fn close_others(
 async fn password(
     State(ctx): State<AppContext>,
     mut signed: Signed,
+    _: SameSite,
     parts: Parts,
     Form(form): Form<NewPassword>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "new password") {
-        return Ok(forbidden);
-    }
+    let browser = label_of(&parts.headers);
     let req = Request::from_parts(parts, Body::empty());
     let refused = if signed.user.verify_password(&form.current).await {
         password_problem(&form.password).map(Problem::New)
@@ -325,6 +336,8 @@ async fn password(
         pid = user.pid.to_string(),
         "password changed on the account page"
     );
+    // Told by mail, with the way to a new one (OWASP ASVS 4.0.3, 2.2.3).
+    AuthMailer::password_changed(&ctx, &user, &browser).await?;
     let said = "Your password is changed, and every other browser is signed out.";
     answer(&ctx, req, signed, StatusCode::OK, None, Some(said)).await
 }
@@ -337,12 +350,10 @@ async fn password(
 async fn delete(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     parts: Parts,
     Form(form): Form<Deletion>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "delete the account") {
-        return Ok(forbidden);
-    }
     if !signed.session.proven() && !signed.user.verify_password(&form.password).await {
         let req = Request::from_parts(parts, Body::empty());
         let problem = Problem::Delete(WRONG_PASSWORD.to_string());
@@ -356,18 +367,19 @@ async fn delete(
         )
         .await;
     }
-    let pool = sql::pool(&ctx);
-    let avatar = avatars::of(pool, signed.user.id)
-        .await
-        .map_err(Error::wrap)?;
-    users::Entity::delete_by_id(signed.user.id)
-        .exec(&ctx.db)
-        .await?;
-    // The picture with the account, once nobody else shows it.
-    if let Some(avatar) = avatar {
-        let Avatars(folder) = stored(&ctx)?;
-        forget_unused(&ctx, &folder, &avatar).await?;
-    }
+    let Avatars(folder) = stored(&ctx)?;
+    let (pool, db, user_id) = (sql::pool(&ctx).clone(), ctx.db.clone(), signed.user.id);
+    // In the uploads' turn: no save of the same picture keeps its file meanwhile.
+    uploads::in_turn(async move {
+        let avatar = avatars::of(&pool, user_id).await.map_err(Error::wrap)?;
+        users::Entity::delete_by_id(user_id).exec(&db).await?;
+        // The picture with the account, once nobody else shows it.
+        if let Some(avatar) = avatar {
+            forget_unused(&pool, &folder, &avatar).await?;
+        }
+        Ok::<_, Error>(())
+    })
+    .await??;
     tracing::info!(pid = signed.user.pid.to_string(), "account deleted");
     let mut res = (StatusCode::SEE_OTHER, [(LOCATION, DELETED)]).into_response();
     cookies::store(&mut res, &Session::cookie_deleted(cookies::secure(&ctx)))?;

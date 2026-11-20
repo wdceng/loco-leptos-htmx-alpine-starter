@@ -130,7 +130,8 @@ Clippy on the browser half:
 cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
 ```
 
-The stylesheet, by ESLint (`npm install` once, Node 24+):
+The stylesheet by ESLint, then the two helpers in `public/js/` by
+TypeScript (`jsconfig.json`; `npm install` once, Node 24+):
 
 ```bash
 npm run lint
@@ -143,6 +144,8 @@ island code.
   `/* eslint-disable css/use-baseline */` … `/* eslint-enable … */`
   around those lines alone, with the reason (`@property` in
   `style/tailwind.css`).
+- **A global a helper reads** (from Leptos, htmx) gets its type in
+  `jsconfig.types.d.ts`, never an `any`.
 - **A mistyped class** (`text-primay`) is caught by nothing: Tailwind
   writes no CSS for it and says nothing. Look at the page.
 
@@ -585,9 +588,12 @@ The phones:
   ios init` and `android init` in a scratch worktree and kept as
   generated. Their names and ids come from `tauri.conf.json` at that
   moment: after a rename, generate them again.
-- **Two Android files aren't as generated:** `MainActivity.kt` (the
-  status bar's colour) and `core-ktx` in `app/build.gradle.kts`. A new
-  `android init` overwrites them: bring both back.
+- **Android files not as generated:** `MainActivity.kt` (the status
+  bar's colour, the system's buttons at a day-night switch), `core-ktx`
+  in `app/build.gradle.kts`, `AndroidManifest.xml` (`taskAffinity`,
+  backups off) and `res/xml/data_extraction_rules.xml`. A new
+  `android init` overwrites the first three: bring them back. The tests
+  in `src-tauri/src/lib.rs` hold the manifest's.
 - **The identifier: letters, digits and dots only.** Tauri turns a `-`
   into `_` for Android and a `_` into `-` for iOS, so either gives the app
   two ids. It's permanent once the app is installed anywhere.

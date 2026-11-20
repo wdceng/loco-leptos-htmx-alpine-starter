@@ -623,6 +623,47 @@ fn a_deployed_server_listens_on_loopback_and_keeps_its_database(#[case] env: Env
     assert!(!config.database.dangerously_recreate, "{env}");
 }
 
+/// Each server's port is its environment's in the project's block of ten
+/// (production X0, staging X1, the dev-server X2; docs/decisions.md), and
+/// its deploy doc's loopback rule closes that block to all but root and
+/// Caddy ("The app's ports on loopback").
+#[test]
+fn each_server_takes_its_port_in_the_block_the_loopback_rule_closes() {
+    let mut block = None;
+    for (digit, path) in [
+        (0, "docs/production.md"),
+        (1, "docs/staging.md"),
+        (2, "docs/dev-server.md"),
+    ] {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        let port: u16 = text
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("Environment=PORT="))
+            .and_then(|port| port.trim().parse().ok())
+            .unwrap_or_else(|| panic!("{path}: no `Environment=PORT=`"));
+        assert_eq!(
+            port % 10,
+            digit,
+            "{path}: {port} is not its environment's port"
+        );
+        let first = *block.get_or_insert(port - digit);
+        assert_eq!(
+            port - digit,
+            first,
+            "{path}: {port} outside the block {first}"
+        );
+        // The rule file's own line, not the counting table's.
+        let rule = format!(
+            "oif \"lo\" tcp dport {first}-{} meta skuid != {{ root, caddy }} counter reject",
+            first + 9
+        );
+        assert!(
+            text.contains(&rule),
+            "{path}: the loopback rule doesn't close `{rule}`"
+        );
+    }
+}
+
 /// SQLite's PRAGMAs are Loco's, the same on every connection of the pool
 /// (WAL, `synchronous` NORMAL, the busy timeout, foreign keys on;
 /// docs/architecture.md): no environment overrides them or runs SQL of its

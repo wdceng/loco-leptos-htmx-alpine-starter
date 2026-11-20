@@ -103,6 +103,15 @@ change of mind gets a new line, and the old one moves to
   production's exact binary. Only the dev server uses the fast profile,
   renamed `dev-server` from `staging`. Every deployed profile is fully
   stripped: with Zig's linker, line tables made a 2 GB binary.
+- 2026-11-17: **A block of ten ports a project, the last digit the
+  environment:** production X0, staging X1, the dev-server X2, a trial X3.
+  Here 5150 to 5159: production 5150, Loco's default, staging 5151, the
+  dev-server 5152, a release build tried locally 5153; the browser tests'
+  lanes from 5160 and the live reload's 3001 stay on the Mac. Apps share
+  a box: a block an app keeps their ports apart and lets one loopback rule
+  name them all ("The app's ports on loopback" in the deploy docs). A
+  project made from this template takes a block of its own. As an islands
+  app on this stack.
 
 ## Islands
 
@@ -296,9 +305,33 @@ change of mind gets a new line, and the old one moves to
   measure: it keeps every element an entry names, and Chrome's notice
   about the reset form kept one old `<main>` per Back. Without DevTools,
   Chrome kept none (a probe).
+- 2026-11-17: **A dialog is a modal `<dialog>`, opened by its button's
+  command,** not a popover. A popover left the page under it reachable:
+  Tab went past Cancel to the page under the veil. `opens` and `closes`
+  write the browser's command (`commandfor`, `command`), and `Navigation`
+  takes it over in every browser: the focus on Cancel, a press outside
+  closing it where `closedby` is missing. An island, not Alpine: the CSP
+  build refuses to touch `document`, so a button can't reach a dialog by
+  its id. The cost: below Chrome 135, Firefox 144 and Safari 26.2, the
+  low bar included, a dialog opens only once the WASM runs. As an islands
+  app on this stack.
+- 2026-11-17: **The islands script hands htmx every link and form put in
+  later**, not only `hx-*` (`public/js/htmx-islands.js`): htmx 4 watches
+  nothing and boosts a link or form only when it processes it, so one an
+  island renders would load the whole page. Processing again what a swap
+  brings does nothing, as htmx skips what it has set up.
+  `Page::add_link` no longer processes the region itself. As an islands
+  app on this stack.
 
 ## Security
 
+- 2026-11-17: **One avatar is saved at a time, in a task of its own,** as
+  an islands app on this stack saves its photos. Its file kept, its row
+  set and the old file taken away, and an account's deletion with its
+  file, run in one turn (`uploads::in_turn`). Before, a save could find
+  its file there, skip the write, and lose it to another save's clean-up
+  before its own row named it; a request timed out midway left a file
+  nobody shows.
 - 2026-11-17: **An upload's memory is bounded,** as an islands app on
   this stack bounds its photos. `image` holds only a picture's sides, so
   a 16-bit PNG at 6000 pixels a side decoded to 288 MB. A picture is now
@@ -311,6 +344,34 @@ change of mind gets a new line, and the old one moves to
   runs. The peak is about twice the decoded picture, the crop or the
   turn copying it, so up to about 1.2 GB with four at once; four slow
   senders can hold every place until the request's timeout.
+- 2026-11-17: **Only root and Caddy open the app's ports,** 5150 to 5159,
+  by a table of nftables' own (`app_loopback`, loaded at boot by
+  `app-loopback.service`). The app keys each visitor on the
+  `CF-Connecting-IP` Caddy hands it, so any other process on the box could
+  name its own address to the rate limiter. Counted for a day first, then
+  loaded only while the count is 0. As an islands app on this stack.
+- 2026-11-17: **A cross-site post is refused by one extractor,
+  `SameSite`,** not a check written first in each handler. The check ran
+  after the body was read, so a bad body answered 422 before it, and a
+  new handler was free to forget it; the extractor answers before the
+  body, and the canary holds every POST to its plain 403. As an islands
+  app on this stack.
+- 2026-11-17: **A name is one line.** Whoever signs up types it, and the
+  welcome mail's text part repeats it to any address, so a line break
+  there writes the sender's own lines into the app's mail. A control
+  character is refused with the name's rule. A tab, a line or paragraph
+  separator becomes a space and the marks that turn text around (U+202A
+  to U+202E, U+2066 to U+2069) are dropped, as a paste from a chat or a
+  contacts app brings them; the plain marks (U+200E, U+200F) stay, as
+  they turn nothing beside them. As in an islands app on this stack.
+- 2026-11-17: **A new password is mailed to the person,** from the
+  account page and the reset link alike, with the browser named and a
+  link to choose another: a change nobody asked for is someone else's
+  (OWASP ASVS 4.0.3, 2.2.3). As an islands app on this stack.
+- 2026-11-17: **The Android app's data stays off backups and new
+  phones:** `allowBackup` off, plus `data_extraction_rules.xml` for
+  Android 12 and up, whose phone-to-phone transfer ignores the flag. The
+  webview keeps the session's cookie. As an islands app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
@@ -459,6 +520,27 @@ change of mind gets a new line, and the old one moves to
 
 ## Working
 
+- 2026-11-19: **The maintainer's skills live here too, generic.**
+  `.claude/skills/` holds the review, the audits (security, UX, native),
+  the dependency and upgrade checks, the tools check and the coverage
+  check, each the method alone; what is the starter's own is in a list
+  beside them (`.claude/review.md`, `security.md`, `ux.md`, `native.md`,
+  `deps.md`, `tools.md`, `coverage.md`), which a new project rewrites for
+  itself. Public and copied, so a guard keeps other projects' names,
+  machines and addresses out (`tests/one_job.rs`); those stay in the
+  git-ignored `CLAUDE.local.md`.
+- 2026-11-19: **The two helpers in `public/js/` are type-checked.**
+  TypeScript (`typescript` 7.0.2) checks them in `npm run lint`, with
+  JSDoc types and `jsconfig.json` (`checkJs`, `strict`); the globals they
+  read from Leptos and htmx are in `jsconfig.types.d.ts`, which no browser
+  loads. A wrong event field or a `null` element fails the lint, not a
+  browser run. Node still runs checks only.
+- 2026-11-17: **A page's name is written once, in `views/pages.rs`,**
+  its title and its heading read from it, and a link that names the
+  page. Six pages wrote it twice and the forgotten password's page named
+  itself two ways (its title now has the heading's "?"); two kept it in
+  a module of their own. A button's words stay the button's. As an
+  islands app on this stack.
 - 2026-11-02: **One command a block, a hint above it, no `#` comment on
   it.** The copy button copies a block, and it should copy the command
   alone. A pipeline split over lines by `&&` stays one block, and so does
@@ -521,6 +603,12 @@ change of mind gets a new line, and the old one moves to
   down, with Google's `GradientProtection`: a scrolled page ran on under
   the see-through bar. The colour is read from the page's `theme-color`,
   so the app holds no copy. From an islands app on this stack.
+- 2026-11-17: **Android's system buttons follow a day-night switch**
+  while the app runs: `enableEdgeToEdge` again in
+  `onConfigurationChanged`. It reads the scheme once a call, and the
+  activity outlives the switch (`uiMode` in `configChanges`), so the
+  buttons stayed light under a dark page. From an islands app on this
+  stack.
 - 2026-10-29: **The app hands calls, mails and texts to the system.** On
   Android the webview opened a footer's phone number itself and showed
   its error page with no way back. `tauri-plugin-opener`, used from Rust

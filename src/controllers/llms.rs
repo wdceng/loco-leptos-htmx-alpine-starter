@@ -9,9 +9,16 @@
 use axum::{http::header::CONTENT_TYPE, response::IntoResponse};
 use loco_rs::prelude::*;
 
-use crate::{controllers::home::DESCRIPTION, views::layout::APP_NAME};
+use crate::{
+    controllers::home::DESCRIPTION,
+    views::{
+        layout::APP_NAME,
+        pages::{FORGOT_PASSWORD, SIGN_IN, SIGN_UP},
+    },
+};
 
-/// The Markdown for a site whose public origin is `host`.
+/// The Markdown for a site whose public origin is `host`, each page by its
+/// own name (`views/pages.rs`).
 #[must_use]
 pub fn body_for(host: &str) -> String {
     let host = host.trim_end_matches('/');
@@ -20,9 +27,9 @@ pub fn body_for(host: &str) -> String {
          > {DESCRIPTION}\n\n\
          ## Pages\n\n\
          - [Home]({host}/): what the site is\n\
-         - [Sign in]({host}/login): sign in to your account\n\
-         - [Sign up]({host}/register): make an account\n\
-         - [Forgot your password]({host}/forgot): get a link to choose a new one\n"
+         - [{SIGN_IN}]({host}/login): sign in to your account\n\
+         - [{SIGN_UP}]({host}/register): make an account\n\
+         - [{FORGOT_PASSWORD}]({host}/forgot): get a link to choose a new one\n"
     )
 }
 

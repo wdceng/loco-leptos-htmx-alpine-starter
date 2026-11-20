@@ -7,7 +7,10 @@ use leptos::prelude::*;
 use crate::{
     controllers::{login, register::PATH},
     models::users::{EMAIL_VERIFICATION_EXPIRATION_HOURS, PASSWORD_MAX, PASSWORD_MIN},
-    views::layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, ProblemLine, TITLE},
+    views::{
+        layout::{BUTTON, BusyForm, FIELD, LEAD, NextSteps, Notice, ProblemLine, TITLE},
+        pages,
+    },
 };
 
 /// The `id` of the line saying why the sign-up was refused.
@@ -22,7 +25,7 @@ const SIGN_UP_PROBLEM: &str = "sign-up-problem";
 pub fn RegisterForm(name: String, email: String, problem: Option<String>) -> impl IntoView {
     let refused = problem.is_some();
     view! {
-        <h1 class=TITLE>"Sign up"</h1>
+        <h1 class=TITLE>{pages::SIGN_UP}</h1>
         <p class=LEAD>
             {format!("A password of {PASSWORD_MIN} to {PASSWORD_MAX} characters. Any characters work.")}
         </p>

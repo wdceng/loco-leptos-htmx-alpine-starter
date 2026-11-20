@@ -183,6 +183,11 @@ web-sys = { version = "0.3.107", features = [
   "HtmlInputElement",
   "ImageBitmap",
   "NodeList",
+  # The dialogs shown modal and closed, a press outside one found by its
+  # place (src/islands/dialogs.rs).
+  "DomRect",
+  "HtmlDialogElement",
+  "MouseEvent",
 ] }
 
 # ---------------------------------------------------------------------------

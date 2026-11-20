@@ -28,8 +28,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A value each app fills in: `TODO` in it, its file on the checklist. Guarded | "Start a new project"; production refuses a name or description still `TODO` (`still_todo`) | `docs/development.md`, `src/deploy_checks.rs`, `tests/config.rs` |
 | The browser tab's title: the page's name, then the app's. `PageMeta::title` holds the page's name alone, empty for home. Guarded | `full_title` | `src/views/layout.rs` |
 | A page's heading and the line under it. Guarded | `TITLE`, `LEAD` | `src/views/layout.rs` |
+| A page's name: its title, its heading and a link to it. A button's words stay the button's. Guarded | `pages` (`SIGN_IN`, `SIGN_IN_CODE`, `SIGN_UP`, `FORGOT_PASSWORD`, `VERIFY_EMAIL`, `ACCOUNT`, `NOT_FOUND`, `TOO_MANY_REQUESTS`, `PARTS`) | `src/views/pages.rs` |
 | A page that only tells something: heading, one line, the way home (not found, errors, 429, the reset and verify links' answers, "check your mail"). Guarded | `Notice`; an error's words `wording` | `src/views/layout.rs`, `src/views/error.rs` |
-| A dialog over the page, and the step it asks; its Cancel; a step beside a form, never a new tab (`no_page_opens_a_new_tab`) | `Dialog`, `DialogCancel` (a native popover, Cancel owned by no form for Safari 17), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs` |
+| A dialog over the page, and the step it asks; its Cancel; a step beside a form, never a new tab (`no_page_opens_a_new_tab`) | `Dialog`, `DialogCancel`, opened and closed only by `opens` and `closes` (a modal `<dialog>`, its buttons' command taken over by `Navigation`'s `dialogs`; guarded by `every_dialog_opens_by_the_one_command`), `DANGER_BUTTON`, `QUIET_BUTTON`, as the account's deletion | `src/views/parts.rs`, `src/islands/dialogs.rs` |
 | A part folded under its heading | `Fold` (`<details>`) | `src/views/parts.rs` |
 | A count beside what it counts | `Badge` | `src/views/parts.rs` |
 | What floats over what: every `z-` | the scale in `docs/look.md` | `docs/look.md` |
@@ -51,6 +52,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A second step after the password: the mailed code, its tries and a new one | `SignIn` (`sign_ins`, the `signin` cookie), `CodeForm`, `AuthMailer::sign_in_code` | `src/models/sign_ins.rs`, `src/controllers/login.rs`, `src/views/login.rs` |
 | What happened at the sign-in, and the account's wait after wrong codes; the person told at the fifth | `auth_events` (`record`, `code_waiting`, `code_failures`, `purge` at start), `AuthMailer::code_failures` | `src/models/auth_events.rs`, `src/controllers/login.rs` |
 | What a new password ends: the other sessions, a sign-in waiting for its code, the count of wrong codes | `Session::after_new_password` (`NewPassword::Set` from the mail's link, `Changed` on the account page) | `src/models/sessions.rs` |
+| The person told their password changed: the account page's or the reset link's | `AuthMailer::password_changed`, `PasswordChangedMail` | `src/mailers/auth.rs`, `src/views/mail.rs` |
 | A code drawn, two digests compared | `secret::drawn`, `secret::same` | `src/secret.rs` |
 | What a user may do; a page for one role. Another role's request is a 403, the error page's | `Role` (`users.role`, read by SQLx); the extractor `Admin`, one an app adds a role | `src/models/roles.rs`, `src/controllers/signed.rs` |
 | Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |
@@ -58,7 +60,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A forgotten password: the form that mails the reset link | `ForgotForm`, `ForgotSent`; the address `forgot::PATH` | `src/views/forgot.rs`, `src/controllers/forgot.rs` |
 | A link on its own line, the next step from a page; an auth form's ways on, under it | `LINK`; `NextSteps` | `src/views/layout.rs` |
 | A password's rule (8 to 128 characters), anywhere one is set | `password_problem` | `src/models/users.rs` |
-| A new account's name (2 to 100 characters) and email, checked before anything else | `name_or_email_problem`, from `Validator` | `src/models/users.rs` |
+| A new account's name (2 to 100 characters, one line) and email, checked before anything else; a typed or pasted name made one line before the check and the save | `name_or_email_problem`, from `Validator` (`one_line`); `one_line_text` | `src/models/users.rs` |
 | An email address as it is stored and looked up: lowercase | `normalized_email` | `src/models/users.rs` |
 | A request's line in the log: its route's pattern or its path, never a query | `RequestLog`, `logged_path` | `src/middleware/request_log.rs` |
 | Hash or check a password | `hashing::hash`, `verify`, `verify_dummy` | `src/hashing.rs` |
@@ -104,7 +106,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | htmx's settings | `HTMX_CONFIG` | `src/views/layout.rs` |
 | A status shown as a page in the region | `PAGE_STATUSES` | `src/islands.rs` |
 | What a move needs beyond htmx: focus, announcement, Back's scroll, a newer build, a gateway's error, no answer | `Navigation` | `src/islands.rs` |
-| Wake islands htmx swaps in, free the ones it takes out (Leptos's `$$dispose`), and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
+| Wake islands htmx swaps in, free the ones it takes out (Leptos's `$$dispose`), hand htmx the links, forms and `hx-*` put in later, and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
 | Something an island schedules again and again (a timeout, a frame) | `Job`, its callback made once; never Leptos's timer helpers (a test refuses them) | `src/islands.rs` |
 | The app: a window on the live site, on desktops and phones | `src-tauri/`, `run` in `src/lib.rs`, its start page `offline/index.html`, the app's one script; the phones' projects in `gen/` | `src-tauri/` |
 | A link that leaves the site in the app (a call, a mail, a text, another app, another site), handed to the system; any other scheme nowhere | `destination` in `src/lib.rs`, the system's schemes `SYSTEM_SCHEMES`, the site from `site_of` | `src-tauri/` |
@@ -133,8 +135,9 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A query of the app's own | `sqlx::query!` on `sql::pool(&ctx)` | `src/sql.rs` |
 | A transaction of the app's own. Guarded | `sql::write`: `BEGIN IMMEDIATE`, a connection a full disk left stuck closed (sqlx #4434) | `src/sql.rs` |
 | A picture someone uploads: checked, made with fixed settings, kept outside the site's folder, named by its hash, served for a year | `uploads::avatar`, `make_avatar` (off the async threads, a `Place` among `AT_ONCE`), `keep`, `forget`, `name_of`; `settings.uploads.path`; served by `controllers::uploads` | `src/uploads.rs`, `src/controllers/uploads.rs` |
+| An element focused without scrolling the page | `focus_quietly` | `src/islands.rs` |
 | A photo shrunk in the browser before it goes | a file field's `data-shrink` and `data-shrink-under`, the `shrink` the `Navigation` island arms | `src/islands/shrink.rs` |
-| A user's avatar | `avatars::of`, `set`, `in_use`; the folder `Avatars` | `src/models/avatars.rs` |
+| A user's avatar | `avatars::of`, `set`, `in_use`; the folder `Avatars`; every file change in `uploads::in_turn` | `src/models/avatars.rs` |
 | A secret handed to a browser, kept as its digest | `secret::fresh`, `digest`, `is_secret` | `src/secret.rs` |
 | A cookie written or read | `cookies::set_cookie`, `store`, `value` | `src/cookies.rs` |
 | A signed-in session: opened, found, closed | `Session` | `src/models/sessions.rs` |
@@ -142,7 +145,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | The app's typed settings | `Settings` | `src/settings.rs` |
 | A rate-limit bucket | `site_bucket`, `auth_bucket`, `files_bucket`; on an auth form's POST alone, `auth_limited` | `src/middleware/rate_limit.rs` |
 | Who is signed in | `Signed`, a handler's extractor (nobody: to `/login`); `signed_in` where a page shows a visitor something else | `src/controllers/signed.rs` |
-| A post another site's page sent, refused | `cross_site::refused`, first in every form's target | `src/controllers/cross_site.rs` |
+| A post another site's page sent, refused, logged by its route's pattern. Guarded | The extractor `SameSite`, taken by every post's handler (after `Signed` where it has one); never a check in a handler's body | `src/controllers/cross_site.rs` |
 | A visitor's address, behind the proxy or not | `VisitorIp`, `key_source` | `src/middleware/rate_limit.rs` |
 
 ## Mail

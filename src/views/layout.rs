@@ -454,7 +454,8 @@ pub fn shell(
                 // cookies unless its link asks for them. Behind a Cloudflare
                 // challenge (staging) that cookie-less fetch gets the
                 // challenge page instead, which Chrome reports as a manifest
-                // syntax error. Seen on wdc's staging, same setup as ours.
+                // syntax error. Seen on another site's staging, same setup
+                // as ours.
                 <link rel="manifest" href=paths::MANIFEST crossorigin="use-credentials"/>
                 // Tints the browser's own bars (Safari, Chrome on Android)
                 // in the page's surface colour (SURFACE_HEX), so the bars

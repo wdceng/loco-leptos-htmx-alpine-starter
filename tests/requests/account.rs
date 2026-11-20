@@ -16,7 +16,10 @@ use chrono::{Duration, Utc};
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
-use super::prepare_data::{PASSWORD, WantsPage, session_cookie, signs_in, user};
+use super::{
+    mails::{assert_from_the_configured_sender, subject, unfolded},
+    prepare_data::{PASSWORD, WantsPage, session_cookie, signs_in, user},
+};
 
 const EMAIL: &str = "account@example.com";
 const MAC: &str =
@@ -130,6 +133,35 @@ async fn another_users_browser_is_not_yours_to_sign_out() {
     .await;
 }
 
+/// A new password is told by mail, naming the browser and the way to
+/// another: a change nobody asked for is someone else's (OWASP ASVS 4.0.3,
+/// 2.2.3).
+#[tokio::test]
+#[serial]
+async fn a_new_password_is_told_by_mail() {
+    request::<App, _, _>(|request, ctx| async move {
+        user(&ctx, EMAIL, true).await;
+        let here = session_cookie(&request, EMAIL, MAC).await;
+        let mailer = ctx.mailer.as_ref().expect("stub mailer");
+        let before = mailer.deliveries().count;
+        let done = request
+            .post("/account/password")
+            .add_header("cookie", here)
+            .add_header("user-agent", MAC)
+            .form(&serde_json::json!({ "current": PASSWORD, "password": "a-new-password" }))
+            .await;
+        assert_eq!(done.status_code(), 200);
+        let deliveries = mailer.deliveries();
+        assert_eq!(deliveries.count, before + 1, "the password's mail");
+        let mail = unfolded(&deliveries.messages[before]);
+        assert_from_the_configured_sender(&mail);
+        assert!(subject(&mail).contains("password was changed"), "{mail}");
+        assert!(mail.contains("Firefox on a Mac"), "{mail}");
+        assert!(mail.contains("http://localhost:5150/forgot"), "{mail}");
+    })
+    .await;
+}
+
 /// A new password needs the current one and the rule; it signs out every
 /// other browser and is the one that signs in.
 #[tokio::test]
@@ -198,7 +230,8 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         let pool = sql::pool(&ctx);
 
         // Fresh from the sign-in: no password field. The step asked in a
-        // dialog (views/parts.rs), its button opening it.
+        // modal dialog (views/parts.rs), its button opening it by its
+        // command.
         let page = request
             .get("/account")
             .add_header("cookie", here.clone())
@@ -206,11 +239,11 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
         let body = page.text();
         assert!(!body.contains(r#"id="delete-password""#));
         for wanted in [
-            r#"popovertarget="delete-account""#,
-            r#"id="delete-account" popover="auto" role="dialog""#,
-            // Cancel with no form owner, so Safari 17 runs its popovertarget
-            // inside the dialog's form (views/parts.rs, `DialogCancel`).
-            r#"form="" popovertarget="delete-account" popovertargetaction="hide""#,
+            r#"commandfor="delete-account" command="show-modal""#,
+            r#"<dialog id="delete-account" closedby="any""#,
+            // Cancel, where the focus goes as it opens (views/parts.rs).
+            r#"commandfor="delete-account" command="close""#,
+            r#"data-cancel="""#,
         ] {
             assert!(body.contains(wanted), "{wanted}: {body}");
         }
@@ -229,7 +262,16 @@ async fn the_account_is_deleted_with_the_password_or_a_fresh_proof() {
             .get("/account")
             .add_header("cookie", here.clone())
             .await;
-        assert!(page.text().contains(r#"id="delete-password""#));
+        let body = page.text();
+        let field = body
+            .split(r#"id="delete-password""#)
+            .nth(1)
+            .and_then(|rest| rest.split('>').next())
+            .expect("the password field");
+        assert!(
+            !field.contains("autofocus"),
+            "no autofocus in a dialog: {field}"
+        );
         let wrong = request
             .post("/account/delete")
             .add_header("cookie", here.clone())

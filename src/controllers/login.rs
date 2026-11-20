@@ -23,7 +23,7 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    controllers::{cross_site, signed::signed_in},
+    controllers::{cross_site::SameSite, signed::signed_in},
     cookies, hashing,
     mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
@@ -39,6 +39,7 @@ use crate::{
     views::{
         layout::PageMeta,
         login::{CodeForm, CodeProblem, LoginForm, SignedIn},
+        pages,
     },
 };
 
@@ -69,7 +70,7 @@ pub struct Submitted {
 fn meta() -> PageMeta {
     PageMeta {
         lang: "en",
-        title: "Sign in".into(),
+        title: pages::SIGN_IN.into(),
         description: "Sign in to your account.".into(),
         robots: None,
         canonical: None,
@@ -100,13 +101,11 @@ async fn page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
 /// to the home page; refused, the form again with the email typed and the
 /// one reason, its title starting "Error: ".
 async fn submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Submitted>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "login") {
-        return Ok(forbidden);
-    }
     let user = users::Model::find_by_email(&ctx.db, &form.email).await.ok();
     let valid = match &user {
         Some(user) => user.verify_password(&form.password).await,
@@ -192,7 +191,7 @@ async fn waiting(ctx: &AppContext, headers: &HeaderMap) -> Result<Option<(String
 
 fn code_meta() -> PageMeta {
     PageMeta {
-        title: "Your sign-in code".into(),
+        title: pages::SIGN_IN_CODE.into(),
         description: "The code we mailed you, to finish signing in.".into(),
         ..meta()
     }
@@ -276,13 +275,11 @@ async fn user_of(ctx: &AppContext, sign_in: &SignIn) -> Result<users::Model> {
 /// with the tries left; spent, the password again. A wrong or spent one
 /// counts toward the account's wait.
 async fn code_submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Code>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "sign-in code") {
-        return Ok(forbidden);
-    }
     let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
         return to_password(&ctx);
     };
@@ -356,10 +353,7 @@ async fn tell_of_failures(
 /// `POST /login/code/again`: a new code mailed, unless the account waits
 /// after wrong codes or one went within the last minute; the form again,
 /// saying which.
-async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "sign-in code again") {
-        return Ok(forbidden);
-    }
+async fn code_again(_: SameSite, State(ctx): State<AppContext>, parts: Parts) -> Result<Response> {
     let Some((secret, sign_in)) = waiting(&ctx, &parts.headers).await? else {
         return to_password(&ctx);
     };
@@ -393,10 +387,11 @@ async fn code_again(State(ctx): State<AppContext>, parts: Parts) -> Result<Respo
 
 /// `POST /logout`: the session closed and the cookie taken away, then the
 /// sign-in page. Nobody signed in, the same answer.
-async fn logout(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&headers, "logout") {
-        return Ok(forbidden);
-    }
+async fn logout(
+    _: SameSite,
+    State(ctx): State<AppContext>,
+    headers: HeaderMap,
+) -> Result<Response> {
     if let Some(signed) = signed_in(&ctx, &headers).await? {
         Session::close(sql::pool(&ctx), signed.session.id)
             .await

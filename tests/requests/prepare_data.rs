@@ -22,7 +22,7 @@ impl WantsPage for axum_test::TestRequest {
 }
 
 /// That no id stands twice in `body`: a second one makes a label, an
-/// `aria-labelledby`, a `popovertarget` or a script find the first.
+/// `aria-labelledby`, a `commandfor` or a script find the first.
 pub fn assert_unique_ids(body: &str) {
     let mut ids: Vec<&str> = body
         .split(r#" id=""#)

@@ -1,69 +1,135 @@
 //! The parts of `views/parts.rs` in a real browser, on their page
 //! (`/e2e/parts`, the browser tests' environment alone): a dialog opens
-//! from its button, and Escape and its Cancel each close it, the browser's
-//! own popover with no script of the site's, Cancel inside a form as a real
-//! dialog's is; a fold opens from its heading.
+//! modal from its button, the page under it inert and the focus on Cancel,
+//! and Cancel, a press outside and Escape each close it, a drag begun
+//! inside keeping it, the focus handed back to its button; a fold opens
+//! from its heading.
 
-use app_e2e::{Key, browse};
+use app_e2e::{Key, browse, dialog_open, opener};
 use serde_json::Value;
 
 const PARTS: &str = "/e2e/parts";
 
-/// Whether the dialog is open.
-const OPEN: &str = "return document.getElementById('parts-dialog').matches(':popover-open')";
+/// The parts page's dialog.
+const DIALOG: &str = "parts-dialog";
 
 #[tokio::test]
-async fn a_dialog_opens_and_escape_or_cancel_closes_it() {
+async fn a_dialog_opens_modal_and_cancel_a_press_outside_or_escape_closes_it() {
     browse(|page| async move {
+        let open = dialog_open(DIALOG);
+        let closed = open.replace("return ", "return !");
         page.open(PARTS).await?;
         assert_eq!(
-            page.eval(OPEN).await?,
+            page.eval(&open).await?,
             Value::Bool(false),
             "closed at first"
         );
 
-        // Cancel inside the dialog's form, owned by none: Safari 17 runs no
-        // popovertarget on a button a form owns (views/parts.rs).
+        page.press(&opener(DIALOG)).await?;
+        page.until("the dialog open", &open).await?;
+        page.until(
+            "the focus on Cancel",
+            "return document.activeElement?.matches('#parts-dialog [data-cancel]')",
+        )
+        .await?;
+        // The page under it inert: its opener takes no focus.
         assert_eq!(
-            page.eval("return document.querySelector('#parts-dialog button[popovertargetaction=hide]').form")
-                .await?,
-            Value::Null,
-            "Cancel owned by no form"
+            page.eval(&format!(
+                "document.querySelector(\"{}\").focus();
+                 return document.activeElement?.matches('#parts-dialog [data-cancel]')",
+                opener(DIALOG)
+            ))
+            .await?,
+            Value::Bool(true),
+            "the page under it inert"
         );
-        page.press("button[popovertarget=parts-dialog]").await?;
-        page.until("the dialog open", OPEN).await?;
-        // The focus in the dialog: the opening button, left with it, is
-        // outside what `aria-modal` lets a screen reader reach.
-        page.until(
-            "the focus in the dialog",
-            "return document.getElementById('parts-dialog').contains(document.activeElement)",
+        page.press("#parts-dialog [data-cancel]").await?;
+        page.until("the dialog closed by Cancel", &closed).await?;
+
+        // A press on the veil closes it where the browser does not
+        // (`closedby`); a drag begun inside keeps it (islands/dialogs.rs).
+        page.press(&opener(DIALOG)).await?;
+        page.until("the dialog open again", &open).await?;
+        assert_eq!(
+            page.eval(
+                "const d = document.getElementById('parts-dialog');
+                 const box = d.getBoundingClientRect();
+                 d.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true,
+                     clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 }));
+                 d.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 2, clientY: 2 }));
+                 return d.open"
+            )
+            .await?,
+            Value::Bool(true),
+            "a drag from inside closed it"
+        );
+        page.eval(
+            "const d = document.getElementById('parts-dialog');
+             d.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 2, clientY: 2 }));
+             d.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 2, clientY: 2 }))",
         )
         .await?;
-        page.press("#parts-dialog button[popovertargetaction=hide]")
+        page.until("the dialog closed by a press outside", &closed)
             .await?;
-        page.until(
-            "the dialog closed by Cancel",
-            &OPEN.replace("return ", "return !"),
-        )
-        .await?;
 
         // Escape: a keyboard's, where the browser has one.
         if page.browser.is_safari() || page.browser.screen().is_some() {
             return Ok(());
         }
-        page.press("button[popovertarget=parts-dialog]").await?;
-        page.until("the dialog open again", OPEN).await?;
+        page.press(&opener(DIALOG)).await?;
+        page.until("the dialog open a third time", &open).await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Escape)
+            .perform()
+            .await?;
+        page.until("the dialog closed by Escape", &closed).await?;
+        Ok(())
+    })
+    .await;
+}
+
+/// Opened from the keyboard, the dialog takes the focus onto its Cancel,
+/// and Escape hands it back to the button that opened it, the browser's
+/// own modal dialog (WAI-ARIA's dialog pattern).
+#[tokio::test]
+async fn a_dialog_hands_the_focus_back_to_its_button() {
+    browse(|page| async move {
+        if page.browser.is_safari() || page.browser.screen().is_some() {
+            page.skip("no keyboard to open and close the dialog with");
+            return Ok(());
+        }
+        page.open(PARTS).await?;
+        page.eval(&format!(
+            "document.querySelector(\"{}\").focus()",
+            opener(DIALOG)
+        ))
+        .await?;
+        page.driver
+            .action_chain()
+            .send_keys(Key::Enter)
+            .perform()
+            .await?;
+        page.until("the dialog open", &dialog_open(DIALOG)).await?;
+        page.until(
+            "the focus on Cancel",
+            "return document.activeElement?.matches('#parts-dialog [data-cancel]')",
+        )
+        .await?;
         page.driver
             .action_chain()
             .send_keys(Key::Escape)
             .perform()
             .await?;
         page.until(
-            "the dialog closed by Escape",
-            &OPEN.replace("return ", "return !"),
+            "the focus back on the opening button",
+            &format!(
+                "return !document.getElementById('parts-dialog').open
+                     && document.activeElement?.matches(\"{}\")",
+                opener(DIALOG)
+            ),
         )
-        .await?;
-        Ok(())
+        .await
     })
     .await;
 }

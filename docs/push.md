@@ -93,6 +93,10 @@ with the mistakes it made on the way.
 - **jsonwebtoken 11 for the push's ES256, beside Loco's 10.** Version 10's
   `rust_crypto` pulled `crypto-bigint` 0.5 and its advisory; Loco keeps 10
   for its own HMAC tokens (`.cargo/audit.toml`).
+- **A failed push's log line without its address.** reqwest's error ends
+  in the URL it posted to: a browser's push address is that device's own,
+  and FCM's names the Firebase project. Log `e.without_url()`, as an
+  islands app on this stack found in its log.
 - **A key of each browser lane's own** (`E2E_PUSH_KEY`, made by `run.sh`):
   a key in the developer's shell must never reach the tests.
 - **An iPhone or iPad takes pushes only in the home-screen app,** iOS 16.4
@@ -107,7 +111,9 @@ with the mistakes it made on the way.
     over the iPhone's raw APNs token need a second sender and a key;
   - the push carries its words: no service worker asks the site for them;
   - the site may call only the plugin's commands, through one capability
-    naming the site's origin, called from one place in its WASM;
+    naming the site's origin, called from one place in its WASM; any
+    script on its pages may call them too, so the app reads what a page
+    hands it first (`architecture.md`, "The app");
   - the iPhone's: `aps-environment`, `UIBackgroundModes`
     `remote-notification`, and the team's APNs key uploaded to Firebase;
     Android's compiles against the app's own Android SDK;

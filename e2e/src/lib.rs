@@ -29,7 +29,7 @@ pub use accounts::{PASSWORD, mailbox};
 pub use browser::{Browser, Screen};
 pub use device::app_package;
 pub use devtools::Held;
-pub use page::Page;
+pub use page::{Page, dialog_open, opener};
 pub use session::{browse, browse_app};
 pub use slow::{Answered, slow_post};
 pub use thirtyfour::prelude::*;
