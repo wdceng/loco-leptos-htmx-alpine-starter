@@ -51,6 +51,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | A second step after the password: the mailed code, its tries and a new one | `SignIn` (`sign_ins`, the `signin` cookie), `CodeForm`, `AuthMailer::sign_in_code` | `src/models/sign_ins.rs`, `src/controllers/login.rs`, `src/views/login.rs` |
 | What happened at the sign-in, and the account's wait after wrong codes; the person told at the fifth | `auth_events` (`record`, `code_waiting`, `code_failures`, `purge` at start), `AuthMailer::code_failures` | `src/models/auth_events.rs`, `src/controllers/login.rs` |
 | What a new password ends: the other sessions, a sign-in waiting for its code, the count of wrong codes | `Session::after_new_password` (`NewPassword::Set` from the mail's link, `Changed` on the account page) | `src/models/sessions.rs` |
+| The person told their password changed: the account page's or the reset link's | `AuthMailer::password_changed`, `PasswordChangedMail` | `src/mailers/auth.rs`, `src/views/mail.rs` |
 | A code drawn, two digests compared | `secret::drawn`, `secret::same` | `src/secret.rs` |
 | What a user may do; a page for one role. Another role's request is a 403, the error page's | `Role` (`users.role`, read by SQLx); the extractor `Admin`, one an app adds a role | `src/models/roles.rs`, `src/controllers/signed.rs` |
 | Asking for the password before a sensitive step, unless the person proved who they are within 15 minutes | `Session::proven`, `Session::prove` (`PROVEN_MINUTES`) | `src/models/sessions.rs` |

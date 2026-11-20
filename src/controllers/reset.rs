@@ -21,8 +21,9 @@ use serde::Deserialize;
 
 use crate::{
     controllers::cross_site::SameSite,
+    mailers::auth::AuthMailer,
     models::{
-        sessions::{NewPassword, Session},
+        sessions::{NewPassword, Session, label_of},
         users::{self, password_problem},
     },
     render::render_token_page,
@@ -81,13 +82,15 @@ async fn page(
 /// `POST /reset`: the password rule first, then the token. A refused
 /// password shows the form again with the reason and the same token, its
 /// title starting "Error: ". The new password signs the user out
-/// everywhere: whoever knew the old one keeps no session.
+/// everywhere: whoever knew the old one keeps no session. The person is
+/// mailed that the password changed.
 async fn submit(
     _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Submitted>,
 ) -> Result<Response> {
+    let browser = label_of(&parts.headers);
     let req = Request::from_parts(parts, Body::empty());
     if let Some(problem) = password_problem(&form.password) {
         let token = form.token;
@@ -121,6 +124,8 @@ async fn submit(
         pid = user.pid.to_string(),
         "password reset through the page"
     );
+    // Told by mail, with the way to a new one (OWASP ASVS 4.0.3, 2.2.3).
+    AuthMailer::password_changed(&ctx, &user, &browser).await?;
     render_token_page(
         &ctx,
         req,

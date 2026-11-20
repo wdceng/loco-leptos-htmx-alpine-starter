@@ -171,6 +171,22 @@ async fn a_new_password_signs_out_everywhere() {
             .await;
         assert_eq!(done.status_code(), 200);
         assert_eq!(Session::count(pool, user.id).await.expect("counted"), 0);
+        // Told by mail, with the way to another.
+        let mails = ctx
+            .mailer
+            .as_ref()
+            .expect("stub mailer")
+            .deliveries()
+            .messages;
+        let told = mails
+            .last()
+            .map(|mail| super::mails::unfolded(mail))
+            .expect("a mail");
+        assert!(
+            super::mails::subject(&told).contains("password was changed"),
+            "{told}"
+        );
+        assert!(told.contains("http://localhost:5150/forgot"), "{told}");
     })
     .await;
 }
