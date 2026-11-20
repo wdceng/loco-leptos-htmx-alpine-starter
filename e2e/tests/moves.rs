@@ -539,8 +539,8 @@ async fn a_late_failure_of_a_link_a_move_took_off_the_page_is_left_alone() {
 /// A link with a request of another method (`hx-delete`) is never loaded
 /// plainly when that request gets no answer: a plain load would ask its
 /// address with a GET (`link_plainly`, src/islands.rs). htmx gives such a
-/// link its own request in place of the boost, so it's made with the
-/// attribute already on it.
+/// link its own request in place of the boost, so the attribute is on it
+/// before the islands script hands it to htmx.
 #[tokio::test]
 async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
     browse(|page| async move {
@@ -558,8 +558,7 @@ async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
             "const a = document.createElement('a');
              a.href = {RESET:?}; a.id = 'e2e-link'; a.textContent = 'e2e';
              a.setAttribute('hx-delete', {RESET:?});
-             document.querySelector('main').append(a);
-             htmx.process(a)"
+             document.querySelector('main').append(a)"
         ))
         .await?;
         page.press("#e2e-link").await?;
@@ -573,6 +572,33 @@ async fn a_link_of_another_method_with_no_answer_is_not_loaded_plainly() {
         );
         assert!(page.in_place().await?, "left in place, not loaded plainly");
         assert_eq!(page.path().await?, "/", "the address unchanged");
+        Ok(())
+    })
+    .await;
+}
+
+/// A form put in after the page loaded, as an island may put one in, is
+/// sent in place as the page's own are: htmx boosts only what it
+/// processes, and the islands script hands it what is added later
+/// (public/js/htmx-islands.js).
+#[tokio::test]
+async fn a_form_put_in_later_is_sent_in_place() {
+    browse(|page| async move {
+        page.open("/").await?;
+        page.mark().await?;
+        page.eval(
+            "const form = document.createElement('form');
+             form.action = '/reset'; form.method = 'get'; form.id = 'e2e-form';
+             const token = document.createElement('input');
+             token.type = 'hidden'; token.name = 'token'; token.value = 'e2e';
+             const send = document.createElement('button');
+             send.type = 'submit'; send.textContent = 'e2e';
+             form.append(token, send);
+             document.querySelector('main').append(form)",
+        )
+        .await?;
+        page.move_to("#e2e-form button", RESET).await?;
+        assert!(page.in_place().await?, "the form sent in place");
         Ok(())
     })
     .await;

@@ -105,7 +105,7 @@ a **one-job break** (CLAUDE.md, Rule no. 1).
 | htmx's settings | `HTMX_CONFIG` | `src/views/layout.rs` |
 | A status shown as a page in the region | `PAGE_STATUSES` | `src/islands.rs` |
 | What a move needs beyond htmx: focus, announcement, Back's scroll, a newer build, a gateway's error, no answer | `Navigation` | `src/islands.rs` |
-| Wake islands htmx swaps in, free the ones it takes out (Leptos's `$$dispose`), and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
+| Wake islands htmx swaps in, free the ones it takes out (Leptos's `$$dispose`), hand htmx the links, forms and `hx-*` put in later, and htmx's Chrome workaround | `public/js/htmx-islands.js`, the glue | `public/js/` |
 | Something an island schedules again and again (a timeout, a frame) | `Job`, its callback made once; never Leptos's timer helpers (a test refuses them) | `src/islands.rs` |
 | The app: a window on the live site, on desktops and phones | `src-tauri/`, `run` in `src/lib.rs`, its start page `offline/index.html`, the app's one script; the phones' projects in `gen/` | `src-tauri/` |
 | A link that leaves the site in the app (a call, a mail, a text, another app, another site), handed to the system; any other scheme nowhere | `destination` in `src/lib.rs`, the system's schemes `SYSTEM_SCHEMES`, the site from `site_of` | `src-tauri/` |

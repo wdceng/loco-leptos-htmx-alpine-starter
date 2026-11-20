@@ -14,7 +14,7 @@
 //    argument, which Chrome 124 to 145 refuse, every swap then failing
 //    (htmx #4182); gone, htmx never calls it. Remove only once Chrome 156
 //    is below the low bar and an htmx release has #4182's fix.
-delete Document.parseHTMLUnsafe;
+delete /** @type {{ parseHTMLUnsafe?: unknown }} */ (Document).parseHTMLUnsafe;
 
 // In blocks, so these consts stay out of the page's global scope.
 {
@@ -24,14 +24,16 @@ delete Document.parseHTMLUnsafe;
   //    outer island first, and only for an element off the page when the
   //    observer below looks: one a swap moves within one task (a morph,
   //    hx-preserve) is back by then and kept.
+  /** @param {Element} island */
   const dispose = (island) => {
     const free = island.$$dispose;
     if (!free) return;
     delete island.$$dispose;
     free();
   };
+  /** @param {Node} node */
   const disposeGone = (node) => {
-    if (node.nodeType !== 1 || node.isConnected) return;
+    if (!(node instanceof Element) || node.isConnected) return;
     if (node.matches("leptos-island")) dispose(node);
     for (const island of node.querySelectorAll("leptos-island"))
       dispose(island);
@@ -57,19 +59,27 @@ delete Document.parseHTMLUnsafe;
   };
   document.addEventListener("htmx:after:swap", wake);
 
-  // 4. htmx 4 doesn't watch the page: process hx-* added later, wake
-  //    islands added later (the swap event may fire on a removed element),
-  //    and free the islands removed.
+  // 4. htmx 4 doesn't watch the page: process hx-* added later, and the
+  //    links and forms added later (an island's), which htmx boosts only
+  //    then; a second process of what a swap brings does nothing. Not
+  //    while the page parses: a form would be set up before its fields
+  //    are there, and htmx sets up the parsed page itself. Wake islands
+  //    added later (the swap event may fire on a removed element), and
+  //    free the islands removed.
   const HX =
-    "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger]";
+    "[hx-get],[hx-post],[hx-put],[hx-patch],[hx-delete],[hx-action],[hx-trigger],a[href],form";
   new MutationObserver((records) => {
     let islands = false;
     for (const record of records) {
       for (const node of record.removedNodes) disposeGone(node);
       for (const node of record.addedNodes) {
-        if (node.nodeType !== 1) continue;
+        if (!(node instanceof Element)) continue;
         // Not where htmx was blocked: the page works as plain links then.
-        if (window.htmx && (node.matches(HX) || node.querySelector(HX)))
+        if (
+          window.htmx &&
+          document.readyState !== "loading" &&
+          (node.matches(HX) || node.querySelector(HX))
+        )
           window.htmx.process(node);
         islands ||=
           node.matches("leptos-island") ||

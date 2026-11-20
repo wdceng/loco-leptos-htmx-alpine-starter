@@ -130,7 +130,8 @@ Clippy on the browser half:
 cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
 ```
 
-The stylesheet, by ESLint (`npm install` once, Node 24+):
+The stylesheet by ESLint, then the two helpers in `public/js/` by
+TypeScript (`jsconfig.json`; `npm install` once, Node 24+):
 
 ```bash
 npm run lint
@@ -143,6 +144,8 @@ island code.
   `/* eslint-disable css/use-baseline */` … `/* eslint-enable … */`
   around those lines alone, with the reason (`@property` in
   `style/tailwind.css`).
+- **A global a helper reads** (from Leptos, htmx) gets its type in
+  `jsconfig.types.d.ts`, never an `any`.
 - **A mistyped class** (`text-primay`) is caught by nothing: Tailwind
   writes no CSS for it and says nothing. Look at the page.
 

@@ -869,7 +869,7 @@ A=/opt/homebrew/share/android-commandlinetools && ("$A/emulator/emulator" -avd a
   Simulator takes from the terminal, so check 5 below by hand. The
   starter's pages have no link that leaves the site, so it puts five into
   the home page first. It reads the page through the webview's debugging
-  socket with Node, the stylesheet lint's.
+  socket with Node, the lint's.
 - **`devices.sh` is what both scripts share:** the site and its `/up`, the
   builds with the run's site, an emulator started and the app opened on
   it, the devices shut down again. Sourced, never run. The builds are
