@@ -20,7 +20,7 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    controllers::cross_site,
+    controllers::cross_site::SameSite,
     models::{
         sessions::{NewPassword, Session},
         users::{self, password_problem},
@@ -83,13 +83,11 @@ async fn page(
 /// title starting "Error: ". The new password signs the user out
 /// everywhere: whoever knew the old one keeps no session.
 async fn submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Submitted>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "reset") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     if let Some(problem) = password_problem(&form.password) {
         let token = form.token;

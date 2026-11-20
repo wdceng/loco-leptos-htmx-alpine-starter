@@ -27,7 +27,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     app::stored,
-    controllers::{cross_site, signed::Signed},
+    controllers::{cross_site::SameSite, signed::Signed},
     cookies,
     middleware::rate_limit::auth_limited,
     models::{
@@ -161,12 +161,10 @@ async fn page(State(ctx): State<AppContext>, signed: Signed, req: Request) -> Re
 async fn avatar(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     parts: Parts,
     mut form: Multipart,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "avatar") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     // A place among the uploads at once, taken before the body is read.
     let place = uploads::Place::wait().await?;
@@ -259,12 +257,9 @@ async fn forget_unused(pool: &SqlitePool, folder: &std::path::Path, name: &str) 
 async fn close(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     Path(id): Path<i64>,
-    parts: Parts,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "close a browser") {
-        return Ok(forbidden);
-    }
     if Session::close_of(sql::pool(&ctx), signed.user.id, id)
         .await
         .map_err(Error::wrap)?
@@ -279,11 +274,8 @@ async fn close(
 async fn close_others(
     State(ctx): State<AppContext>,
     signed: Signed,
-    parts: Parts,
+    _: SameSite,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "close the other browsers") {
-        return Ok(forbidden);
-    }
     Session::close_others(sql::pool(&ctx), signed.user.id, signed.session.id)
         .await
         .map_err(Error::wrap)?;
@@ -301,12 +293,10 @@ async fn close_others(
 async fn password(
     State(ctx): State<AppContext>,
     mut signed: Signed,
+    _: SameSite,
     parts: Parts,
     Form(form): Form<NewPassword>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "new password") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     let refused = if signed.user.verify_password(&form.current).await {
         password_problem(&form.password).map(Problem::New)
@@ -355,12 +345,10 @@ async fn password(
 async fn delete(
     State(ctx): State<AppContext>,
     signed: Signed,
+    _: SameSite,
     parts: Parts,
     Form(form): Form<Deletion>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "delete the account") {
-        return Ok(forbidden);
-    }
     if !signed.session.proven() && !signed.user.verify_password(&form.password).await {
         let req = Request::from_parts(parts, Body::empty());
         let problem = Problem::Delete(WRONG_PASSWORD.to_string());

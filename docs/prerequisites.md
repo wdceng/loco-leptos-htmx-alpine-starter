@@ -450,8 +450,8 @@ When (`docs/decisions.md`, Working):
   SDK (emulator, images, platform tools), Xcode and its Simulators.
 - **A release at least two weeks old.** A newer one waits for next month.
 - **Security fixes at once**, outside the month: a crate's advisory, macOS.
-- **The M5 first**, then one Android lane (`e2e/run.sh android`), then the
-  M1.
+- **The development Mac first**, then one Android lane
+  (`e2e/run.sh android`), then the test machine.
 - **One major upgrade at a time**, each its own commit; the versions within
   a major together.
 - **Never while the browser lanes run.**

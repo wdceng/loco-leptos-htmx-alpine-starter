@@ -798,7 +798,9 @@ async fn a_second_press_sends_no_second_post() {
 }
 
 /// While the form is on its way, slower than 200 ms, it's `aria-busy` and
-/// its button takes the `busy:` look; the answer's page holds neither. The
+/// its button takes the `busy:` look, faded and out of the pointer's
+/// reach, never `disabled`, so the keyboard's focus stays on it; the
+/// answer's page holds neither. The
 /// answer held back a second and a half in the page
 /// ([`Page::answer_with`]), so every browser runs it.
 #[tokio::test]
@@ -825,10 +827,12 @@ async fn a_sent_form_looks_busy_until_its_answer() {
         )
         .await?;
         page.until(
-            "the form busy and its button's look changed",
+            "the form busy, its button faded and out of the pointer's reach, still enabled",
             &format!(
                 "return document.querySelector('main form')?.getAttribute('aria-busy') === 'true'
-                     && getComputedStyle({button}).opacity !== {idle:?}"
+                     && getComputedStyle({button}).opacity !== {idle:?}
+                     && getComputedStyle({button}).pointerEvents === 'none'
+                     && !{button}.disabled"
             ),
         )
         .await?;

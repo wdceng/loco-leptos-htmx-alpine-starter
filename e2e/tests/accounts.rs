@@ -6,7 +6,7 @@
 //! Alpine. Each test signs up an account of its own ([`mailbox`]), its
 //! mails read from the lane's Mailpit.
 
-use app_e2e::{NEWER_BUILD, PASSWORD, browse, mailbox};
+use app_e2e::{NEWER_BUILD, PASSWORD, browse, dialog_open, mailbox, opener};
 use serde_json::Value;
 
 /// A visitor signs up, verifies through the mail's link, and signs in: the
@@ -104,9 +104,8 @@ async fn an_admin_signs_in_with_the_mailed_code() {
     .await;
 }
 
-/// The account's deletion is asked in a dialog: the focus in it, on Cancel
-/// where no password is asked (signed in a moment ago), and Cancel closes
-/// it with the account kept.
+/// The account's deletion is asked in a modal dialog: the focus in it, on
+/// Cancel, and Cancel closes it with the account kept.
 #[tokio::test]
 async fn the_accounts_deletion_is_asked_in_a_dialog() {
     browse(|page| async move {
@@ -114,24 +113,17 @@ async fn the_accounts_deletion_is_asked_in_a_dialog() {
         page.sign_up("Ana", &email).await?;
         page.sign_in(&email, PASSWORD).await?;
         page.open("/account").await?;
-        page.press("button[popovertarget=delete-account]").await?;
-        page.until(
-            "the dialog open",
-            "return document.getElementById('delete-account').matches(':popover-open')",
-        )
-        .await?;
+        page.press(&opener("delete-account")).await?;
+        let open = dialog_open("delete-account");
+        page.until("the dialog open", &open).await?;
         page.until(
             "the focus on Cancel",
-            "return document.activeElement?.matches('#delete-account button[popovertargetaction=hide]')",
+            "return document.activeElement?.matches('#delete-account [data-cancel]')",
         )
         .await?;
-        page.press("#delete-account button[popovertargetaction=hide]")
+        page.press("#delete-account [data-cancel]").await?;
+        page.until("the dialog closed", &open.replace("return ", "return !"))
             .await?;
-        page.until(
-            "the dialog closed",
-            "return !document.getElementById('delete-account').matches(':popover-open')",
-        )
-        .await?;
         assert_eq!(page.path().await?, "/account", "still on the account page");
         Ok(())
     })

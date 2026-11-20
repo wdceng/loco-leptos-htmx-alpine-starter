@@ -305,6 +305,16 @@ change of mind gets a new line, and the old one moves to
   measure: it keeps every element an entry names, and Chrome's notice
   about the reset form kept one old `<main>` per Back. Without DevTools,
   Chrome kept none (a probe).
+- 2026-11-17: **A dialog is a modal `<dialog>`, opened by its button's
+  command,** not a popover. A popover left the page under it reachable:
+  Tab went past Cancel to the page under the veil. `opens` and `closes`
+  write the browser's command (`commandfor`, `command`), and `Navigation`
+  takes it over in every browser: the focus on Cancel, a press outside
+  closing it where `closedby` is missing. An island, not Alpine: the CSP
+  build refuses to touch `document`, so a button can't reach a dialog by
+  its id. The cost: below Chrome 135, Firefox 144 and Safari 26.2, the
+  low bar included, a dialog opens only once the WASM runs. As an islands
+  app on this stack.
 
 ## Security
 
@@ -333,6 +343,12 @@ change of mind gets a new line, and the old one moves to
   `CF-Connecting-IP` Caddy hands it, so any other process on the box could
   name its own address to the rate limiter. Counted for a day first, then
   loaded only while the count is 0. As an islands app on this stack.
+- 2026-11-17: **A cross-site post is refused by one extractor,
+  `SameSite`,** not a check written first in each handler. The check ran
+  after the body was read, so a bad body answered 422 before it, and a
+  new handler was free to forget it; the extractor answers before the
+  body, and the canary holds every POST to its plain 403. As an islands
+  app on this stack.
 - 2026-11-11: **RUSTSEC-2026-0459 is accepted until sqlx moves.** SQLite
   before 3.54 can hand back stale memory when it opens a database with a
   crafted `-wal` beside it. The app opens only its own database, which
@@ -481,6 +497,15 @@ change of mind gets a new line, and the old one moves to
 
 ## Working
 
+- 2026-11-19: **The maintainer's skills live here too, generic.**
+  `.claude/skills/` holds the review, the audits (security, UX, native),
+  the dependency and upgrade checks, the tools check and the coverage
+  check, each the method alone; what is the starter's own is in a list
+  beside them (`.claude/review.md`, `security.md`, `ux.md`, `native.md`,
+  `deps.md`, `tools.md`, `coverage.md`), which a new project rewrites for
+  itself. Public and copied, so a guard keeps other projects' names,
+  machines and addresses out (`tests/one_job.rs`); those stay in the
+  git-ignored `CLAUDE.local.md`.
 - 2026-11-02: **One command a block, a hint above it, no `#` comment on
   it.** The copy button copies a block, and it should copy the command
   alone. A pipeline split over lines by `&&` stays one block, and so does

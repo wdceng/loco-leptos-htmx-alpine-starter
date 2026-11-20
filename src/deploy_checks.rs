@@ -260,6 +260,6 @@ mod tests {
     fn a_value_still_todo_is_the_templates() {
         assert!(still_todo("TODO App"));
         assert!(still_todo("TODO: what the site is, in one sentence."));
-        assert!(!still_todo("Ljekarna Štefan"));
+        assert!(!still_todo("Example Shop"));
     }
 }

@@ -1003,7 +1003,7 @@ run.
 
 | Browser | Low bar | Why that version |
 |---|---|---|
-| desktop Chrome | 114 (May 2023) | first with popovers |
+| desktop Chrome | 114 (May 2023) | first with popovers (the template's own dialog is a modal `<dialog>`, opened there by the islands: `command` is Chrome 135's) |
 | Firefox | 128 (Jul 2024) | Tailwind v4's floor |
 | iOS | 17.5 (May 2024) | last iOS 17 |
 | Android | 15, Chrome 124 (Apr 2024) | Android 14's Chrome is 113, before popovers |

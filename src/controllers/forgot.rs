@@ -19,7 +19,7 @@ use loco_rs::prelude::*;
 use serde::Deserialize;
 
 use crate::{
-    controllers::cross_site,
+    controllers::cross_site::SameSite,
     mailers::auth::AuthMailer,
     middleware::rate_limit::auth_limited,
     models::users,
@@ -62,13 +62,11 @@ async fn page(State(ctx): State<AppContext>, req: Request) -> Result<Response> {
 /// `POST /forgot`: an account with the address gets the reset link; every
 /// post gets the same page.
 async fn submit(
+    _: SameSite,
     State(ctx): State<AppContext>,
     parts: Parts,
     Form(form): Form<Submitted>,
 ) -> Result<Response> {
-    if let Some(forbidden) = cross_site::refused(&parts.headers, "forgot") {
-        return Ok(forbidden);
-    }
     let req = Request::from_parts(parts, Body::empty());
     if let Ok(user) = users::Model::find_by_email(&ctx.db, &form.email).await {
         let user = user

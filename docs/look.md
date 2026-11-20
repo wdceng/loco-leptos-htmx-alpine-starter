@@ -12,17 +12,18 @@ One scale, lowest first. Every `z-` in the code is one of these.
 |---|---|
 | none | the page itself |
 | `z-20` | the skip link while it has focus (`src/views/layout.rs`) |
-| the top layer | a dialog (`Dialog`, a native popover), over everything, with no `z-` at all |
+| the top layer | a dialog (`Dialog`, a modal `<dialog>`), over everything, with no `z-` at all |
 
 - **A new part that floats takes a step here first.** Between two steps,
   leave room: the next is `z-10` under the skip link.
-- **Popovers need no `z-`:** the browser puts them in the top layer.
+- **The top layer needs no `z-`:** the browser puts a modal dialog and a
+  popover there.
 
 ## The parts
 
 | Part | Component | Notes |
 |---|---|---|
-| A dialog over the page | `Dialog`, `DialogCancel` | A native popover: Escape, a tap outside and Cancel close it, with no script of the site's |
+| A dialog over the page | `Dialog`, `DialogCancel`, opened by `opens` | A modal `<dialog>`: the page under it inert, the focus on Cancel; Escape, a press outside and Cancel close it |
 | The main button of a step that can't be undone | `DANGER_BUTTON` | `BUTTON`'s shape in the danger colour |
 | A button that leaves without doing the step | `QUIET_BUTTON` | A dialog's Cancel |
 | A part folded under its heading | `Fold` | The native `<details>` |
