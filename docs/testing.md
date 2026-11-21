@@ -609,9 +609,8 @@ Start on `/reset?token=x`, console and network tab open, then:
 3. Send the reset form with a short password: the form comes back with
    the reason, and the address stays `/reset?token=x`.
 
-Expected: no console errors, no CSP violations. With a screen reader the
-new title is read after each move. The request tests check the shell's
-markup (`the_shell_moves_between_pages_in_place`); the browser tests
+Expected: no console errors, no CSP violations. The request tests check
+the shell's markup (`the_shell_moves_between_pages_in_place`); the browser tests
 above check the swap, the focus, the scroll, a deploy and a gateway's 502.
 
 ### Rate limiting
