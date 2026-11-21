@@ -4,7 +4,7 @@ Read by `/ux-audit`. The starter has no pages of its own beyond sign-in and the 
 
 ## Users
 
-A visitor on a phone, a visitor on a desktop, someone signing up and back in, an admin with the mailed code, someone with a screen reader, someone on a slow network.
+A visitor on a phone, a visitor on a desktop, someone signing up and back in, an admin with the mailed code, someone on a slow network.
 
 ## Journeys
 

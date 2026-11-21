@@ -5,7 +5,7 @@ description: Use when the maintainer asks for a UX audit, a UI audit, a UI/UX re
 
 # UX audit
 
-An expert inspection of the site and the apps from the user's side: the users the project's list names (a shopper on a phone, one on a desktop, a staff member at work, a customer with an account, someone with a screen reader). Read-only. Not usability testing: it finds what breaks the guidelines, never why a real person gets stuck ("heuristic evaluations cannot replace user research", NN/g); that is a few real users watched, named in the report when a finding needs it.
+An expert inspection of the site and the apps from the user's side: the users the project's list names (a shopper on a phone, one on a desktop, a staff member at work, a customer with an account). Read-only. Not usability testing: it finds what breaks the guidelines, never why a real person gets stuck ("heuristic evaluations cannot replace user research", NN/g); that is a few real users watched, named in the report when a finding needs it.
 
 A change's own UI is `/review`'s (passes 1, 6, 7, 8, 17); this is the whole site at once. The backend has `/security-audit` and `/review`; nothing here repeats them. A native part's rung (web, a bridge, a native screen) and Apple's 4.2 are `/native-audit`'s; this checks how it feels.
 
