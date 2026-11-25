@@ -62,6 +62,9 @@ id=$(conf identifier)
 
 android_sdk=${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}
 adb="$android_sdk/platform-tools/adb"
+# An adb server this script starts holds as many files as e2e/run.sh's
+# (its top: chromedriver's leaked connections ran a 256 server out).
+ulimit -n 65536 2>/dev/null || ulimit -n "$(sysctl -n kern.maxfilesperproc)" 2>/dev/null || true
 export ANDROID_HOME=$android_sdk
 export NDK_HOME=${NDK_HOME:-$(find "$android_sdk/ndk" -maxdepth 1 -mindepth 1 -type d | sort | tail -1)}
 avds=$("$android_sdk/emulator/emulator" -list-avds)
