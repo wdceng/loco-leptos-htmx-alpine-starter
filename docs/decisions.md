@@ -87,6 +87,21 @@ change of mind gets a new line, and the old one moves to
 - 2026-10-28: **No Windows installer.** The app is a few MB that open the
   live site: the `.exe` alone is enough, so `nsis` is out of
   `bundle.targets` and NSIS needs no install.
+- 2026-11-25: **Android's activity takes what Tauri's template leaves to
+  the system, `gen/` edited by hand for it:** Back with no page left
+  sends the app to the background (`moveTaskToBack`, as Android 12 and up
+  does for an app's first screen; Back with a page left still the
+  page's on Android 7 to 12 too, below that app's floor of 15), the
+  cookies written to disk on
+  `onStop`, the process ended in `onDestroy` before Tauri's `exit()`, the
+  JNI methods kept from R8, and the launch in the start page's white.
+  Each seen in an islands app on this stack; tests in `src-tauri/src/lib.rs`
+  keep them through a `tauri android init`. Sources: Android's
+  [WebView guide](https://developer.android.com/develop/ui/views/layout/webapps/managing-webview),
+  [predictive Back](https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture),
+  [`CookieManager.flush`](https://developer.android.com/reference/android/webkit/CookieManager#flush())
+  and the [splash screen](https://developer.android.com/develop/ui/views/launch/splash-screen),
+  read 2026-11-25.
 
 ## Environments and builds
 

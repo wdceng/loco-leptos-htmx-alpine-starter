@@ -389,6 +389,132 @@ mod tests {
         );
     }
 
+    /// Every method of the activity Rust calls by name over JNI is kept in
+    /// the Android release build, whose R8 removes what no Kotlin calls
+    /// (`proguard-rules.pro`): each name a `call_method` here passes named
+    /// in the keep rule and declared in the activity, and the rule among
+    /// the release build's files.
+    #[test]
+    fn androids_release_keeps_every_method_rust_calls() {
+        let source = include_str!("lib.rs");
+        let call = concat!("call_", "method(");
+        let mut called: Vec<&str> = source
+            .split(call)
+            .skip(1)
+            .filter_map(|after| after.split('"').nth(1))
+            .collect();
+        called.sort_unstable();
+        called.dedup();
+        assert!(!called.is_empty(), "no call_method found");
+        let rules = include_str!("../gen/android/app/proguard-rules.pro");
+        let kept = rules
+            .split("-keepclassmembers class com.example.app.MainActivity {")
+            .nth(1)
+            .and_then(|rest| rest.split('}').next())
+            .expect("the activity's keep rule");
+        let kotlin =
+            include_str!("../gen/android/app/src/main/java/com/example/app/MainActivity.kt");
+        for name in &called {
+            assert!(
+                kept.contains(&format!(" {name}(")),
+                "{name} called over JNI and not kept: {kept}"
+            );
+            assert!(
+                kotlin.contains(&format!("fun {name}(")),
+                "{name} not in the activity"
+            );
+        }
+        let gradle = include_str!("../gen/android/app/build.gradle.kts");
+        assert!(
+            gradle.contains("include(\"**/*.pro\")"),
+            "the release build reads every .pro file"
+        );
+    }
+
+    /// Back reaches androidx's dispatcher on every Android the app runs on,
+    /// where Tauri's `AppPlugin` takes it first: Android 13 to 15 only where
+    /// the manifest asks, 16 and up by default. Without it Android 15's Back
+    /// went to `onBackPressed` alone and sent the app away with a menu open
+    /// (an islands app on this stack, 2026-11-22).
+    #[test]
+    fn android_takes_back_through_the_dispatcher() {
+        let manifest = include_str!("../gen/android/app/src/main/AndroidManifest.xml");
+        let application = manifest
+            .split_once("<application")
+            .and_then(|(_, rest)| rest.split_once('>'))
+            .map(|(attributes, _)| attributes)
+            .expect("the application");
+        assert!(
+            application.contains(r#"android:enableOnBackInvokedCallback="true""#),
+            "{application}"
+        );
+    }
+
+    /// The launch looks like the start page it opens on, by day and at
+    /// night: Android's window and splash, and the iPhone's launch screen,
+    /// in the start page's surface (`--surface`, offline/index.html, which
+    /// is always light), never the system's dark at night.
+    #[test]
+    fn the_launch_is_the_start_pages_surface() {
+        let page = include_str!("../offline/index.html");
+        let surface = page
+            .split_once("--surface: #")
+            .and_then(|(_, rest)| rest.get(..6))
+            .expect("the start page's --surface")
+            .to_ascii_uppercase();
+        let colors = include_str!("../gen/android/app/src/main/res/values/colors.xml");
+        assert!(
+            colors.contains(&format!(
+                r##"<color name="start_surface">#FF{surface}</color>"##
+            )),
+            "Android's start_surface is the start page's #{surface}"
+        );
+        for themes in [
+            include_str!("../gen/android/app/src/main/res/values/themes.xml"),
+            include_str!("../gen/android/app/src/main/res/values-night/themes.xml"),
+        ] {
+            for item in [
+                "android:windowBackground",
+                "android:windowSplashScreenBackground",
+            ] {
+                let line = themes
+                    .lines()
+                    .find(|line| line.contains(&format!(r#"<item name="{item}""#)))
+                    .unwrap_or_else(|| panic!("no {item}: {themes}"));
+                assert!(
+                    line.trim_end().ends_with(">@color/start_surface</item>"),
+                    "{item} in start_surface: {line}"
+                );
+            }
+        }
+        let storyboard = include_str!("../gen/apple/LaunchScreen.storyboard");
+        assert!(
+            !storyboard.contains("systemBackgroundColor"),
+            "the iPhone's launch follows the system's dark"
+        );
+        let color = storyboard
+            .split_once(r#"<color key="backgroundColor" "#)
+            .and_then(|(_, rest)| rest.split_once("/>"))
+            .map(|(attributes, _)| attributes)
+            .expect("the launch screen's background colour");
+        // Each channel as a fraction, however many decimals Xcode writes,
+        // within half a step of the start page's.
+        for (name, at) in [("red", 0), ("green", 2), ("blue", 4)] {
+            let wanted =
+                f64::from(u8::from_str_radix(&surface[at..at + 2], 16).expect("a hex colour"))
+                    / 255.0;
+            let found: f64 = color
+                .split_once(&format!(r#"{name}=""#))
+                .and_then(|(_, rest)| rest.split_once('"'))
+                .and_then(|(value, _)| value.parse().ok())
+                .unwrap_or_else(|| panic!("no {name} in {color}"));
+            assert!(
+                (found - wanted).abs() < 0.5 / 255.0,
+                "the iPhone's launch {name} {found}, the start page's #{surface}"
+            );
+        }
+    }
+
     /// The Android app's activity runs in a task of its own, so another
     /// app's cannot take its place there (task hijacking, OWASP MASTG); a
     /// manifest Tauri writes again would lose it.

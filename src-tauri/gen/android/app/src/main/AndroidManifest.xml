@@ -7,8 +7,13 @@
 
     <!-- Nothing of the app's in a cloud backup or carried to another phone:
          its webview keeps the session's cookie. Android 12 and up ignore
-         allowBackup for a transfer, so their rules too. -->
+         allowBackup for a transfer, so their rules too.
+         Back through androidx's dispatcher on Android 13 and up: 13 to 15
+         take it only when asked, 16 and up by default; without it Android
+         15's Back reached onBackPressed alone and left the app. Android 7
+         to 12 reach it through MainActivity's onBackPressed. -->
     <application
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"

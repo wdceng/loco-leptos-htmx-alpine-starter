@@ -1,6 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.app_native" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+        <!-- The launch the start page's surface (colors.xml), never the
+             system's dark at night; values-night the same. -->
+        <item name="android:windowBackground">@color/start_surface</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/start_surface</item>
     </style>
 </resources>
