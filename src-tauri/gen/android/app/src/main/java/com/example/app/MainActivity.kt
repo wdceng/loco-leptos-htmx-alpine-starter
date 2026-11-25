@@ -3,9 +3,11 @@ package com.example.app
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Process
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import androidx.core.graphics.ColorUtils
@@ -38,6 +40,42 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     this.webView = webView
+  }
+
+  // Back with no page left to go back to: the app goes to the background,
+  // as Android 12 and up does for an app's first screen, never ended. While
+  // a callback is on, Back goes to androidx's dispatcher, where Tauri's
+  // `AppPlugin` takes the page back: Android 7 to 12 call this straight
+  // from the key. The plugin calls this again with its own callback off
+  // once the page can't go back (tauri 2.12.5, AppPlugin.kt). An override,
+  // not a callback of its own: an always-on one took Back from the keyboard
+  // and the page (an islands app on this stack, 2026-11-19).
+  @Deprecated("Called by the system before Android 13, and by Tauri's AppPlugin")
+  override fun onBackPressed() {
+    if (onBackPressedDispatcher.hasEnabledCallbacks()) {
+      super.onBackPressed()
+    } else {
+      moveTaskToBack(true)
+    }
+  }
+
+  // The app out of sight: the cookies written to disk, the session's with
+  // them (`CookieManager.flush`). The webview writes them on a timer, and
+  // an app ended a few seconds after a sign-in came back signed out.
+  override fun onStop() {
+    super.onStop()
+    CookieManager.getInstance().flush()
+  }
+
+  // The activity ended for good: the process ended here at once, as Tauri
+  // would end it right after, but never through `exit()`, which on Android
+  // runs the system libraries' destructors while their threads still run
+  // (the WebView's render thread crashed in `libhwui`, 1 run in 10, an
+  // islands app on this stack, 2026-11-19). A turn remakes the activity
+  // and keeps the process.
+  override fun onDestroy() {
+    if (!isChangingConfigurations) Process.killProcess(Process.myPid())
+    super.onDestroy()
   }
 
   // wry hands its webview to setContentView: it goes inside the layout that

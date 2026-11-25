@@ -150,6 +150,9 @@
       const retry = document.getElementById("retry");
       let timer = 0;
       let checking = false;
+      // Whether the focus was on "Try again" as a shown check hid it, so a
+      // failure puts it back there, not on the page's top.
+      let refocus = false;
 
       // Only the site's own `ok` opens it; anything else, an error page
       // included, counts as no answer. `quiet`: the automatic retries keep
@@ -158,6 +161,9 @@
       // and that check's outcome takes it over.
       async function check(quiet) {
         if (!quiet) {
+          // A keyboard's focus on the button about to be hidden comes back
+          // to it too, whatever started the check (the network's return).
+          refocus = refocus || document.activeElement === retry;
           connecting.hidden = false;
           problem.hidden = true;
         }
@@ -185,6 +191,10 @@
           if (problemText.textContent !== text) problemText.textContent = text;
           connecting.hidden = true;
           problem.hidden = false;
+          if (refocus) {
+            refocus = false;
+            retry.focus();
+          }
           timer = setTimeout(check, RETRY_MS, true);
         } finally {
           clearTimeout(stop);
@@ -192,7 +202,12 @@
         }
       }
 
-      retry.addEventListener("click", () => check(false));
+      // A tap sets it itself: WebKit leaves the focus on the page's body
+      // after a tap on a button.
+      retry.addEventListener("click", () => {
+        refocus = true;
+        check(false);
+      });
       window.addEventListener("online", () => check(false));
       check(false);
     </script>

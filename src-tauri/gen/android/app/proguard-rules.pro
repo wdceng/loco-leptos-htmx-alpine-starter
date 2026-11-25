@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# The activity's methods the app's Rust calls by name over JNI
+# (src-tauri/src/lib.rs, `call_method`): no Kotlin calls them, so R8's full
+# mode takes them out of the release build (an islands app on this stack
+# lost five so, 2026-11-14). A test in src-tauri/src/lib.rs holds every name Rust
+# calls to this list.
+-keepclassmembers class com.example.app.MainActivity {
+    public void paintStatusBar();
+}
