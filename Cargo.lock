@@ -2421,8 +2421,6 @@ checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 [[package]]
 name = "leptos"
 version = "0.9.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cc814b3a2c6183629a1595538db463d9646cae8f62de9014e588c068905c7ce"
 dependencies = [
  "any_spawner",
  "base64 0.23.1",
@@ -2551,8 +2549,6 @@ dependencies = [
 [[package]]
 name = "leptos_macro"
 version = "0.9.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a54eaf7b0fdf6b1cc6fdd15b198cf2ad334e300ff79ce4be5a6a48cf2a23395"
 dependencies = [
  "attribute-derive",
  "convert_case 0.12.0",

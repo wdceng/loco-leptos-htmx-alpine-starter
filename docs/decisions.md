@@ -48,6 +48,16 @@ change of mind gets a new line, and the old one moves to
   the root, kept as long as the tab; so no island calls them, a job makes
   its callback once (`Job`, `src/islands.rs`), and a test refuses the
   helpers. `leptos/lazy` stays off: `#[island(lazy)]` hydrates without it.
+- 2026-11-25: **Leptos's `leptos` and `leptos_macro` vendored:** 0.9.0-rc1
+  as published, copied into `vendor/` and patched in by path (`Cargo.toml`,
+  `[patch.crates-io]`), with one fix each: a lazy island's loader
+  `fallible`, as a lazy route's (#4785), so a chunk that fails to load
+  rejects where it panicked and, under `panic = "abort"`, hung; and the
+  islands script going on past an island that fails, so the islands after
+  it wake (`Navigation`, after the home page's `IslandsCheck`). The same
+  copy as an islands app on this stack's, proven there first; reported
+  upstream (leptos-rs/leptos#5024). Dropped, `vendor/` with it, once a
+  Leptos release has the fix.
 - 2026-10-21: **One Reduce Motion rule, the scrollbar's room kept, no
   scroll anchoring, controls 44px tall.** Not a look but how pages behave:
   an islands app on this stack saw each go wrong (a move flashing the

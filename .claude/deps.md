@@ -29,6 +29,7 @@ In `.cargo/audit.toml`, each with its reason:
 
 - **sqlx #4434** (a connection a full disk left inside a transaction): `close_stuck` in `src/sql.rs`, through `sql::write`. Canary: `a_connection_stuck_in_a_transaction_is_closed_and_the_write_goes_on` (`tests/models/sql_pool.rs`). Fixed in sqlx 0.9.1 (#4473); once taken, `close_stuck` goes.
 - **htmx #4147 and #4182** (`parseHTMLUnsafe` dropping Leptos's comments, then refused by older Chrome): `delete Document.parseHTMLUnsafe` in `public/js/htmx-islands.js`. Ends once Chrome 156 is below the low bar and an htmx release has #4182's fix.
+- **leptos-rs/leptos#5024** (a lazy island whose chunk fails to load hung the islands script, every island after it asleep): `leptos` and `leptos_macro` 0.9.0-rc1 vendored with the fix (`vendor/`, `Cargo.toml`'s `[patch.crates-io]`). Canaries: `without_a_lazy_islands_chunk_the_islands_after_it_wake` (`e2e/tests/blocked.rs`) and `the_islands_loader_goes_on_past_an_island_that_fails` (`tests/requests/home.rs`). Ends with a Leptos release that has it.
 - **htmx #4193** (the history state wiped): `keep_scroll` merges `htmx: true` (`HTMX_KEY`, `src/islands.rs`); `e2e/tests/moves.rs` checks it. Ends with a release that has #4198.
 
 ## Last run

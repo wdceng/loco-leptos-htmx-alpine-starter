@@ -257,6 +257,37 @@ async fn the_islands_loader_waits_for_idle_two_seconds_at_most() {
     .await;
 }
 
+/// Leptos's islands loader goes on past an island that fails, a lazy one
+/// whose chunk did not load, so the islands after it still wake: the
+/// vendored `leptos`' (Cargo.toml, [patch.crates-io]), its lazy islands'
+/// loader the vendored `leptos_macro`'s, both in the lock with no registry
+/// source (the macro's half shows only in a browser, e2e/tests/blocked.rs).
+/// Should this fail after a Leptos update, read the new loader: the patch
+/// may be gone with the fix upstream (leptos-rs/leptos#5024).
+#[tokio::test]
+#[serial]
+async fn the_islands_loader_goes_on_past_an_island_that_fails() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let page = request.get("/").await.text();
+        assert!(
+            page.contains("console.error(`Could not hydrate the island ${id}:`, e);"),
+            "{page}"
+        );
+    })
+    .await;
+    let lock = std::fs::read_to_string("Cargo.lock").unwrap_or_default();
+    for name in ["leptos", "leptos_macro"] {
+        let entry = lock
+            .split("[[package]]")
+            .find(|entry| entry.contains(&format!("\nname = \"{name}\"\n")))
+            .unwrap_or_default();
+        assert!(
+            !entry.is_empty() && !entry.contains("source = "),
+            "{name} not from vendor/: {entry}"
+        );
+    }
+}
+
 /// The page reaches the glass (`viewport-fit=cover`), and the safe-area
 /// helper marks the camera's side before the stylesheet draws anything:
 /// before its link, and without `defer` or `async`, which would run it

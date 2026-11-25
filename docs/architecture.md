@@ -95,7 +95,11 @@ load, so not one island runs. `src/assets.rs` refuses to boot that build,
 and one whose main script names a loader the site folder lacks.
 cargo-leptos 0.3.12 or newer: 0.3.11 got hashed split names wrong in two
 ways (`development.md`, "Lazy islands"). The home page's `IslandsCheck`
-keeps the split path in use, so CI builds and checks it.
+keeps the split path in use, so CI builds and checks it. A lazy island
+whose chunk fails to load (a bad network, a blocker) stays asleep alone,
+its failure said in the console, the islands after it waking: Leptos's own
+loader panicked and hung its islands script, fixed in the vendored `leptos`
+and `leptos_macro` (`decisions.md`, 2026-11-25).
 
 **Moves in place (htmx 4, Alpine)** - The shell's `#page` region boosts
 every link and form in it (`hx-boost`), so htmx fetches the next page and

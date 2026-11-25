@@ -150,7 +150,9 @@ so the suite runs in about a second.
   (doctype, `lang="en"`), the app name (`APP_NAME`), exactly one `<h1>`, the
   skip link and its target, the islands loader script, the wasm file it
   loads (`app.wasm`, guarding the compile-time `LEPTOS_OUTPUT_NAME` gotcha),
-  and the footer year computed at render time.
+  the loader going on past an island that fails, the vendored `leptos` and
+  `leptos_macro` in use (`Cargo.toml`'s `[patch.crates-io]`), and the footer
+  year computed at render time.
 - `tests/requests/not_found.rs`: unknown paths. As HTML, a 404 with the
   not-found page inside the shell and `cache-control: no-store`. Without an
   HTML `Accept`, a 404 with one line of text and no page. Both carry the
@@ -521,7 +523,8 @@ and an emulator's is the one of its Chrome's version
   slower than the 15 s limit is cut there with a 408 (`slow_post`).
 - **Blocked** (`e2e/tests/blocked.rs`, Chrome and Edge): with htmx refused
   a link and a form are page loads; with Alpine or the WASM refused a move
-  and a refused form still stay in place.
+  and a refused form still stay in place; with a lazy island's chunk
+  refused the islands after it still wake.
 - **Memory** (`e2e/tests/memory.rs`): an island that leaves is freed; twenty
   moves and twenty Back and Forward steps keep the documents, detached
   nodes, listeners, JS heap and WASM memory flat, measured three times.

@@ -1,0 +1,216 @@
+[package]
+name = "leptos"
+version = "0.9.0-rc1"
+authors = ["Greg Johnston"]
+license = "MIT"
+repository = "https://github.com/leptos-rs/leptos"
+homepage = "https://leptos.dev/"
+description = "Leptos is a full-stack, isomorphic Rust web framework leveraging fine-grained reactivity to build declarative user interfaces."
+readme = "../README.md"
+rust-version.workspace = true
+edition.workspace = true
+
+[dependencies]
+throw_error = { workspace = true }
+any_spawner = { workspace = true, features = [
+  "wasm-bindgen",
+  "futures-executor",
+] }
+base64 = { optional = true, workspace = true, default-features = true }
+cfg-if = { workspace = true, default-features = true }
+hydration_context = { workspace = true }
+either_of = { workspace = true }
+leptos_dom = { workspace = true }
+leptos_hot_reload = { workspace = true }
+leptos_macro = { workspace = true }
+leptos_server = { workspace = true, features = ["tachys"] }
+leptos_config = { workspace = true }
+leptos-spin-macro = { optional = true, workspace = true, default-features = true }
+oco_ref = { workspace = true }
+or_poisoned = { workspace = true }
+paste = { workspace = true, default-features = true }
+rand = { optional = true, workspace = true, default-features = true }
+# NOTE: While not used directly, `getrandom`'s `wasm_js` feature is needed when `rand` is used on WASM to
+#       avoid a compilation error
+getrandom = { optional = true, workspace = true, default-features = true }
+reactive_graph = { workspace = true, features = ["serde"] }
+rustc-hash = { workspace = true, default-features = true }
+tachys = { workspace = true, features = [
+  "reactive_graph",
+  "reactive_stores",
+  "oco",
+] }
+thiserror = { workspace = true, default-features = true }
+tracing = { optional = true, workspace = true, default-features = true }
+typed-builder = { workspace = true, default-features = true }
+typed-builder-macro = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+server_fn = { workspace = true, features = ["form-redirects", "browser"] }
+web-sys = { features = [
+  "ShadowRoot",
+  "ShadowRootInit",
+  "ShadowRootMode",
+], workspace = true, default-features = true }
+wasm-bindgen = { workspace = true, default-features = true }
+wasm-bindgen-futures = { workspace = true, default-features = true }
+serde_qs = { workspace = true, default-features = true }
+slotmap = { workspace = true, default-features = true }
+futures = { workspace = true, default-features = true }
+send_wrapper = { workspace = true, default-features = true }
+wasm_split_helpers = { workspace = true, default-features = true }
+subsecond = { workspace = true, default-features = true, optional = true }
+dioxus-cli-config = { workspace = true, default-features = true, optional = true }
+dioxus-devtools = { workspace = true, default-features = true, optional = true }
+
+[features]
+hydration = [
+  "reactive_graph/hydration",
+  "leptos_server/hydration",
+  "hydration_context/browser",
+  "leptos_dom/hydration",
+]
+csr = ["leptos_macro/csr", "reactive_graph/effects", "getrandom?/wasm_js"]
+hydrate = [
+  "leptos_macro/hydrate",
+  "hydration",
+  "tachys/hydrate",
+  "reactive_graph/effects",
+  "getrandom?/wasm_js",
+]
+default-tls = ["server_fn/default-tls"]
+rustls = ["server_fn/rustls"]
+ssr = [
+  "leptos_macro/ssr",
+  "leptos_server/ssr",
+  "server_fn/ssr",
+  "hydration",
+  "tachys/ssr",
+]
+nightly = ["leptos_macro/nightly", "reactive_graph/nightly", "tachys/nightly"]
+rkyv = ["server_fn/rkyv", "leptos_server/rkyv"]
+bitcode = ["server_fn/bitcode"]
+bitcode-serde = ["server_fn/bitcode-serde"]
+serde-lite = ["server_fn/serde-lite", "leptos_server/serde-lite"]
+cbor = ["server_fn/cbor"]
+msgpack = ["server_fn/msgpack"]
+postcard = ["server_fn/postcard"]
+multipart = ["server_fn/multipart"]
+tracing = [
+  "dep:tracing",
+  "reactive_graph/tracing",
+  "tachys/tracing",
+  "leptos_macro/tracing",
+  "leptos_dom/tracing",
+  "leptos_server/tracing",
+]
+nonce = ["base64", "rand", "dep:getrandom"]
+spin = ["leptos-spin-macro"]
+islands = ["leptos_macro/islands"]
+trace-component-props = [
+  "leptos_macro/trace-component-props",
+  "leptos_dom/trace-component-props",
+]
+delegation = ["tachys/delegation"]
+islands-router = ["tachys/mark_branches"]
+subsecond = [
+  "reactive_graph/subsecond",
+  "dep:subsecond",
+  "dep:dioxus-cli-config",
+  "dep:dioxus-devtools",
+  "web-sys/Location",
+  "web-sys/MessageEvent",
+  "web-sys/WebSocket",
+  "web-sys/Window",
+]
+lazy = ["tachys/lazy"]
+
+[dev-dependencies]
+tokio = { features = [
+  "rt-multi-thread",
+  "macros",
+], workspace = true, default-features = true }
+tokio-test = { workspace = true, default-features = true }
+any_spawner = { workspace = true, features = ["futures-executor", "tokio"] }
+
+[build-dependencies]
+rustc_version = { workspace = true, default-features = true }
+
+# Having an erasure feature rather than normal --cfg erase_components for the proc macro crate is a workaround for this rust issue:
+# https://github.com/rust-lang/cargo/issues/4423
+# TLDR proc macros will ignore RUSTFLAGS when --target is specified on the cargo command.
+# This works around the issue by the non proc-macro crate which does see RUSTFLAGS enabling the replacement feature on the proc-macro crate, which wouldn't.
+# This is automatic as long as the leptos crate is depended upon,
+# downstream usage should never manually enable this feature.
+[target.'cfg(erase_components)'.dependencies]
+leptos_macro = { workspace = true, features = ["__internal_erase_components"] }
+
+[package.metadata.cargo-all-features]
+denylist = [
+  "tracing",
+  "template_macro",
+  "rustls",
+  "default-tls",
+  "wasm-bindgen",
+  "rkyv",                  # was causing clippy issues on nightly
+  "trace-component-props",
+  "spin",
+  "islands",
+  "bitcode",
+  "bitcode-serde",
+  "serde-lite",
+  "cbor",
+  "msgpack",
+  "postcard",
+  "multipart",
+]
+skip_feature_sets = [
+  [
+    "csr",
+    "ssr",
+  ],
+  [
+    "csr",
+    "hydrate",
+  ],
+  [
+    "ssr",
+    "hydrate",
+  ],
+  [
+    "serde",
+    "serde-lite",
+  ],
+  [
+    "serde",
+    "miniserde",
+  ],
+  [
+    "serde",
+    "rkyv",
+  ],
+  [
+    "miniserde",
+    "rkyv",
+  ],
+  [
+    "serde-lite",
+    "rkyv",
+  ],
+  [
+    "default-tls",
+    "rustls",
+  ],
+]
+max_combination_size = 2
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--generate-link-to-definition", "--cfg", "erase_components"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(leptos_debuginfo)',
+  'cfg(rustc_nightly)',
+  'cfg(erase_components)',
+] }

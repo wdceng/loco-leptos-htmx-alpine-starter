@@ -1,4 +1,7 @@
 [workspace]
+# The Leptos crates as published, patched in below: not ours to build, lint
+# or format as members.
+exclude = ["vendor"]
 
 [package]
 name = "app"
@@ -135,8 +138,9 @@ ts-rs = { version = "12.0.1", features = [
 # choice, not a `cargo update`. It brings the islands loader's idle timeout
 # (#4978; Chrome 114 to 123 could start no island without it) and an
 # island's state freed through `$$dispose` on its element (#4953,
-# public/js/htmx-islands.js calls it), so neither a fork nor a collector of
-# our own. `leptos/lazy` stays off: `#[island(lazy)]` hydrates without it.
+# public/js/htmx-islands.js calls it), so no collector of our own; its
+# `leptos` and `leptos_macro` patched from vendor/ ([patch.crates-io]).
+# `leptos/lazy` stays off: `#[island(lazy)]` hydrates without it.
 # `leptos_axum` brings tower-http 0.7 beside Loco's 0.6, one crate built
 # twice until Loco moves.
 # ---------------------------------------------------------------------------
@@ -341,6 +345,18 @@ reload-port = 3001
 bin-features = ["ssr"]
 lib-features = ["hydrate"]
 lib-profile-release = "wasm-release"
+
+# Leptos 0.9.0-rc1's `leptos` and `leptos_macro` as published, copied into
+# vendor/ with one fix each (2026-11-25): a lazy island's loader fallible,
+# so a refused chunk rejects where it panicked and hung, and the islands
+# script going on past an island that fails, so the islands after it in
+# the page still wake (leptos-rs/leptos#5024). The other Leptos crates
+# from crates.io. Drop this block and vendor/ once a Leptos release has
+# the fix (the refused-chunk test in e2e/tests/blocked.rs); a newer Leptos
+# makes Cargo warn that the patch was not used.
+[patch.crates-io]
+leptos = { path = "vendor/leptos" }
+leptos_macro = { path = "vendor/leptos_macro" }
 
 # Dev: fast incremental rebuilds of our own code; dependencies are optimised
 # once and cached, so they cost nothing on later builds.
