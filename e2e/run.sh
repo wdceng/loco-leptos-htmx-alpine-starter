@@ -98,6 +98,14 @@
 # browser's window; Safari always does.
 set -euo pipefail
 
+# The open files every process the lane starts may hold, raised from the
+# 256 a macOS shell starts with: chromedriver keeps a connection to the
+# adb server open for each of its commands, and the adb server, which
+# never raises its own limit, ran out 250 to 340 tests into an Android
+# lane ("Too many open files", then no session; an islands app on this
+# stack, 2026-11-24). The Mac's cap for a process is kern.maxfilesperproc.
+ulimit -n 65536 2>/dev/null || ulimit -n "$(sysctl -n kern.maxfilesperproc)" 2>/dev/null || true
+
 browser=${1:?"usage: e2e/run.sh chrome|edge|firefox|safari|iphone|ipad|ipad-air|android|android-tablet|desktop|phones|tablets|main|all, a low-bar lane (the name and -low) or low, a beta lane (a desktop browser's name and -beta) or beta [cargo nextest arguments]"}
 shift
 # A low-bar or beta lane does what its top-bar twin does, `kind` its twin's
@@ -177,7 +185,7 @@ summary() {
     echo "   BROKEN: no session on this lane since $(cat "$e2e/$lane/no-session")"
     echo "   the tests after it failed at once; the list: target/e2e/$lane/nextest.txt"
   else
-    sed -n '/^ *Summary \[/,$p' "$out" 2>/dev/null | grep -E '^ *(FAIL|FLAKY|TIMEOUT|SIG[A-Z]+) ' || true
+    sed -n '/^ *Summary \[/,$p' "$out" 2>/dev/null | grep -E '^ *(TRY [0-9]+ )?(FAIL|FLAKY|TIMEOUT|SIG[A-Z]+) ' || true
   fi
   # The five slowest, so a test that grows slow shows without a search.
   grep -sE '^ +PASS \[' "$out" | sed -E 's/^ +PASS \[ *([0-9.]+)s\] \([^)]*\) [^ ]+ /   \1 s  /' |
@@ -547,6 +555,17 @@ print(found[0] if found else "")' "$runtime" "$device_name")
         echo "emulator $emulator_version crashes in its OpenGL layer: back to 37.2.12 (docs/prerequisites.md, the devices)" >&2
         exit 1
       fi
+      # The adb server started again under the limit above where no device
+      # is on it: a server a shell at 256 started keeps 256 for good (adb
+      # never raises it). With a device on it, another lane's emulator or
+      # a phone on USB (`cargo tauri android dev`, its `adb reverse`), it
+      # stays.
+      if "$adb" devices 2>/dev/null | grep -qE $'\t(device|offline|unauthorized)$'; then
+        echo "the adb server kept as found, a device on it" >&2
+      else
+        "$adb" kill-server >/dev/null 2>&1 || true
+        "$adb" start-server >/dev/null 2>&1 || true
+      fi
       # With no window, on the Mac's GPU (`-gpu host`): `auto` drew in
       # software, on the cores the tests need. `E2E_EMULATOR_GPU` names
       # another drawing for a probe (`swiftshader_indirect`, in software).
@@ -880,6 +899,43 @@ if (($# == 0)); then
   else
     filter=(-E 'not test(/^boot::/) and not test(/^app::/)')
   fi
+elif [[ $kind == app ]]; then
+  # A caller's filter on the app's lane narrowed to the app's own tests:
+  # the browsers' tests ran inside the app, where no second tab or page
+  # header of the site's stands. Each filterset gets the app's prefix; a
+  # name alone gets it as a filterset of its own, which nextest ANDs with
+  # the names.
+  given=()
+  own='test(/^app::/)'
+  narrowed=
+  while (($#)); do
+    case $1 in
+      -E | --filterset)
+        if (($# >= 2)); then
+          given+=("$1" "($2) and $own")
+          narrowed=1
+          shift 2
+          continue
+        fi
+        ;;
+      --filterset=*)
+        given+=("--filterset=(${1#--filterset=}) and $own")
+        narrowed=1
+        shift
+        continue
+        ;;
+      -E=*)
+        given+=("-E=(${1#-E=}) and $own")
+        narrowed=1
+        shift
+        continue
+        ;;
+    esac
+    given+=("$1")
+    shift
+  done
+  set -- "${given[@]}"
+  [[ -n $narrowed ]] || filter=(-E "$own")
 fi
 cargo nextest run --manifest-path e2e/Cargo.toml --profile "$browser" "${filter[@]}" "$@" 2>&1 |
   tee "$lane/nextest.txt" || failed=1

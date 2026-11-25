@@ -131,7 +131,14 @@ impl Browser {
                 } else {
                     "ms:edgeOptions"
                 };
-                let mut args = vec!["--window-size=1280,900"];
+                // Never backgrounded: a page Chrome takes for covered goes
+                // hidden mid-test and draws no frame, a fade frozen (Chrome
+                // 124, in an islands app on this stack); Puppeteer's defaults.
+                let mut args = vec![
+                    "--window-size=1280,900",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-renderer-backgrounding",
+                ];
                 if !headed {
                     args.push("--headless=new");
                 }
@@ -211,6 +218,16 @@ mod tests {
     fn a_low_or_beta_lane_starts_its_own_binary() {
         let caps = Value::from(Browser::Chrome.capabilities(false, "", Some("/old/chrome")));
         assert_eq!(caps["goog:chromeOptions"]["binary"], "/old/chrome");
+        assert_eq!(
+            caps["goog:chromeOptions"]["args"],
+            serde_json::json!([
+                "--window-size=1280,900",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--headless=new"
+            ]),
+            "never backgrounded, headless unless watched"
+        );
         let caps = Value::from(Browser::Firefox.capabilities(true, "", None));
         assert_eq!(caps["webSocketUrl"], true, "BiDi on, to hear the page");
         assert_eq!(caps["moz:firefoxOptions"]["args"], serde_json::json!([]));

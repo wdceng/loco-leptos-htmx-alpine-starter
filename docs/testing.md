@@ -443,6 +443,10 @@ As an islands app on this stack tests its own.
   this stack's own app lane:** never two of them at once.
 - **What it doesn't test:** the iPhone's app, and the links to other apps
   (`tel:`, `mailto:`), which `links.sh` taps by hand.
+- **A filter given to it runs the app's tests alone** (`run.sh` adds
+  `and test(/^app::/)` to each `-E`, and `-E 'test(/^app::/)'` beside a
+  name alone): the browsers' tests ran inside the app, where no second tab
+  or site header stands.
 
 The script builds the site into `target/e2e` with `--split`, once. Each
 lane then starts its own site (`LOCO_ENV=e2e`, `config/e2e.yaml`, a fresh
@@ -452,6 +456,12 @@ and called flaky if it then passes. It never touches the watch loop's
 `target/site`, port 5150 or database, so it runs beside `cargo leptos
 watch`. Each lane's files are in `target/e2e/<lane>/`: `run.txt`,
 `server.log`, `driver.log`, `skipped.txt` and `failures/`.
+
+- **Every lane raises its open files** (`ulimit -n` at `run.sh`'s top):
+  chromedriver keeps a connection to the adb server for each command, and
+  an adb server a shell started at 256 ran out mid-lane ("Too many open
+  files", then no session). An Android lane starts the adb server again
+  under the raised limit where no device is on it, an emulator or a phone.
 
 Each lane has its own Mailpit, which the site sends to (SMTP on 1100 plus
 the lane's number, its web side on 8100 plus it, `config/e2e.yaml`'s

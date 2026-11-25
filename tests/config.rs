@@ -855,3 +855,48 @@ fn the_apps_start_page_may_ask_its_site() {
         "`connect-src` in tauri.conf.json must be the start page's `SITE`, alone"
     );
 }
+
+/// The browser tests' open files raised before a lane starts a process, and
+/// the adb server started again under that limit only where no device is
+/// on it: chromedriver's connections to an adb server a shell
+/// at 256 had started broke Android lanes mid-way (e2e/run.sh's top).
+#[test]
+fn every_lane_raises_its_open_files_and_adb_starts_under_them() {
+    let read = |path: &str| std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let run_sh = read("e2e/run.sh");
+    let lines: Vec<&str> = run_sh.lines().collect();
+    let raised = lines
+        .iter()
+        .position(|line| line.starts_with("ulimit -n "))
+        .expect("run.sh raises no open-files limit");
+    // A command at a line's start, never a word in a message or comment.
+    let first_process = lines
+        .iter()
+        .position(|line| {
+            let line = line.trim_start();
+            line.starts_with("\"$adb\"") || line.starts_with("cargo ")
+        })
+        .expect("run.sh starts no process");
+    assert!(
+        raised < first_process,
+        "run.sh raises the open-files limit only at line {}, after a process at {}",
+        raised + 1,
+        first_process + 1
+    );
+    let restart = lines
+        .iter()
+        .position(|line| line.contains("kill-server"))
+        .expect("run.sh never starts the adb server again under the limit");
+    assert!(
+        lines[restart.saturating_sub(4)..restart]
+            .iter()
+            .any(|line| line.contains("devices") && line.contains("(device|offline|unauthorized)")),
+        "run.sh kills the adb server without checking that no device is on it"
+    );
+    assert!(
+        read("src-tauri/devices.sh")
+            .lines()
+            .any(|line| line.starts_with("ulimit -n ")),
+        "devices.sh starts an adb server at the shell's 256 files"
+    );
+}
