@@ -121,3 +121,43 @@ async fn without_the_wasm_a_move_and_a_refused_form_stay_in_place() {
     })
     .await;
 }
+
+/// Whether the island `component` is on the page and awake: `$$dispose`
+/// set on its element once it has hydrated ([`Page::ready`]); its
+/// `data-component` the name and a hash (`IslandsCheck_6030e2c1e49579a5`).
+fn awake(component: &str) -> String {
+    format!(
+        "const island = document.querySelector(
+             \"leptos-island[data-component^='{component}_']\");
+         return island ? typeof island.$$dispose === 'function' : 'missing'"
+    )
+}
+
+/// The home page's lazy island's chunk refused, its loader's own file
+/// (`IslandsCheck`, a copy in the cache too): it stays asleep, and the
+/// shell's `Navigation` after it in the page still wakes (the vendored
+/// Leptos fix, Cargo.toml's [patch.crates-io]).
+#[tokio::test]
+async fn without_a_lazy_islands_chunk_the_islands_after_it_wake() {
+    browse(|page| async move {
+        if !can_block(&page) {
+            return Ok(());
+        }
+        page.allow_errors();
+        page.block(&["*/pkg/split_islands_check_loader_*"]).await?;
+        page.devtools(
+            "Network.setCacheDisabled",
+            serde_json::json!({ "cacheDisabled": true }),
+        )
+        .await?;
+        page.load("/").await?;
+        page.until("Navigation awake", &awake("Navigation")).await?;
+        assert_eq!(
+            page.eval(&awake("IslandsCheck")).await?,
+            Value::from(false),
+            "the refused island on the page and asleep"
+        );
+        Ok(())
+    })
+    .await;
+}

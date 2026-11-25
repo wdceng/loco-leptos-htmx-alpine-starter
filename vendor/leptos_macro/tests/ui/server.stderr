@@ -1,0 +1,47 @@
+error: positional argument follows keyword argument
+ --> tests/ui/server.rs:3:32
+  |
+3 | #[server(endpoint = "my_path", FooBar)]
+  |                                ^^^^^^
+
+error: keyword argument repeated: `endpoint`
+ --> tests/ui/server.rs:9:30
+  |
+9 | #[server(endpoint = "first", endpoint = "second")]
+  |                              ^^^^^^^^
+
+error: expected string literal
+  --> tests/ui/server.rs:14:15
+   |
+14 | #[server(Foo, Bar)]
+   |               ^^^
+
+error: expected string literal
+  --> tests/ui/server.rs:18:15
+   |
+18 | #[server(Foo, Bar, bazz)]
+   |               ^^^
+
+error: expected identifier
+  --> tests/ui/server.rs:23:10
+   |
+23 | #[server("Foo")]
+   |          ^^^^^
+
+error: expected `,`
+  --> tests/ui/server.rs:28:14
+   |
+28 | #[server(Foo Bar)]
+   |              ^^^
+
+error: unexpected extra argument
+  --> tests/ui/server.rs:33:49
+   |
+33 | #[server(FooBar, "/foo/bar", "Cbor", "my_path", "extra")]
+   |                                                 ^^^^^^^
+
+error: Encoding not found.
+  --> tests/ui/server.rs:38:21
+   |
+38 | #[server(encoding = "wrong")]
+   |                     ^^^^^^^

@@ -351,7 +351,8 @@ whether it's released:
 tools/upstream.sh
 ```
 
-It watches htmx #4182 (`parseHTMLUnsafe`, Chrome 124 to 145).
+It watches htmx #4182 (`parseHTMLUnsafe`, Chrome 124 to 145) and Leptos
+#5024 (a lazy island's failed chunk, the vendored `leptos`).
 
 ## Environments
 
