@@ -460,6 +460,9 @@ When (`docs/decisions.md`, Working):
 - **A full `cargo update` fails while a `Cargo.toml` requirement is under
   two weeks old** (a security fix taken early): it waits for that date, or
   runs with the same `CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE=0`.
+- **A full `cargo update` moves a fix taken early in the lock alone back
+  down** (a crate under two weeks old that no `Cargo.toml` names): run
+  `cargo audit` after it, and take the fix again on its one command.
 - **The development Mac first**, then one Android lane
   (`e2e/run.sh android`), then the test machine.
 - **One major upgrade at a time**, each its own commit; the versions within
