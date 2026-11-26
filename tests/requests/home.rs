@@ -171,7 +171,7 @@ async fn the_shell_moves_between_pages_in_place() {
             "/vendor/hx-alpine-compat-4.0.1.min.js",
             "/vendor/hx-preload-4.0.1.min.js",
             "/js/htmx-islands.js",
-            "/vendor/alpinejs-csp-3.17.4.min.js",
+            "/vendor/alpinejs-csp-3.17.5.min.js",
         ];
         let at: Vec<usize> = order
             .iter()
