@@ -87,7 +87,7 @@ src-tauri/linux.sh
 | Server, database, accounts, e-mail, jobs | Loco's Rest API starter | Loco 1.3.1 (SQLite only), Sea-ORM 2.0.4 |
 | Pages, rendered on the server | Leptos in islands mode | 0.9.0-rc1, its release candidate |
 | Moves between pages, without a reload | htmx 4 | 4.0.1, its preload and alpine-compat extensions 4.0.1 |
-| Small page state, like a menu | Alpine, its CSP build | 3.17.4 |
+| Small page state, like a menu | Alpine, its CSP build | 3.17.5 |
 | Styling | Tailwind v4, its default look | v4, the one cargo-leptos downloads, unpinned |
 | The app's own queries | SQLx `query!`, checked at compile time | 0.9.0 |
 | The app on desktops and phones | Tauri 2 | 2.12.5 |
