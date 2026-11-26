@@ -4,6 +4,16 @@ loco-tool = "run --"
 
 playground = "run --example playground"
 
+# The two-week rule held by cargo itself (stable since 1.100, Cargo's own
+# changelog): the resolver passes over a crate version under 14 days old
+# unless Cargo.lock holds it and the update leaves it locked, in the app's
+# and the browser tests' workspaces too, which read this file from below.
+# A security fix taken at once lifts it on its one command:
+# `CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE=0 cargo update -p <crate> --precise <version>`;
+# a full `cargo update` fails until that fix is two weeks old.
+[registry]
+global-min-publish-age = "14 days"
+
 [env]
 # Leptos picks the wasm file name at compile time from this variable: with it
 # set the page loads `app.wasm`, which is what cargo-leptos writes; without

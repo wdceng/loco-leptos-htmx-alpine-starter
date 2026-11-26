@@ -449,7 +449,17 @@ When (`docs/decisions.md`, Working):
 - **Monthly**, the first Monday: the crates, the tools above, the Android
   SDK (emulator, images, platform tools), Xcode and its Simulators.
 - **A release at least two weeks old.** A newer one waits for next month.
+  For the crates cargo holds it (`.cargo/config.toml`, cargo 1.100+).
 - **Security fixes at once**, outside the month: a crate's advisory, macOS.
+  A crate's fix under two weeks old lifts cargo's rule on its one command:
+
+  ```bash
+  CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE=0 cargo update -p <crate> --precise <version>
+  ```
+
+- **A full `cargo update` fails while a `Cargo.toml` requirement is under
+  two weeks old** (a security fix taken early): it waits for that date, or
+  runs with the same `CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE=0`.
 - **The development Mac first**, then one Android lane
   (`e2e/run.sh android`), then the test machine.
 - **One major upgrade at a time**, each its own commit; the versions within

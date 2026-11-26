@@ -575,6 +575,13 @@ change of mind gets a new line, and the old one moves to
   (`docs/prerequisites.md`, Updates). Emulator 37.2.13, two days old, cost
   a day: it crashed every Android lane on both Macs. Security fixes don't
   wait. As an islands app on this stack.
+- 2026-11-26: **Cargo holds the two weeks for the crates**
+  (`[registry] global-min-publish-age = "14 days"`, `.cargo/config.toml`,
+  cargo 1.100 or newer): a resolve passes over a release under 14 days
+  old unless `Cargo.lock` holds it and the update leaves it locked, in
+  all three workspaces. A security fix lifts it on its one command
+  (`docs/prerequisites.md`, Updates); a full `cargo update` fails until
+  that fix is two weeks old. As an islands app on this stack.
 - 2026-10-03: **Generators run in a scratch `git worktree`**, their files
   brought over with editing tools, so every change shows as a diff.
 - 2026-10-05: **The maintainer commits:**
